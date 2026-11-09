@@ -27,6 +27,12 @@ var inventory: Array = []
 ## 어종 도감: 어종 id → 가장 큰 기록(cm)
 var dex := {}
 
+## 낚시 장비 (GearDB 참고)
+var equipped_rod := GearDB.DEFAULT_ROD
+var equipped_reel := GearDB.DEFAULT_REEL
+var owned_rods: Array = [GearDB.DEFAULT_ROD]
+var owned_reels: Array = [GearDB.DEFAULT_REEL]
+
 ## 하루 시간 (자정부터 몇 분째인지). 07:00 = 420
 var time_minutes := 7 * 60
 ## 지금 있는 장소 id (Locations.LIST 참고)

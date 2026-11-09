@@ -37,6 +37,11 @@ var forgiving := true # 첫 물고기를 잡기 전까지 판정을 너그럽게
 var force_first_fish := "bolak" # 첫 물고기 고정
 var catch_count := 0
 
+## 장비 능력치 (GearDB.apply로 넣는다)
+var cast_mult := 1.0 # 최대 던지기 거리
+var reel_mult := 1.0 # 감는 속도
+var tension_mult := 1.0 # 장력이 오르는 정도 (작을수록 버티기 쉬움)
+
 var rng := RandomNumberGenerator.new()
 
 var _power_dir := 1.0
@@ -63,7 +68,7 @@ func press() -> void:
 
 func release() -> void:
 	if state == State.CHARGING:
-		cast_power = maxf(power, 0.08)
+		cast_power = maxf(power, 0.08) * cast_mult
 		progress = 0.0
 		state = State.CASTING
 
@@ -158,8 +163,8 @@ func _update_reel(dt: float, held: bool) -> void:
 
 	var pull := fish_pull()
 	if held:
-		tension += (0.35 + pull * 0.75) * dt
-		distance -= REEL_SPEED * dt * (1.0 - pull * 0.35)
+		tension += (0.35 + pull * 0.75) * dt * tension_mult
+		distance -= REEL_SPEED * dt * (1.0 - pull * 0.35) * reel_mult
 	else:
 		tension -= TENSION_DOWN * dt
 		distance += 0.06 * pull * dt

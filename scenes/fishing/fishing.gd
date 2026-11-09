@@ -22,7 +22,7 @@ var minutes := float(START_MIN)
 
 var _bg: SeaBackdrop
 var _layer: Control
-var _player: ArtSlot
+var _player: PlayerRig
 var _clock: Label
 var _count: Label
 var _hint: Label
@@ -46,9 +46,8 @@ const FEET := Vector2(0.5, 0.985) # 주인공 발 위치
 const FLOAT_NEAR_SCALE := 1.0
 const FLOAT_FAR_SCALE := 0.4
 
-## SD 주인공 뒷모습 그림(player_sd_back.png) 기준 위치. 그림 크기 대비 비율이다.
+## SD 주인공 몸 그림 크기 (낚싯대와 릴은 PlayerRig가 따로 붙인다)
 const PLAYER_SIZE := Vector2(150.0, 230.0)
-const SD_TIP := Vector2(0.95, 0.02) # 낚싯대 끝 (그림이 오면 맞춘다)
 
 var _held := false
 var _in_story := true
@@ -70,8 +69,11 @@ func _ready() -> void:
 	_bg.art_blend = BG_ART_BLEND
 	add_child(_bg)
 
-	_player = ArtSlot.make("player_sd_back", "SD 주인공 뒷모습", PLAYER_SIZE)
+	_player = PlayerRig.new()
+	_player.size = PLAYER_SIZE
+	_player.set_gear(GameState.equipped_rod, GameState.equipped_reel)
 	add_child(_player)
+	GearDB.apply(logic, GameState.equipped_rod, GameState.equipped_reel)
 
 	_layer = Control.new()
 	_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -326,26 +328,33 @@ func _place_player() -> void:
 	_player.size = PLAYER_SIZE
 	var feet := _bg.art_point(FEET)
 	_player.position = feet - Vector2(_player.size.x / 2.0, _player.size.y)
-	_player.pivot_offset = Vector2(_player.size.x / 2.0, _player.size.y)
-	# 상태에 따라 몸을 살짝 기울여 낚싯대 움직임을 표현한다 (-는 뒤로 젖힘)
-	var tilt := 0.0
+	# 상태에 따라 낚싯대 각도와 몸 기울기를 바꾼다 (낚싯대 -90은 수직 위)
+	var rod := -58.0
+	var lean := 0.0
 	match logic.state:
 		FishingLogic.State.CHARGING:
-			tilt = -8.0 * logic.power
+			rod = lerpf(-70.0, -105.0, logic.power) # 머리 뒤로 젖힘
+			lean = -4.0 * logic.power
 		FishingLogic.State.CASTING:
-			tilt = lerpf(-8.0 * logic.cast_power, 5.0, minf(logic.progress * 2.5, 1.0))
-		FishingLogic.State.REELING:
-			tilt = -2.0 - logic.fish_pull() * 4.0
+			var k := minf(logic.progress * 2.5, 1.0)
+			rod = lerpf(-105.0, -38.0, k) # 앞으로 휘두름
+			lean = lerpf(-4.0, 3.0, k)
+		FishingLogic.State.WAITING:
+			rod = -48.0
 		FishingLogic.State.BITE:
-			tilt = 2.0
-	_player.rotation = lerp_angle(_player.rotation, deg_to_rad(tilt), 0.25)
+			rod = -44.0
+		FishingLogic.State.REELING:
+			rod = -72.0 + logic.fish_pull() * 14.0 # 세우고 버티다 당기면 숙여짐
+			lean = -2.0
+	_player.rod_angle = lerpf(_player.rod_angle, rod, 0.3)
+	_player.lean = lerpf(_player.lean, lean, 0.25)
 
 
 # ─── 낚싯대, 줄, 찌 ─────────────────────────────────
 # 낚싯줄과 찌는 게임 판정을 보여 주는 요소라 선과 점으로만 그린다.
 
 func _rod_tip() -> Vector2:
-	return _player.get_transform() * (SD_TIP * _player.size)
+	return _player.tip_global()
 
 
 ## 바다 위 깊이(0 = 방파제 앞, 1 = 가장 멀리)를 화면 좌표로 바꾼다.

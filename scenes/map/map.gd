@@ -90,6 +90,10 @@ func _build_hud() -> void:
 	h.add_child(_clock)
 	_money = UiKit.label("", 22, UiKit.CREAM)
 	h.add_child(_money)
+	var gear_btn := UiKit.button("장비", false)
+	gear_btn.custom_minimum_size = Vector2(90, 40)
+	gear_btn.pressed.connect(_open_gear)
+	h.add_child(gear_btn)
 	_refresh_hud()
 
 	_toast = UiKit.shadowed(UiKit.label("", 22, UiKit.CREAM, HORIZONTAL_ALIGNMENT_CENTER), Color(0, 0, 0, 0.7), 2)
@@ -181,3 +185,63 @@ func _show_toast(text: String) -> void:
 	var tw := create_tween()
 	tw.tween_interval(2.0)
 	tw.tween_property(_toast, "modulate:a", 0.0, 0.6)
+
+
+# ─── 장비 ───────────────────────────────────────────
+# 가진 낚싯대와 릴 중에서 고른다. 고른 장비는 낚시 화면의 SD 주인공과 낚시 능력치에 바로 반영된다.
+
+var _gear_panel: PanelContainer
+
+
+func _open_gear() -> void:
+	if _gear_panel:
+		_gear_panel.queue_free()
+	_gear_panel = PanelContainer.new()
+	_gear_panel.add_theme_stylebox_override("panel", UiKit.box(UiKit.PAPER, 16, UiKit.NAVY, 2, 24))
+	_gear_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_gear_panel.custom_minimum_size = Vector2(560, 0)
+	_gear_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_gear_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	add_child(_gear_panel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	_gear_panel.add_child(v)
+	v.add_child(UiKit.label("낚시 장비", 30, UiKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UiKit.label("낚싯대", 22, UiKit.TEAL))
+	for id in GameState.owned_rods:
+		var r := GearDB.rod(id)
+		v.add_child(_gear_row(r.name, "던지기 %d%%  버티기 +%d%%" % [int(r.cast * 100), int(r.strength * 100)], id == GameState.equipped_rod, func():
+			GameState.equipped_rod = id
+			_open_gear()))
+	v.add_child(UiKit.label("릴", 22, UiKit.TEAL))
+	for id in GameState.owned_reels:
+		var l := GearDB.reel(id)
+		v.add_child(_gear_row(l.name, "감기 %d%%  드랙 +%d%%" % [int(l.speed * 100), int(l.drag * 100)], id == GameState.equipped_reel, func():
+			GameState.equipped_reel = id
+			_open_gear()))
+	v.add_child(UiKit.label("새 장비는 준호네 낚시방에서 살 수 있어요.", 18, UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	var close := UiKit.button("닫기")
+	close.pressed.connect(func():
+		_gear_panel.queue_free()
+		_gear_panel = null)
+	row.add_child(close)
+	v.add_child(row)
+
+
+func _gear_row(title: String, stats: String, equipped: bool, on_pick: Callable) -> HBoxContainer:
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 12)
+	var name_label := UiKit.label(title, 20, UiKit.INK)
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(name_label)
+	h.add_child(UiKit.label(stats, 17, UiKit.INK_SOFT))
+	if equipped:
+		h.add_child(UiKit.label("사용 중", 18, UiKit.CORAL))
+	else:
+		var b := UiKit.button("장착", false)
+		b.custom_minimum_size = Vector2(80, 36)
+		b.pressed.connect(on_pick)
+		h.add_child(b)
+	return h

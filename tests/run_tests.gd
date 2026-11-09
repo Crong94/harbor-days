@@ -13,6 +13,7 @@ func _init() -> void:
 	_test_fish_db()
 	_test_fishing()
 	_test_locations()
+	_test_gear()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -197,3 +198,40 @@ func _test_locations() -> void:
 	_eq(Locations.is_unlocked("shop", {}), true, "식당은 처음부터 열림")
 	_eq(Locations.is_unlocked("rocks", {}), false, "갯바위는 잠김")
 	_eq(Locations.is_unlocked("rocks", {"learned_tide": true}), true, "물때 배우면 갯바위 열림")
+
+
+func _test_gear() -> void:
+	var S := FishingLogic.State
+	for id in GearDB.RODS:
+		var r := GearDB.rod(id)
+		_eq(r.grip < r.seat and r.seat < r.tip and r.tip <= 1.0, true, "%s 낚싯대 위치 순서" % id)
+	_eq(GearDB.rod("없는것").name, GearDB.rod(GearDB.DEFAULT_ROD).name, "없는 낚싯대는 기본값")
+
+	var basic := _new_logic(9)
+	GearDB.apply(basic, "old_float", "cheap_spinning")
+	var good := _new_logic(9)
+	GearDB.apply(good, "carbon_rock", "lever_brake")
+	_eq(good.tension_mult < basic.tension_mult, true, "좋은 장비는 장력이 덜 오름")
+	_eq(good.reel_mult > basic.reel_mult, true, "좋은 릴은 빨리 감김")
+
+	# 같은 힘으로 던지면 좋은 낚싯대가 더 멀리
+	for l in [basic, good]:
+		l.press()
+		_run_until(l, [], func(_x): return true, 0.5)
+		l.release()
+	_eq(good.cast_power > basic.cast_power, true, "좋은 낚싯대가 더 멀리 (%.2f > %.2f)" % [good.cast_power, basic.cast_power])
+
+	# 계속 감기만 할 때 좋은 장비가 더 오래 버틴다
+	var times := []
+	for gear in [["old_float", "cheap_spinning"], ["carbon_rock", "lever_brake"]]:
+		var l := _new_logic(11)
+		GearDB.apply(l, gear[0], gear[1])
+		_cast(l)
+		_run_until(l, [S.BITE], func(_x): return false, 10.0)
+		l.press()
+		var t := 0.0
+		while l.state == S.REELING and t < 30.0:
+			l.update(1.0 / 60.0, true)
+			t += 1.0 / 60.0
+		times.append(t)
+	_eq(times[1] > times[0], true, "좋은 장비가 더 오래 버팀 (%.1fs > %.1fs)" % [times[1], times[0]])
