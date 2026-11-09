@@ -12,6 +12,7 @@ func _init() -> void:
 	_test_won()
 	_test_fish_db()
 	_test_fishing()
+	_test_locations()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -178,3 +179,21 @@ func _test_fishing() -> void:
 		if l4.state == S.CAUGHT:
 			caught += 1
 	_eq(caught >= 16, true, "보통 판정에서도 요령 있게 하면 대부분 잡힘 (%d/20)" % caught)
+
+
+func _test_locations() -> void:
+	for id in Locations.LIST:
+		var loc := Locations.get_loc(id)
+		var p: Vector2 = loc.pos
+		_eq(p.x >= 0.0 and p.x <= 1.0 and p.y >= 0.0 and p.y <= 1.0, true, "%s 위치 범위" % id)
+		var scene: String = loc.scene
+		if not scene.is_empty():
+			_eq(ResourceLoader.exists(scene), true, "%s 장면 파일 존재" % id)
+	_eq(Locations.travel_minutes("shop", "shop"), 0, "같은 장소 이동 0분")
+	_eq(Locations.travel_minutes("shop", "diner"), 5, "옆 가게는 최소 5분")
+	_eq(Locations.travel_minutes("shop", "breakwater"), Locations.travel_minutes("breakwater", "shop"), "이동 시간 대칭")
+	_eq(Locations.travel_minutes("shop", "breakwater") % 5, 0, "5분 단위")
+	_eq(Locations.travel_minutes("shop", "island") > Locations.travel_minutes("shop", "rocks"), true, "섬은 배 시간 추가")
+	_eq(Locations.is_unlocked("shop", {}), true, "식당은 처음부터 열림")
+	_eq(Locations.is_unlocked("rocks", {}), false, "갯바위는 잠김")
+	_eq(Locations.is_unlocked("rocks", {"learned_tide": true}), true, "물때 배우면 갯바위 열림")

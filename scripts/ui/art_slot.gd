@@ -37,17 +37,23 @@ func set_art(id: String, label: String) -> void:
 	queue_redraw()
 
 
+## 그림이 실제로 그려지는 영역 (비율 유지로 생기는 여백 제외). 그림이 없으면 칸 전체.
+func content_rect() -> Rect2:
+	if not _tex:
+		return Rect2(Vector2.ZERO, size)
+	var ts := _tex.get_size()
+	var k := minf(size.x / ts.x, size.y / ts.y)
+	var ds := ts * k
+	return Rect2((size - ds) / 2.0, ds)
+
+
 func _draw() -> void:
 	var r := Rect2(Vector2.ZERO, size)
 	if _tex:
 		# 비율을 유지하며 칸 안에 맞춘다
-		var ts := _tex.get_size()
-		var k := minf(size.x / ts.x, size.y / ts.y)
-		var ds := ts * k
-		var pos := (size - ds) / 2.0
 		if flip_h:
 			draw_set_transform(Vector2(size.x, 0), 0.0, Vector2(-1, 1))
-		draw_texture_rect(_tex, Rect2(pos, ds), false)
+		draw_texture_rect(_tex, content_rect(), false)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		return
 	draw_rect(r, Color(0.6, 0.6, 0.6, 0.35))

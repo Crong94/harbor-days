@@ -2,7 +2,7 @@ extends Control
 ## 챕터 2: 새벽 북쪽 방파제 찌낚시. 첫 물고기는 볼락.
 ## 규칙은 FishingLogic, 이 스크립트는 입력, 시간, 화면 표시만 맡는다.
 
-const NEXT_SCENE := "res://scenes/title/title.tscn" # 〈첫 번째 손님〉이 생기면 바꾼다
+const NEXT_SCENE := "res://scenes/map/map.tscn" # 〈첫 번째 손님〉이 생기면 식당으로 바꾼다
 
 const START_MIN := 5 * 60 # 05:00
 const END_MIN := 7 * 60 # 07:00
@@ -283,8 +283,12 @@ func _build_summary() -> void:
 	v.add_child(_summary_list)
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	var btn := UiKit.button("식당으로")
-	btn.pressed.connect(func(): UiKit.go_to(self, NEXT_SCENE))
+	var btn := UiKit.button("마을 지도로")
+	btn.pressed.connect(func():
+		GameState.flags["first_fishing_done"] = true
+		GameState.time_minutes = END_MIN
+		GameState.current_location = "breakwater"
+		UiKit.go_to(self, NEXT_SCENE))
 	row.add_child(btn)
 	v.add_child(row)
 	_summary.hide()

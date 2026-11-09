@@ -44,6 +44,7 @@ docs              기획 문서
 scenes/title      타이틀
 scenes/prologue   사직서(플레이어명 입력), 간판(가게명 입력)
 scenes/fishing    새벽 방파제 찌낚시 (첫 물고기 볼락)
+scenes/map        마을 지도. 장소 선택, 이동 시간, 해금 (scripts/data/locations.gd)
 scripts/fishing   FishingLogic (낚시 규칙, 헤드리스 테스트 가능)
 scripts/data      FishDB (어종 데이터)
 assets/art        사용자에게 받은 그림 (docs/그림_요청_목록.md)

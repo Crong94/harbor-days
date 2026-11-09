@@ -27,6 +27,24 @@ var inventory: Array = []
 ## 어종 도감: 어종 id → 가장 큰 기록(cm)
 var dex := {}
 
+## 하루 시간 (자정부터 몇 분째인지). 07:00 = 420
+var time_minutes := 7 * 60
+## 지금 있는 장소 id (Locations.LIST 참고)
+var current_location := "shop"
+## 스토리 진행 표시. 장소 해금 조건 등에 쓴다. 예: flags["met_mansu"] = true
+var flags := {}
+
+
+func has_flag(name: String) -> bool:
+	return flags.get(name, false)
+
+
+func clock_text() -> String:
+	var m := time_minutes % (24 * 60)
+	var h := m / 60
+	var period := "새벽" if h < 6 else ("오전" if h < 12 else ("오후" if h < 18 else "저녁" if h < 21 else "밤"))
+	return "%d일차 %s %02d:%02d" % [day, period, h, m % 60]
+
 var _player_regex := RegEx.create_from_string("^[가-힣a-zA-Z0-9]+$")
 var _shop_regex := RegEx.create_from_string("^[가-힣a-zA-Z0-9 ]+$")
 
