@@ -20,11 +20,13 @@ var _dialogue: DialogueBox
 var _guest: ArtSlot
 var _cook_panel: PanelContainer
 var _cook_title: Label
+var _cook_step: PanelContainer
 var _cook_art: ArtSlot
 var _cook_hint: Label
+var _stars: Label
 var _gauge: Control
-var _ledger: PanelContainer
-var _ledger_text: Label
+var _ledger: Control
+var _ledger_rows: VBoxContainer
 var _ledger_btn: Button
 var _held := false
 var _sizzle := 0.0
@@ -33,20 +35,39 @@ var _sizzle := 0.0
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var base := ColorRect.new()
-	base.color = UiKit.WOOD_DARK
+	base.color = Color("2b2420")
 	base.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	base.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(base)
-	var bg := ArtSlot.make("bg_shop_inside_day", "식당 내부 (아침)", Vector2.ZERO)
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	var bg := UiKit.cover_art("bg_shop_inside_day")
+	if bg:
+		add_child(bg)
+	add_child(UiKit.shade([[0.0, 0.5], [0.2, 0.0], [0.7, 0.0], [1.0, 0.6]], Color("1a1410")))
 
-	_guest = ArtSlot.make("npc_sundeok", "최순덕 초상화", Vector2(300, 420))
-	_guest.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	_guest.offset_left = -400
-	_guest.offset_right = -100
-	_guest.offset_top = -650
-	_guest.offset_bottom = -230
+	# 위: 가게 이름과 시각
+	var bar := UiKit.hbox(UiKit.SPACE_SM)
+	bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	bar.offset_left = 20
+	bar.offset_right = -20
+	bar.offset_top = 24
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(bar)
+	bar.add_child(UiKit.chip("", GameState.shop_name, "icon_shop"))
+	bar.add_child(UiKit.spacer())
+	bar.add_child(UiKit.chip("", "오전 07:30", "icon_clock"))
+	if not bg:
+		var note := UiKit.text("식당 내부 그림 준비 중 · bg_shop_inside_day", "caption", Color(1, 1, 1, 0.35), HORIZONTAL_ALIGNMENT_CENTER)
+		note.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+		note.offset_top = 92
+		add_child(note)
+
+	# 손님 초상화 (화면 가운데 위)
+	_guest = ArtSlot.make("npc_sundeok", "최순덕", Vector2(420, 560))
+	_guest.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_guest.offset_left = -210
+	_guest.offset_right = 210
+	_guest.offset_top = 210
+	_guest.offset_bottom = 770
 	_guest.hide()
 	add_child(_guest)
 
@@ -131,6 +152,7 @@ func _on_dialogue_finished() -> void:
 func _start_cooking() -> void:
 	step = Step.COOK
 	_cook_title.text = _recipe.get("name", "생선구이")
+	UiKit.set_chip(_cook_step, "1 / 2 간 맞추기")
 	_cook_art.set_art("kitchen/grill", "화로")
 	_cook_hint.text = "꾹 누르면 %s을 뿌려요. 적당하다 싶을 때 손을 떼요" % Catalog.flavor(cook.flavor).get("tool", "소금")
 	_cook_panel.show()
@@ -143,6 +165,7 @@ func _on_phase_changed() -> void:
 			_held = false
 			Sound.play_sfx("tap")
 			_cook_hint.text = "노릇하게 익었을 때 눌러서 불에서 내려요"
+			UiKit.set_chip(_cook_step, "2 / 2 굽기")
 			_sizzle = 0.0
 		CookingLogic.Phase.DONE:
 			_held = false
@@ -153,7 +176,11 @@ func _served() -> void:
 	step = Step.SERVED
 	Sound.play_sfx("good" if cook.stars() >= 3 else "okay")
 	_cook_art.set_art(Catalog.dish_art(_recipe.get("id", "")), _recipe.get("name", "생선구이"))
-	_cook_hint.text = "★".repeat(cook.stars()) + "☆".repeat(3 - cook.stars())
+	_cook_hint.text = {3: "완벽해요", 2: "괜찮아요", 1: "아쉬워요"}.get(cook.stars(), "")
+	UiKit.set_chip(_cook_step, "완성")
+	_stars.text = "★".repeat(cook.stars()) + "☆".repeat(3 - cook.stars())
+	_stars.show()
+	UiKit.pop_in(_cook_panel)
 	_gauge.hide()
 	var grill_line := {
 		"good": "겉은 노릇하고 속은 촉촉하다.",
@@ -205,15 +232,14 @@ func _show_ledger() -> void:
 	_guest.hide()
 	Sound.play_sfx("coin")
 	var profit := GameState.sales_today - GameState.spent_today
-	_ledger_text.text = "\n".join([
-		"매출 %s" % GameState.format_won(GameState.sales_today),
-		"지출 %s (크릴 미끼, 가스비)" % GameState.format_won(GameState.spent_today),
-		"순이익 %s" % GameState.format_won(profit),
-		"",
-		"\"이 정도면... 해볼 만하겠는데?\"",
-	])
+	for c in _ledger_rows.get_children():
+		c.queue_free()
+	_ledger_rows.add_child(_ledger_row("매출", "볼락구이 1접시", "+" + GameState.format_won(GameState.sales_today), UiKit.SEA))
+	_ledger_rows.add_child(_ledger_row("지출", "크릴 미끼, 가스비", "-" + GameState.format_won(GameState.spent_today), UiKit.DANGER))
+	_ledger_rows.add_child(UiKit.divider())
+	_ledger_rows.add_child(_ledger_row("순이익", "", GameState.format_won(profit), UiKit.INK, true))
 	_ledger.show()
-	UiKit.fade_in(_ledger, 0.5)
+	UiKit.fade_in(_ledger, 0.4)
 	_ledger_btn.grab_focus()
 
 
@@ -228,71 +254,96 @@ func _next_day() -> void:
 # ─── 화면 구성 ──────────────────────────────────────
 
 func _build_cook_panel() -> void:
-	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	center.offset_bottom = -200 # 대사창 자리
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(center)
-	_cook_panel = PanelContainer.new()
-	_cook_panel.add_theme_stylebox_override("panel", UiKit.box(UiKit.PAPER, 16, UiKit.MUSTARD, 3, 24))
-	_cook_panel.custom_minimum_size = Vector2(560, 0)
+	var holder := CenterContainer.new()
+	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	holder.offset_top = 100
+	holder.offset_bottom = -280 # 대사창 자리
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(holder)
+	_cook_panel = UiKit.paper_panel(28)
+	UiKit.elevate(_cook_panel.get_theme_stylebox("panel"), 3)
+	_cook_panel.custom_minimum_size = Vector2(640, 0)
 	_cook_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	center.add_child(_cook_panel)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 10)
+	holder.add_child(_cook_panel)
+	var v := UiKit.vbox(UiKit.SPACE_MD)
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_cook_panel.add_child(v)
-	_cook_title = UiKit.label("", UiKit.SIZE_HEADING, UiKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	v.add_child(_cook_title)
-	_cook_art = ArtSlot.make("kitchen/grill", "화로", Vector2(380, 230))
-	_cook_art.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	v.add_child(_cook_art)
+	var head := UiKit.hbox(UiKit.SPACE_MD)
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cook_title = UiKit.text("", "h1", UiKit.INK)
+	head.add_child(_cook_title)
+	head.add_child(UiKit.spacer())
+	_cook_step = UiKit.chip("", "", "", false)
+	head.add_child(_cook_step)
+	v.add_child(head)
+	var art_box := PanelContainer.new()
+	art_box.add_theme_stylebox_override("panel", UiKit.inset_box(UiKit.SPACE_LG, UiKit.RADIUS_LG))
+	art_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(art_box)
+	_cook_art = ArtSlot.make("kitchen/grill", "화로", Vector2(540, 320))
+	art_box.add_child(_cook_art)
+	_stars = UiKit.text("", "h1", UiKit.SUN, HORIZONTAL_ALIGNMENT_CENTER)
+	_stars.add_theme_font_override("font", UiKit.font("bold"))
+	_stars.hide()
+	v.add_child(_stars)
 	_gauge = Control.new()
-	_gauge.custom_minimum_size = Vector2(480, 56)
+	_gauge.custom_minimum_size = Vector2(0, 64)
 	_gauge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_gauge.draw.connect(_draw_gauge)
 	v.add_child(_gauge)
-	_cook_hint = UiKit.label("", 22, UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER)
+	_cook_hint = UiKit.paragraph("", "body", UiKit.INK_SOFT, 0.0, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(_cook_hint)
 	_cook_panel.hide()
 
 
 ## 판정 게이지. 간 맞추기는 뿌린 양만 보여 주고(감으로 친다), 굽기는 노릇한 구간을 보여 준다.
 func _draw_gauge() -> void:
-	var r := Rect2(Vector2(0, 26), Vector2(_gauge.size.x, 24))
-	var font := _gauge.get_theme_default_font()
-	_gauge.draw_rect(r, Color(0, 0, 0, 0.15))
+	var font := UiKit.font("semibold")
+	var r := Rect2(Vector2(0, 34), Vector2(_gauge.size.x, 24))
 	if cook.phase == CookingLogic.Phase.SEASON:
-		_gauge.draw_string(font, Vector2(0, 18), Catalog.flavor(cook.flavor).get("name", "간"), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, UiKit.INK_SOFT)
-		_gauge.draw_rect(Rect2(r.position, Vector2(r.size.x * cook.amount, r.size.y)), UiKit.TEAL)
+		_gauge.draw_string(font, Vector2(0, 20), Catalog.flavor(cook.flavor).get("name", "간"), HORIZONTAL_ALIGNMENT_LEFT, -1, 17, UiKit.INK_SOFT)
+		UiKit.draw_bar(_gauge, r, cook.amount, UiKit.SEA, false)
 	else:
-		_gauge.draw_string(font, Vector2(0, 18), "익은 정도", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, UiKit.INK_SOFT)
-		var g := CookingLogic.GRILL_GOOD
-		_gauge.draw_rect(Rect2(r.position + Vector2(r.size.x * g.x, 0), Vector2(r.size.x * (g.y - g.x), r.size.y)), Color(UiKit.MUSTARD, 0.45))
-		var col := UiKit.CORAL if cook.doneness > g.y else UiKit.WOOD
-		_gauge.draw_rect(Rect2(r.position, Vector2(r.size.x * cook.doneness, r.size.y)), col)
-	_gauge.draw_rect(r, UiKit.INK, false, 2.0)
+		_gauge.draw_string(font, Vector2(0, 20), "익은 정도", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, UiKit.INK_SOFT)
+		var col := UiKit.CORAL if cook.doneness > CookingLogic.GRILL_GOOD.y else UiKit.WOOD
+		UiKit.draw_bar(_gauge, r, cook.doneness, col, false, CookingLogic.GRILL_GOOD)
 
 
 func _build_ledger() -> void:
+	_ledger = Control.new()
+	_ledger.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_ledger)
+	_ledger.add_child(UiKit.scrim())
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(center)
-	_ledger = PanelContainer.new()
-	_ledger.add_theme_stylebox_override("panel", UiKit.box(UiKit.PAPER, 16, UiKit.NAVY, 2, 32))
-	_ledger.custom_minimum_size = Vector2(520, 0)
-	center.add_child(_ledger)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 14)
-	_ledger.add_child(v)
-	v.add_child(UiKit.label("장부 첫 줄", UiKit.SIZE_HEADING, UiKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
-	_ledger_text = UiKit.label("", 22, UiKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	v.add_child(_ledger_text)
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_ledger_btn = UiKit.button("다음 날로")
+	_ledger.add_child(center)
+	var panel := UiKit.paper_panel(36)
+	UiKit.elevate(panel.get_theme_stylebox("panel"), 3)
+	panel.custom_minimum_size = Vector2(620, 0)
+	center.add_child(panel)
+	var v := UiKit.vbox(UiKit.SPACE_LG)
+	panel.add_child(v)
+	v.add_child(UiKit.badge("1일차 밤", UiKit.NAVY_DEEP, UiKit.FOAM))
+	v.add_child(UiKit.text("장부 첫 줄", "h1", UiKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+	_ledger_rows = UiKit.vbox(UiKit.SPACE_SM)
+	v.add_child(_ledger_rows)
+	var quote := UiKit.text("\"이 정도면... 해볼 만하겠는데?\"", "body", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER)
+	quote.add_theme_font_override("font", UiKit.font("serif"))
+	v.add_child(quote)
+	_ledger_btn = UiKit.action("다음 날로")
+	_ledger_btn.custom_minimum_size.y = 60
 	_ledger_btn.pressed.connect(_next_day)
-	row.add_child(_ledger_btn)
-	v.add_child(row)
+	v.add_child(_ledger_btn)
 	_ledger.hide()
+
+
+## 장부 한 줄: 항목, 설명, 금액
+func _ledger_row(key: String, note: String, amount: String, color: Color, strong := false) -> HBoxContainer:
+	var h := UiKit.hbox(UiKit.SPACE_MD)
+	h.add_child(UiKit.text(key, "title" if strong else "body", UiKit.INK))
+	if not note.is_empty():
+		h.add_child(UiKit.text(note, "caption", UiKit.INK_MUTED))
+	h.add_child(UiKit.spacer())
+	var a := UiKit.text(amount, "h2" if strong else "title", color)
+	h.add_child(a)
+	return h

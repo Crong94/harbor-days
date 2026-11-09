@@ -13,7 +13,8 @@
 ## 지금까지 상황 (코드 환경, 내 PC 로컬 git, 원격 레포 없음)
 - 프로젝트 루트: `C:\Users\<USER>\Desktop\오늘의 바다` (브랜치 main). 클라우드에서 만든 것을 bundle로 옮겨 왔다 (`docs/LOCAL_SETUP.md`)
 - `docs/ref/`에 참조 그림이 이미 들어 있다
-- 엔진: Godot 4.4.1 Standard, GDScript, 2D, 1280x720. Godot 실행 파일 위치는 사용자에게 한 번 물어서 확인한다 (PATH에 없을 수 있음)
+- 엔진: Godot 4.4.1 Standard, GDScript, 2D, **세로 720x1280** (PC 창 540x960). Godot 위치는 아래 1번 참고
+- UI: `docs/UI_디자인_시스템.md` 물빛 유리 + 종이 혼합, Pretendard + 고운바탕. 모든 화면을 이 규칙으로 다시 짰다 (2026-11-09)
 - 먼저 읽을 것: `CLAUDE.md` (작업 규칙), `docs/LOCAL_SETUP.md`, `docs/그림_요청_목록.md`, `docs/찌낚시_동작_조사.md`, `docs/물고기_그림_목록.md`, 기획서 `docs/오늘의바다_시나리오_v3.md`
 - 참조 그림 원본은 git에 없다. 사용자가 드라이브 `오늘의바다_백업/ref`를 `docs/ref/`에 풀어 둔다 (없으면 요청)
 - 만든 것
@@ -29,14 +30,15 @@
   - 조사 자동 처리 대사 템플릿 `{player|이/가}` 등, 기본 이름 한바다 / 오늘의 식탁
   - 테스트 171개 (`tests/run_tests.gd`)
 - 바다 한 접시(이전 게임, Godot 4 + C#) APK에서 가져온 것: 소리 36개, 어종 71종과 레시피 50개 데이터(`assets/data`, `Catalog`), 요리 50접시, 조리도구, 화로 등 주방, 재료, 장비 아이콘. 자세한 건 CLAUDE.md의 〈바다 한 접시 자료〉
-- 받은 그림 중 게임에 들어간 것: `player_sd_body.png`, `rod_old_float.png`, `bg_fishing_dawn.jpg`, `fish_bolak.png`(세밀화), 임시 `fish_mangsang.png`·`fish_noraemi.png`(아이콘풍 시트 조각)
+- 받은 그림 중 게임에 들어간 것: `player_sd_body.png`, `rod_old_float.png`, `bg_fishing_dawn.jpg`, 물고기 3종 `fish_bolak.png`·`fish_mangsang.png`·`fish_noraemi.png`(모두 사용자 시트 조각). 임시 세로 배경 `bg_fishing_night`, `bg_fishing_day`, `map_village`, `bg_tackle_shop`(바다 한 접시 그림)
 
 ## 확정된 결정
 - 제목 〈오늘의 바다〉, 주인공 1994년 2월생, 2020년 3월 만 26세 첫 취업, 7년 차 퇴사
 - 엔진 Godot 4. GitHub는 계정 정지 문제가 풀릴 때까지 쓰지 않는다 (remote, push, Actions 금지). 로컬 커밋만
 - 화풍: 깔끔한 2D 셀 채색 코지 게임 스타일 (수채화는 접음: 사용자가 요즘 트렌드에 맞는 깔끔한 그림을 원함)
 - 주인공 얼굴 기준: 1차 시안 B + 옅은 수염. 낚시 화면의 주인공은 SD 2.5등신 뒷모습
-- 물고기 그림은 **세밀화풍** (아이콘풍 시트는 임시)
+- 물고기 그림은 **사용자 시트 그림**으로 통일 (세밀화 볼락은 이질적이라 접음)
+- 화면은 세로 모바일. 마을 지도는 오늘의 바다 전용 세로 지도로 새로 뽑는다
 - 낚시 화면은 방파제 끝에서 바다를 보는 뒤쪽 시점, 바다가 넓게 보이게
 - 그림은 절대 직접 만들지 않는다. 코드로 그리는 장식 그림도 새로 만들지 않는다 (사용자가 코드 그림을 촌스럽다고 함). 낚싯줄, 찌, 게이지 같은 판정 표시만 선으로 그린다
 - 백업: `./tools/backup.sh`(Git Bash)로 bundle을 만들어 사용자가 드라이브 `오늘의바다_백업`에 올린다. 그림 원본은 git에 넣지 않는다
@@ -61,7 +63,7 @@
    - 프롬프트 9 `rod_starter_float.png` 결과 대기 중 (참조: `docs/ref/낚싯대_낡은릴찌.png`, 같은 구도로 디자인만 변경. 새 남색 광택 몸통, 검은 EVA 그립, 은색 릴시트와 가이드, 하늘색 띠 두 줄). 다음 `rod_carbon_rock.png`
    - 릴 3종 `reel_cheap_spinning.png`, `reel_spinning_2500.png`, `reel_lever_brake.png` (옆모습, 위쪽 가운데가 낚싯대에 붙는 다리, 투명)
    - `bg_fishing_morning.jpg`: `bg_fishing_dawn`과 같은 구도의 아침 (밝기만큼 섞임. 참조 `docs/ref/낚시화면_새벽_2차.png`)
-   - 망상어, 노래미 세밀화 (참조 `docs/ref/볼락_세밀화.png`)
+   - **세로 그림 세트** (`docs/그림_요청_목록.md` 〈세로 화면 그림〉): 마을 지도, 타이틀, 새벽 낚시, 사무실, 식당 외관과 간판, 식당 내부, 순덕, 준호, UI 아이콘
    - 새 장면용: `bg_shop_inside_day`(식당 내부), `npc_sundeok`(최순덕), `bg_tackle_shop`, `npc_junho` (`docs/그림_요청_목록.md`)
    - 그 뒤: 마을 지도 `map_village`, 식당 외관, 항구 (프롬프트 초안 `docs/배경_지도_프롬프트.md`, 화풍은 클린 셀 채색으로)
    - 그림이 오면 위치 비율을 그림에 맞춘다 (낚싯대 grip/seat/tip/axis는 gear_db, 손 위치는 player_rig HAND, 배경은 fishing.gd의 WATER_NEAR_Y 등)

@@ -1,81 +1,92 @@
 extends Control
-## 챕터 1: 낡은 나무판에 가게 이름을 쓰고 간판을 다는 장면. 여기서 {shop}이 정해진다.
+## 프롤로그 2 (챕터 1): 낡은 나무판에 가게 이름을 쓰고 간판을 다는 장면. 여기서 {shop}이 정해진다.
+## 그림: bg_shop_front (식당 외관), ui_signboard (빈 나무 간판, 투명 배경). 사용자에게 받는다.
+## 그림이 없으면 마을 그림을 어둡게 깔고, 간판은 나무색 판으로 대신 보여 준다.
 
 const NEXT_SCENE := "res://scenes/fishing/fishing.tscn"
 
-var _board: PanelContainer
-var _shop_edit: LineEdit
+var _board: Control
 var _shop_label: Label
-var _prompt: Label
+var _form: PanelContainer
+var _shop_edit: LineEdit
 var _error: Label
-var _hint: Label
-var _buttons: HBoxContainer
+var _lead: Label
 var _dialogue: DialogueBox
-var _end_buttons: HBoxContainer
+var _next_btn: Button
 
 
 func _ready() -> void:
-	var bg := SeaBackdrop.new()
-	bg.mode = SeaBackdrop.Mode.DUSK
-	add_child(bg)
+	var base := ColorRect.new()
+	base.color = UiKit.NAVY_DEEP
+	base.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(base)
+	var art := UiKit.cover_art("bg_shop_front" if ArtSlot.has_art("bg_shop_front") else "map_village")
+	if art:
+		if not ArtSlot.has_art("bg_shop_front"):
+			art.modulate = Color(0.55, 0.5, 0.6) # 임시 배경은 노을빛으로 눌러 둔다
+		add_child(art)
+	add_child(UiKit.shade([[0.0, 0.6], [0.4, 0.15], [1.0, 0.85]]))
 
-	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	center.offset_bottom = -120
-	add_child(center)
+	var root := UiKit.vbox(UiKit.SPACE_LG)
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root.offset_left = 36
+	root.offset_right = -36
+	root.offset_top = 72
+	root.offset_bottom = -48
+	add_child(root)
 
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 18)
-	center.add_child(v)
+	var step := UiKit.chip("프롤로그 2 / 2", "간판")
+	step.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	root.add_child(step)
+	_lead = UiKit.paragraph("간판 자리가 비어 있다.\n낡은 나무판에 가게 이름을 적어 보자.", "body", UiKit.FOAM_SOFT, 0.0, HORIZONTAL_ALIGNMENT_CENTER)
+	root.add_child(_lead)
 
-	_prompt = UiKit.shadowed(UiKit.label("간판 자리가 비어 있다. 낡은 나무판에 가게 이름을 적어 보자.", UiKit.SIZE_BODY, UiKit.CREAM, HORIZONTAL_ALIGNMENT_CENTER), Color(UiKit.NAVY_DEEP, 0.6), 2)
-	v.add_child(_prompt)
+	var top_space := Control.new()
+	top_space.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_child(top_space)
 
-	_board = PanelContainer.new()
-	_board.custom_minimum_size = Vector2(720, 150)
-	_board.add_theme_stylebox_override("panel", UiKit.box(UiKit.WOOD, 10, UiKit.WOOD_DARK, 8, 28))
-	v.add_child(_board)
+	_board = _make_board()
+	root.add_child(_board)
 
-	var board_stack := VBoxContainer.new()
-	board_stack.alignment = BoxContainer.ALIGNMENT_CENTER
-	_board.add_child(board_stack)
+	var mid_space := Control.new()
+	mid_space.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_child(mid_space)
 
-	_shop_edit = UiKit.line_edit(GameState.DEFAULT_SHOP_NAME, 56, UiKit.CREAM, GameState.SHOP_NAME_MAX)
+	# 입력 카드 (유리)
+	_form = UiKit.glass_panel(28, UiKit.RADIUS_LG, true)
+	root.add_child(_form)
+	var fv := UiKit.vbox(UiKit.SPACE_MD)
+	_form.add_child(fv)
+	fv.add_child(UiKit.text("가게 이름", "label", UiKit.FOAM_SOFT))
+	_shop_edit = UiKit.line_edit(GameState.DEFAULT_SHOP_NAME, 28, UiKit.FOAM, GameState.SHOP_NAME_MAX, true)
+	_shop_edit.custom_minimum_size.y = 64
 	_shop_edit.text_submitted.connect(func(_t): _hang_sign())
-	_shop_edit.text_changed.connect(func(_t): _error.text = "")
-	board_stack.add_child(_shop_edit)
-
-	_shop_label = UiKit.shadowed(UiKit.label("", 64, UiKit.CREAM, HORIZONTAL_ALIGNMENT_CENTER), Color(0, 0, 0, 0.4), 3)
-	_shop_label.hide()
-	board_stack.add_child(_shop_label)
-
-	_error = UiKit.shadowed(UiKit.label("", UiKit.SIZE_SMALL, Color("ffd1c4"), HORIZONTAL_ALIGNMENT_CENTER), Color(0, 0, 0, 0.5), 1)
-	_error.custom_minimum_size.y = 24
-	v.add_child(_error)
-
-	_hint = UiKit.shadowed(UiKit.label("비워 두면 ‘%s’(으)로 정해져요. 한글 %d자까지, 띄어쓰기 가능." % [GameState.DEFAULT_SHOP_NAME, GameState.SHOP_NAME_MAX], UiKit.SIZE_SMALL, UiKit.CREAM, HORIZONTAL_ALIGNMENT_CENTER), Color(0, 0, 0, 0.5), 1)
-	v.add_child(_hint)
-
-	_buttons = HBoxContainer.new()
-	_buttons.alignment = BoxContainer.ALIGNMENT_CENTER
-	_buttons.add_theme_constant_override("separation", 14)
-	var random_btn := UiKit.button("이름 추천", false)
+	_shop_edit.text_changed.connect(_on_typed)
+	fv.add_child(_shop_edit)
+	_error = UiKit.text("", "caption", Color("ffb4a6"))
+	fv.add_child(_error)
+	fv.add_child(UiKit.text("비워 두면 ‘%s’(으)로 정해져요. 한글 %d자까지, 띄어쓰기 가능." % [GameState.DEFAULT_SHOP_NAME, GameState.SHOP_NAME_MAX], "caption", UiKit.FOAM_SOFT))
+	fv.add_child(UiKit.gap(4))
+	var buttons := UiKit.hbox(UiKit.SPACE_MD)
+	var random_btn := UiKit.action("이름 추천", "glass")
+	random_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	random_btn.pressed.connect(func():
+		Sound.play_sfx("page", 0.05)
 		_shop_edit.text = GameState.random_shop_name()
-		_error.text = "")
-	_buttons.add_child(random_btn)
-	var hang_btn := UiKit.button("간판 달기")
+		_on_typed(_shop_edit.text))
+	buttons.add_child(random_btn)
+	var hang_btn := UiKit.action("간판 달기")
+	hang_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hang_btn.size_flags_stretch_ratio = 1.6
 	hang_btn.pressed.connect(_hang_sign)
-	_buttons.add_child(hang_btn)
-	v.add_child(_buttons)
+	buttons.add_child(hang_btn)
+	fv.add_child(buttons)
 
-	_end_buttons = HBoxContainer.new()
-	_end_buttons.alignment = BoxContainer.ALIGNMENT_CENTER
-	var back_btn := UiKit.button("다음 날 새벽으로")
-	back_btn.pressed.connect(func(): UiKit.go_to(self, NEXT_SCENE, 0.8))
-	_end_buttons.add_child(back_btn)
-	_end_buttons.hide()
-	v.add_child(_end_buttons)
+	_next_btn = UiKit.action("다음 날 새벽으로")
+	_next_btn.custom_minimum_size.y = 60
+	_next_btn.pressed.connect(func(): UiKit.go_to(self, NEXT_SCENE, 0.8))
+	_next_btn.hide()
+	root.add_child(_next_btn)
 
 	_dialogue = DialogueBox.new()
 	add_child(_dialogue)
@@ -83,27 +94,65 @@ func _ready() -> void:
 
 	_shop_edit.grab_focus()
 	UiKit.fade_in(self)
+	UiKit.rise_in(_form, 0.2)
+
+
+## 간판: 그림(ui_signboard)이 있으면 그 위에 글씨를, 없으면 나무색 판에 글씨를 쓴다
+func _make_board() -> Control:
+	var holder := Control.new()
+	holder.custom_minimum_size = Vector2(0, 220)
+	holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var plate: Control
+	var sign_art := UiKit.cover_art("ui_signboard")
+	if sign_art:
+		sign_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		plate = sign_art
+	else:
+		var p := PanelContainer.new()
+		var s := UiKit.box(UiKit.WOOD, 18, UiKit.WOOD_DARK, 6, 0)
+		UiKit.elevate(s, 3)
+		p.add_theme_stylebox_override("panel", s)
+		plate = p
+	plate.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	plate.offset_left = 10
+	plate.offset_right = -10
+	holder.add_child(plate)
+	_shop_label = UiKit.text(GameState.DEFAULT_SHOP_NAME, "h1", Color(UiKit.FOAM, 0.35), HORIZONTAL_ALIGNMENT_CENTER)
+	_shop_label.add_theme_font_size_override("font_size", 58)
+	_shop_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_shop_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	UiKit.shadowed(_shop_label, Color(0, 0, 0, 0.45), 3)
+	holder.add_child(_shop_label)
+	return holder
+
+
+## 입력하는 대로 간판에 글씨가 미리 비친다
+func _on_typed(t: String) -> void:
+	_error.text = ""
+	var s := t.strip_edges()
+	_shop_label.text = s if not s.is_empty() else GameState.DEFAULT_SHOP_NAME
+	_shop_label.add_theme_color_override("font_color", UiKit.FOAM if not s.is_empty() else Color(UiKit.FOAM, 0.35))
 
 
 func _hang_sign() -> void:
 	var problem := GameState.validate_shop_name(_shop_edit.text)
 	if not problem.is_empty():
 		_error.text = problem
+		Sound.play_sfx("bad", 0.0, -8.0)
 		return
 	var n := _shop_edit.text.strip_edges()
 	GameState.shop_name = n if not n.is_empty() else GameState.DEFAULT_SHOP_NAME
-
-	_shop_edit.hide()
-	_buttons.hide()
-	_hint.hide()
-	_error.text = ""
-	_prompt.text = ""
 	_shop_label.text = GameState.shop_name
-	_shop_label.show()
+	_shop_label.add_theme_color_override("font_color", UiKit.FOAM)
+	_lead.text = ""
+	var tw_form := create_tween()
+	tw_form.tween_property(_form, "modulate:a", 0.0, UiKit.MOTION_BASE)
+	tw_form.tween_callback(_form.hide)
 
 	# 간판이 걸리는 느낌으로 살짝 튕기게
+	Sound.play_sfx("stamp")
 	_board.pivot_offset = _board.size / 2
-	_board.scale = Vector2(0.85, 0.85)
+	_board.scale = Vector2(0.88, 0.88)
 	var tw := create_tween()
 	tw.tween_property(_board, "scale", Vector2(1.04, 1.04), 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(_board, "scale", Vector2.ONE, 0.15)
@@ -116,6 +165,7 @@ func _hang_sign() -> void:
 
 
 func _on_dialogue_finished() -> void:
-	_prompt.text = GameState.line("{player}의 작은 식당, {shop}")
-	_end_buttons.show()
-	_end_buttons.get_child(0).grab_focus()
+	_lead.text = GameState.line("{player}의 작은 식당, {shop}")
+	_next_btn.show()
+	UiKit.rise_in(_next_btn)
+	_next_btn.grab_focus()

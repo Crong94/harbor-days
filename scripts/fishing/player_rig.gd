@@ -11,8 +11,8 @@ extends Control
 const BODY_ART := "player_sd_body"
 ## 몸 그림 크기 대비 오른손 위치 (그림이 오면 맞춘다)
 const HAND := Vector2(0.92, 0.375)
-const ROD_LENGTH := 300.0 # 화면에서 낚싯대 길이 (px)
-const REEL_SIZE := 46.0
+const ROD_LENGTH := 430.0 # 화면에서 낚싯대 길이 (px, 세로 화면 기준)
+const REEL_SIZE := 62.0
 
 var rod_id := GearDB.DEFAULT_ROD
 var reel_id := GearDB.DEFAULT_REEL

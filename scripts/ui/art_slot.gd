@@ -8,6 +8,8 @@ const ART_DIR := "res://assets/art/"
 var art_id := ""
 var label_text := ""
 var flip_h := false
+## true면 칸을 꽉 채우도록 그림을 키우고 넘치는 부분은 잘라 낸다 (배경, 지도)
+var cover := false
 var _tex: Texture2D
 
 
@@ -48,7 +50,7 @@ func content_rect() -> Rect2:
 	if not _tex:
 		return Rect2(Vector2.ZERO, size)
 	var ts := _tex.get_size()
-	var k := minf(size.x / ts.x, size.y / ts.y)
+	var k := maxf(size.x / ts.x, size.y / ts.y) if cover else minf(size.x / ts.x, size.y / ts.y)
 	var ds := ts * k
 	return Rect2((size - ds) / 2.0, ds)
 
@@ -62,13 +64,13 @@ func _draw() -> void:
 		draw_texture_rect(_tex, content_rect(), false)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		return
-	draw_rect(r, Color(0.6, 0.6, 0.6, 0.35))
-	draw_rect(r, Color(1, 1, 1, 0.6), false, 2.0)
-	var font := get_theme_default_font()
-	var fs := 16
-	var lines := ["그림 필요", label_text, art_id + ".png"]
-	var y := size.y / 2.0 - fs * 1.6
+	# 그림이 오기 전 빈 자리: 옅은 점선 느낌의 둥근 칸과 작은 안내
+	draw_style_box(UiKit.box(Color(1, 1, 1, 0.07), UiKit.RADIUS_MD, Color(1, 1, 1, 0.28), 2, 0), r)
+	var font := UiKit.font("semibold")
+	var small := UiKit.font("regular")
+	var lines := [[label_text, font, 17, Color(1, 1, 1, 0.85)], ["그림 준비 중 · " + art_id, small, 13, Color(1, 1, 1, 0.55)]]
+	var y := size.y / 2.0 - 18.0
 	for line in lines:
-		var w := font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		draw_string(font, Vector2((size.x - w) / 2.0, y + fs), line, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1, 1, 1, 0.9))
-		y += fs * 1.4
+		var w: float = line[1].get_string_size(line[0], HORIZONTAL_ALIGNMENT_LEFT, -1, line[2]).x
+		draw_string(line[1], Vector2((size.x - w) / 2.0, y + line[2]), line[0], HORIZONTAL_ALIGNMENT_LEFT, -1, line[2], line[3])
+		y += line[2] + 10.0

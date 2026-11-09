@@ -46,6 +46,11 @@ var sales_today := 0
 var spent_today := 0
 
 
+func _ready() -> void:
+	# 게임 전체 기본 모양 (글꼴, 스크롤바, 툴팁)
+	get_tree().root.theme = UiKit.build_theme()
+
+
 func has_flag(name: String) -> bool:
 	return flags.get(name, false)
 
