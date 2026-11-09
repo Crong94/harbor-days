@@ -329,7 +329,7 @@ func _place_player() -> void:
 	var feet := _bg.art_point(FEET)
 	_player.position = feet - Vector2(_player.size.x / 2.0, _player.size.y)
 	# 상태에 따라 낚싯대 각도와 몸 기울기를 바꾼다 (낚싯대 -90은 수직 위)
-	var rod := -58.0
+	var rod := -70.0
 	var lean := 0.0
 	match logic.state:
 		FishingLogic.State.CHARGING:
@@ -337,14 +337,14 @@ func _place_player() -> void:
 			lean = -4.0 * logic.power
 		FishingLogic.State.CASTING:
 			var k := minf(logic.progress * 2.5, 1.0)
-			rod = lerpf(-105.0, -38.0, k) # 앞으로 휘두름
+			rod = lerpf(-105.0, -55.0, k) # 앞으로 휘두름
 			lean = lerpf(-4.0, 3.0, k)
 		FishingLogic.State.WAITING:
-			rod = -48.0
+			rod = -64.0
 		FishingLogic.State.BITE:
-			rod = -44.0
+			rod = -60.0
 		FishingLogic.State.REELING:
-			rod = -72.0 + logic.fish_pull() * 14.0 # 세우고 버티다 당기면 숙여짐
+			rod = -82.0 + logic.fish_pull() * 14.0 # 세우고 버티다 당기면 숙여짐
 			lean = -2.0
 	_player.rod_angle = lerpf(_player.rod_angle, rod, 0.3)
 	_player.lean = lerpf(_player.lean, lean, 0.25)

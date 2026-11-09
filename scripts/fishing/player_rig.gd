@@ -18,7 +18,7 @@ const REEL_SIZE := 46.0
 var rod_id := GearDB.DEFAULT_ROD
 var reel_id := GearDB.DEFAULT_REEL
 ## 낚싯대 각도 (도). 0은 오른쪽 수평, -90은 수직 위
-var rod_angle := -58.0
+var rod_angle := -70.0
 ## 몸 기울기 (도)
 var lean := 0.0
 
