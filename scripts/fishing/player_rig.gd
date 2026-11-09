@@ -10,7 +10,7 @@ extends Control
 
 const BODY_ART := "player_sd_body"
 ## 몸 그림 크기 대비 오른손 위치 (그림이 오면 맞춘다)
-const HAND := Vector2(0.74, 0.5)
+const HAND := Vector2(0.92, 0.375)
 const ROD_LENGTH := 300.0 # 화면에서 낚싯대 길이 (px)
 const ROD_THICK := 26.0 # 낚싯대 그림을 그릴 높이 (px)
 const REEL_SIZE := 46.0
@@ -72,17 +72,6 @@ func tip_global() -> Vector2:
 
 
 func _draw() -> void:
-	# 몸
-	draw_set_transform_matrix(_body_xform())
-	if _body_tex:
-		draw_texture_rect(_body_tex, Rect2(Vector2.ZERO, size), false)
-	else:
-		draw_rect(Rect2(Vector2.ZERO, size), Color(0.6, 0.6, 0.6, 0.35))
-		draw_rect(Rect2(Vector2.ZERO, size), Color(1, 1, 1, 0.6), false, 2.0)
-		var font := get_theme_default_font()
-		draw_string(font, Vector2(8, size.y * 0.8), "SD 몸 그림 필요", HORIZONTAL_ALIGNMENT_LEFT, size.x - 16, 15, Color(1, 1, 1, 0.9))
-	draw_set_transform_matrix(Transform2D.IDENTITY)
-
 	# 낚싯대
 	var r := GearDB.rod(rod_id)
 	var start := _rod_point(0.0)
@@ -112,3 +101,14 @@ func _draw() -> void:
 		draw_line(seat, seat + down * 12.0, Color("2b2a28"), 3.0)
 		draw_circle(seat + down * 20.0, 10.0, l.color)
 		draw_circle(seat + down * 20.0, 4.0, Color("2b2a28"))
+
+	# 몸은 맨 나중에 그려서 손이 낚싯대 손잡이를 쥔 것처럼 보이게 한다
+	draw_set_transform_matrix(_body_xform())
+	if _body_tex:
+		draw_texture_rect(_body_tex, Rect2(Vector2.ZERO, size), false)
+	else:
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0.6, 0.6, 0.6, 0.35))
+		draw_rect(Rect2(Vector2.ZERO, size), Color(1, 1, 1, 0.6), false, 2.0)
+		var font := get_theme_default_font()
+		draw_string(font, Vector2(8, size.y * 0.8), "SD 몸 그림 필요", HORIZONTAL_ALIGNMENT_LEFT, size.x - 16, 15, Color(1, 1, 1, 0.9))
+	draw_set_transform_matrix(Transform2D.IDENTITY)

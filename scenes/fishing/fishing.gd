@@ -47,7 +47,7 @@ const FLOAT_NEAR_SCALE := 1.0
 const FLOAT_FAR_SCALE := 0.4
 
 ## SD 주인공 몸 그림 크기 (낚싯대와 릴은 PlayerRig가 따로 붙인다)
-const PLAYER_SIZE := Vector2(150.0, 230.0)
+const PLAYER_SIZE := Vector2(100.0, 240.0)
 
 var _held := false
 var _in_story := true
