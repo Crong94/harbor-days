@@ -1,64 +1,109 @@
 class_name PlayerRig
 extends Control
-## 낚시하는 SD 주인공을 몸, 낚싯대, 릴 세 장으로 조립해서 그린다.
-## 장비를 바꾸면 set_gear()로 낚싯대와 릴 그림만 바뀐다.
+## 낚시하는 SD 주인공(뒷모습)을 동작 프레임 + 낚싯대 그림으로 조립해서 그린다.
 ##
-## 그림 (사용자에게 받음)
-##   player_sd_body.png : 낚싯대 없이 오른손으로 무언가를 쥔 자세의 SD 뒷모습
-##   rod_<id>.png, reel_<id>.png : GearDB 참고
-## 그림이 없으면 몸은 회색 칸, 낚싯대는 선, 릴은 원으로 대신 보여 준다.
+## 그림
+##   몸: assets/art/sd/back_01~12.png (사용자가 준 SD 동작 시트 뒷모습을 tools/slice_grid.py로 자름)
+##     01 차렷  02 기본  03 힘 모으기  04 머리 뒤로 넘김  05 던지기  06 던진 뒤
+##     07 콧노래(♪)  08 입질 놀람(!!!)  09 감기  10 버티기(땀)  11 크게 버티기  12 만세
+##   낚싯대: 바다 한 접시 장비 그림. 대 몸통 blank-n(낚싯대 단계) 위에 밑동+릴 butt-n(릴 단계)
+##     GearDB.BLANK_LOOK, BUTT_LOOK 숫자로 이어 붙인다. 대 몸통은 물고기가 당기면 휜다(bend)
+## 손은 프레임마다 위치가 달라서 HANDS 표에 프레임 크기 대비 비율로 적었다.
+## 낚싯대를 먼저 그리고 몸을 나중에 그려서 주먹이 손잡이를 쥔 것처럼 보이게 한다.
 
-const BODY_ART := "player_sd_body"
-## 몸 그림 크기 대비 오른손 위치 (그림이 오면 맞춘다)
-const HAND := Vector2(0.92, 0.375)
-const ROD_LENGTH := 430.0 # 화면에서 낚싯대 길이 (px, 세로 화면 기준)
-const REEL_SIZE := 62.0
+const FRAME_ART := "sd/back_%02d"
+const FRAME_COUNT := 12
+## 프레임별 오른손(낚싯대 쥔 손) 위치. 프레임 크기 대비 비율
+const HANDS := {
+	1: Vector2(0.763, 0.68), 2: Vector2(0.746, 0.632), 3: Vector2(0.763, 0.477),
+	4: Vector2(0.797, 0.358), 5: Vector2(0.763, 0.501), 6: Vector2(0.803, 0.501),
+	7: Vector2(0.729, 0.609), 8: Vector2(0.729, 0.609), 9: Vector2(0.729, 0.525),
+	10: Vector2(0.661, 0.477), 11: Vector2(0.593, 0.465), 12: Vector2(0.695, 0.203),
+}
+## 자세 이름 → 프레임
+const POSES := {
+	"stand": 1, "idle": 2, "charge": 3, "charge_full": 4, "cast": 5, "cast_end": 6,
+	"wait": 2, "hum": 7, "bite": 8, "reel": 9, "strain": 10, "strain_hard": 11, "cheer": 12, "fail": 1,
+}
+const ROD_LENGTH := 470.0 # 화면에서 낚싯대 전체 길이 (px, 밑동 끝에서 대 끝까지)
+const BEND_MAX := 0.24 # 최대로 휠 때 대 끝이 옆으로 가는 정도 (대 몸통 길이 대비)
+const BLANK_SEGMENTS := 16
 
 var rod_id := GearDB.DEFAULT_ROD
 var reel_id := GearDB.DEFAULT_REEL
+var pose := "idle"
 ## 낚싯대를 든 높이 (도). 뒤에서 보는 시점이라 화면 회전이 아니라 원근으로 표현한다.
-##   0: 바다 쪽으로 수평 (화면에서는 짧게 보임)
-##   45: 찌를 보는 기본 자세
-##   90: 하늘로 수직 (가장 길게 보임)
-##   120 이상: 머리 뒤로 넘김 (캐스팅 준비, 시계로 1시 방향)
+##   0: 바다 쪽으로 수평 (화면에서는 짧게 보임)  45: 찌를 보는 기본 자세
+##   90: 하늘로 수직 (가장 길게 보임)  120 이상: 머리 뒤로 넘김 (캐스팅 준비)
 var pitch := 45.0
-## 낚싯대가 오른쪽으로 벌어진 정도 (도). 오른손으로 쥐어서 몸 오른쪽으로 비스듬하다
+## 낚싯대가 오른쪽으로 벌어진 정도 (도)
 var roll := 22.0
 ## 몸 기울기 (도)
 var lean := 0.0
+## 대가 휜 정도 0~1과 휘는 쪽 (화면 좌표, 보통 찌나 물고기 위치)
+var bend := 0.0
+var bend_toward := Vector2.ZERO
 
-var _body_tex: Texture2D
-var _rod_tex: Texture2D
-var _reel_tex: Texture2D
+var _frames: Array = []
+var _blank_tex: Texture2D
+var _butt_tex: Texture2D
+var _t := 0.0
+var _hum_timer := 4.0
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if ArtSlot.has_art(BODY_ART):
-		_body_tex = load(ArtSlot.art_path(BODY_ART))
+	_frames.resize(FRAME_COUNT + 1)
+	for i in range(1, FRAME_COUNT + 1):
+		var id := FRAME_ART % i
+		_frames[i] = load(ArtSlot.art_path(id)) if ArtSlot.has_art(id) else null
 	set_gear(rod_id, reel_id)
 
 
 func set_gear(new_rod: String, new_reel: String) -> void:
 	rod_id = new_rod
 	reel_id = new_reel
-	_rod_tex = load(ArtSlot.art_path("rod_" + rod_id)) if ArtSlot.has_art("rod_" + rod_id) else null
-	_reel_tex = load(ArtSlot.art_path("reel_" + reel_id)) if ArtSlot.has_art("reel_" + reel_id) else null
+	var b := GearDB.blank_art(rod_id)
+	var u := GearDB.butt_art(reel_id)
+	_blank_tex = load(ArtSlot.art_path(b)) if ArtSlot.has_art(b) else null
+	_butt_tex = load(ArtSlot.art_path(u)) if ArtSlot.has_art(u) else null
 	queue_redraw()
 
 
-func _process(_delta: float) -> void:
+## 몸 그림 비율 (가로/세로). 크기를 정할 때 쓴다
+func body_aspect() -> float:
+	var tex: Texture2D = _frames[2] if _frames.size() > 2 else null
+	return tex.get_width() / float(tex.get_height()) if tex else 0.7
+
+
+func _process(delta: float) -> void:
+	_t += delta
+	# 찌를 보며 기다릴 때 가끔 콧노래
+	if pose == "wait":
+		_hum_timer -= delta
+		if _hum_timer < -1.4:
+			_hum_timer = randf_range(5.0, 9.0)
 	queue_redraw()
 
 
-## 몸 기울기를 적용한 변환 (발 가운데를 중심으로 기운다)
+func frame() -> int:
+	var p := pose
+	if p == "wait" and _hum_timer < 0.0:
+		p = "hum"
+	return POSES.get(p, 2)
+
+
+## 몸 기울기와 숨쉬기를 적용한 변환 (발 가운데를 중심으로)
 func _body_xform() -> Transform2D:
 	var pivot := Vector2(size.x / 2.0, size.y)
-	return Transform2D(deg_to_rad(lean), pivot) * Transform2D(0.0, -pivot)
+	var breathe := 1.0
+	if pose in ["idle", "wait", "stand"]:
+		breathe = 1.0 + 0.012 * sin(_t * 2.4)
+	return Transform2D(deg_to_rad(lean), Vector2(1.0, breathe), 0.0, pivot) * Transform2D(0.0, -pivot)
 
 
 func _hand() -> Vector2:
-	return _body_xform() * (HAND * size)
+	return _body_xform() * (HANDS.get(frame(), HANDS[2]) * size)
 
 
 ## 화면에서 낚싯대가 향하는 각도 (라디안). 머리 뒤로 넘기면 끝이 살짝 몸쪽으로 돌아온다
@@ -67,67 +112,104 @@ func _screen_angle() -> float:
 	return deg_to_rad(-90.0 + roll + lean + back * 1.3)
 
 
-func _rod_dir() -> Vector2:
-	return Vector2.from_angle(_screen_angle())
-
-
 ## 원근: 바다 쪽으로 누울수록, 머리 뒤로 넘길수록 화면에서 짧아 보인다
 func _foreshorten() -> float:
 	return 0.32 + 0.68 * sin(deg_to_rad(clampf(pitch, 0.0, 180.0)))
 
 
-## 낚싯대 위 비율 위치(0 손잡이 끝 ~ 1 낚싯대 끝)를 이 노드 좌표로
-func _rod_point(t: float) -> Vector2:
-	var r := GearDB.rod(rod_id)
-	return _hand() + _rod_dir() * (t - r.grip) * ROD_LENGTH * _foreshorten()
+## 낚싯대 그림 배치 계산. 그림이 없으면 빈 Dictionary
+func _geom() -> Dictionary:
+	if _blank_tex == null or _butt_tex == null:
+		return {}
+	var bl: Array = GearDB.BLANK_LOOK[GearDB.rod(rod_id).tier - 1]
+	var bu: Array = GearDB.BUTT_LOOK[GearDB.reel(reel_id).tier - 1]
+	var bw := float(_butt_tex.get_width())
+	var bh := float(_butt_tex.get_height())
+	var kw := float(_blank_tex.get_width())
+	var kh := float(_blank_tex.get_height())
+	var sb: float = bu[1] / bl[1] # 대 몸통 그림 px → 밑동 그림 px
+	var s := ROD_LENGTH / (bh + kh * sb) # 그림 px → 화면 px
+	var axis := Vector2.from_angle(_screen_angle())
+	var right := Vector2(-axis.y, axis.x)
+	var fore := _foreshorten()
+	var hand := _hand()
+	var grip_y := GearDB.BUTT_GRIP_Y * bh
+	var tube_x: float = bu[0] * bw
+	# 휘는 방향: 대 끝에서 본 목표가 대의 오른쪽인지 왼쪽인지
+	var blank_len := kh * sb * s * fore
+	var side := 1.0
+	if bend_toward != Vector2.ZERO:
+		var local_target := get_global_transform().affine_inverse() * bend_toward
+		side = signf((local_target - hand).dot(right))
+		if side == 0.0:
+			side = 1.0
+	return {
+		"bw": bw, "bh": bh, "kw": kw, "kh": kh, "sb": sb, "s": s, "axis": axis, "right": right,
+		"fore": fore, "hand": hand, "grip_y": grip_y, "tube_x": tube_x, "blank_cx": bl[0] * kw,
+		"bend_vec": right * side * clampf(bend, 0.0, 1.0) * BEND_MAX * blank_len,
+	}
+
+
+## 밑동 그림 좌표 → 이 노드 좌표
+func _butt_point(g: Dictionary, ix: float, iy: float) -> Vector2:
+	return g.hand + g.right * (ix - g.tube_x) * g.s + g.axis * (g.grip_y - iy) * g.s * g.fore
+
+
+## 대 몸통 그림 좌표 → 이 노드 좌표 (휨 포함)
+func _blank_point(g: Dictionary, jx: float, jy: float) -> Vector2:
+	var u: float = (g.kh - jy) / g.kh
+	var ix: float = g.tube_x + (jx - g.blank_cx) * g.sb
+	var iy: float = -(g.kh - jy) * g.sb
+	return _butt_point(g, ix, iy) + g.bend_vec * u * u
+
+
+## 낚싯대 끝 (이 노드 좌표)
+func tip_local() -> Vector2:
+	var g := _geom()
+	if g.is_empty():
+		var axis := Vector2.from_angle(_screen_angle())
+		return _hand() + axis * ROD_LENGTH * 0.8 * _foreshorten()
+	return _blank_point(g, g.blank_cx, 0.0)
 
 
 ## 낚싯대 끝의 화면 좌표. 낚싯줄이 여기서 나간다.
 func tip_global() -> Vector2:
-	return get_global_transform() * _rod_point(GearDB.rod(rod_id).tip)
+	return get_global_transform() * tip_local()
 
 
 func _draw() -> void:
-	# 낚싯대
-	var r := GearDB.rod(rod_id)
-	var start := _rod_point(0.0)
-	var ang := _screen_angle()
-	var shown := ROD_LENGTH * _foreshorten()
-	if _rod_tex:
-		var ts := _rod_tex.get_size()
-		var h := ROD_LENGTH * ts.y / ts.x # 굵기는 그림 비율대로, 길이만 원근으로 줄인다
-		draw_set_transform(start, ang)
-		draw_texture_rect(_rod_tex, Rect2(0, -r.get("axis", 0.5) * h, shown, h), false)
-		draw_set_transform_matrix(Transform2D.IDENTITY)
+	var g := _geom()
+	if g.is_empty():
+		draw_line(_hand(), tip_local(), Color("3a3a42"), 4.0, true)
 	else:
-		draw_line(start, _rod_point(r.tip), r.color, 4.0, true)
-		draw_line(start, _rod_point(r.seat + 0.06), Color("2b2a28"), 7.0, true) # 손잡이
-
-	# 릴 (낚싯대 아래쪽에 매달림)
-	var l := GearDB.reel(reel_id)
-	var seat := _rod_point(r.seat)
-	var down := _rod_dir().orthogonal() # 낚싯대 아래 방향
-	if down.y < 0:
-		down = -down
-	if _reel_tex:
-		draw_set_transform(seat, ang)
-		var ts := _reel_tex.get_size()
-		var h := REEL_SIZE
-		var w := h * ts.x / ts.y
-		draw_texture_rect(_reel_tex, Rect2(-w / 2.0, 0, w, h), false)
+		_draw_blank(g)
+		# 밑동+릴: 그림을 대 방향으로 돌리고 길이만 원근으로 줄인다
+		var origin := _butt_point(g, 0.0, 0.0)
+		draw_set_transform_matrix(Transform2D(g.right * g.s, -g.axis * g.s * g.fore, origin))
+		draw_texture(_butt_tex, Vector2.ZERO)
 		draw_set_transform_matrix(Transform2D.IDENTITY)
-	else:
-		draw_line(seat, seat + down * 12.0, Color("2b2a28"), 3.0)
-		draw_circle(seat + down * 20.0, 10.0, l.color)
-		draw_circle(seat + down * 20.0, 4.0, Color("2b2a28"))
 
 	# 몸은 맨 나중에 그려서 손이 낚싯대 손잡이를 쥔 것처럼 보이게 한다
+	var tex: Texture2D = _frames[frame()] if _frames.size() > frame() else null
 	draw_set_transform_matrix(_body_xform())
-	if _body_tex:
-		draw_texture_rect(_body_tex, Rect2(Vector2.ZERO, size), false)
+	if tex:
+		draw_texture_rect(tex, Rect2(Vector2.ZERO, size), false)
 	else:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.6, 0.6, 0.6, 0.35))
-		draw_rect(Rect2(Vector2.ZERO, size), Color(1, 1, 1, 0.6), false, 2.0)
-		var font := get_theme_default_font()
-		draw_string(font, Vector2(8, size.y * 0.8), "SD 몸 그림 필요", HORIZONTAL_ALIGNMENT_LEFT, size.x - 16, 15, Color(1, 1, 1, 0.9))
 	draw_set_transform_matrix(Transform2D.IDENTITY)
+
+
+## 대 몸통을 여러 토막으로 나눠 휜 모양대로 그린다
+func _draw_blank(g: Dictionary) -> void:
+	var white := PackedColorArray([Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE])
+	for k in BLANK_SEGMENTS:
+		var y0: float = g.kh * (1.0 - float(k) / BLANK_SEGMENTS)
+		var y1: float = g.kh * (1.0 - float(k + 1) / BLANK_SEGMENTS)
+		var pts := PackedVector2Array([
+			_blank_point(g, 0.0, y0), _blank_point(g, g.kw, y0),
+			_blank_point(g, g.kw, y1), _blank_point(g, 0.0, y1),
+		])
+		var uvs := PackedVector2Array([
+			Vector2(0, y0 / g.kh), Vector2(1, y0 / g.kh), Vector2(1, y1 / g.kh), Vector2(0, y1 / g.kh),
+		])
+		draw_polygon(pts, white, uvs, _blank_tex)

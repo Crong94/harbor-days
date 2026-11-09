@@ -5,8 +5,8 @@
 ## 환경
 - 엔진: Godot 4.4.1, GDScript, 2D, 렌더러 GL Compatibility (웹 내보내기 대응)
 - 해상도: **세로 720x1280** (PC 창 540x960), stretch mode canvas_items. 2026-11-09 가로에서 세로로 바꿨다
-- 글꼴: Pretendard 5굵기(UI, 본문) + 고운바탕 2굵기(제목). 모두 `assets/fonts`, OFL
-- UI: `docs/UI_디자인_시스템.md` (물빛 유리 + 종이 혼합). 토큰과 컴포넌트는 `scripts/ui/ui_kit.gd`
+- 글꼴: 주아(제목, 버튼, 숫자) + Pretendard 5굵기(본문) + 고운바탕 2굵기(사직서처럼 편지 느낌일 때만). 모두 `assets/fonts`, OFL
+- UI: `docs/UI_디자인_시스템.md` (둥글고 귀여운 코지: 굵은 외곽선 + 입체 턱, SD 그림 팔레트). 토큰과 컴포넌트는 `scripts/ui/ui_kit.gd`
 
 ## GitHub 사용 금지 (중요)
 - 계정 문제 해결 전까지 **원격 저장소를 연결하거나 push하지 않는다.** `git remote add`, `git push`, GitHub Actions 설정 모두 금지.
@@ -48,7 +48,7 @@ godot --headless --path . --export-release "Web" build/web/index.html  # 웹 빌
   - 가짜 체크무늬가 그려져 나오거나 흰 배경으로 나오면 받은 뒤 배경을 지워서 쓴다
 - 배경 그림, 지도, 설정화는 투명 배경이 필요 없다
 - 뽑는 순서: ① 설정화 ② 낚시 자세 ③ 볼락 ④ 망상어, 노래미 ⑤ 마을 지도 ⑥ 방파제 낮 ⑦ 방파제 밤 ⑧ 식당 외관 ⑨ 식당 내부 낮 ⑩ 식당 내부 밤 ⑪ 항구
-- 화풍: 깔끔한 2D 셀 채색 코지 게임 스타일. 주인공 얼굴 기준은 1차 시안 B(현실적인 청년형) + 옅은 수염. 화풍 기준 그림은 `docs/ref/키비주얼_v2.png`
+- 화풍: 둥글고 귀여운 코지 (굵고 둥근 남보라 외곽선, 단순한 면, 볼터치, 파스텔). 기준 그림은 `docs/ref/SD_설정화_3면.png`(주인공)와 물고기 시트(`assets/art/fish_bolak.png`)
 - 지금 임시 그림: 낚시 배경(`bg_fishing_night`, `bg_fishing_day`), 지도(`map_village`), 낚시방(`bg_tackle_shop`)은 바다 한 접시 그림이다. 오늘의 바다 전용 세로 그림으로 바꾼다
 
 ## 바다 한 접시 (이전 게임) 자료
@@ -59,7 +59,7 @@ godot --headless --path . --export-release "Web" build/web/index.html  # 웹 빌
 - 장면 실행 검사: `<Godot>_console.exe --headless --path . res://scenes/<장면>.tscn --quit-after 120` (테스트 스크립트 모드에서는 오토로드가 없어서 장면을 불러올 수 없다)
 
 ## 코드 규칙
-- UI는 씬 파일을 최소로 두고 스크립트 `_ready()`에서 만든다. 색, 글자, 버튼, 패널은 `UiKit`의 토큰과 컴포넌트만 쓴다 (`docs/UI_디자인_시스템.md`). 새 화면도 유리 + 종이 규칙을 따른다
+- UI는 씬 파일을 최소로 두고 스크립트 `_ready()`에서 만든다. 색, 글자, 버튼, 패널은 `UiKit`의 토큰과 컴포넌트만 쓴다 (`docs/UI_디자인_시스템.md`). 새 화면도 코지 규칙(chunky 상자, 주아체 제목)을 따른다
 - 화면 확인: `Godot_v4.4.1-stable_win64.exe --path . res://scenes/<장면>.tscn --write-movie <폴더>/x.png --fixed-fps 30 --quit-after 75 --resolution 720x1280`로 프레임을 찍어 본다
 - 플레이어명, 가게명이 들어가는 대사는 템플릿으로 쓰고 `GameState.line()`으로 바꾼다.
   - `{player}`, `{shop}`, `{pet}`
@@ -73,19 +73,20 @@ assets/fonts      폰트
 docs              기획 문서
 scenes/title      타이틀
 scenes/prologue   사직서(플레이어명 입력), 간판(가게명 입력)
-scenes/fishing    방파제 찌낚시. 첫날은 새벽 튜토리얼(첫 물고기 볼락), 그 뒤는 아무 시간대 자유 낚시
+scenes/fishing    방파제 찌낚시. 첫날은 새벽 튜토리얼(첫 물고기 볼락), 그 뒤는 아무 시간대 자유 낚시. 캐스팅 포인트, 챔질 PERFECT, 좌우 줄다리기, 미끼, 물때·날씨, 주문
 scenes/restaurant 〈첫 번째 손님〉 식당 장면 (볼락구이, 최순덕)
 scenes/shop       준호네 낚시방 (장비 구매, 장착)
 scenes/map        마을 지도. 장소 선택, 이동 시간, 해금 (scripts/data/locations.gd)
 scripts/fishing   FishingLogic (낚시 규칙, 헤드리스 테스트 가능)
 scripts/cooking   CookingLogic (간 맞추기, 굽기 규칙)
-scripts/data      FishDB (어종), GearDB (장비), Locations (장소), Catalog (바다 한 접시 어종 71종, 레시피 50개)
+scripts/data      FishDB (어종 7종, 희귀도), GearDB (낚싯대·릴 10단계), BaitDB (미끼), SeaDay (물때·날씨), Orders (식당 주문), Locations (장소), Catalog (바다 한 접시 어종 71종, 레시피 50개)
 assets/art        사용자에게 받은 그림 (docs/그림_요청_목록.md). dish, cook_tool, kitchen, ingredient, gear_icon은 바다 한 접시에서 가져옴
+assets/art/sd     주인공 SD 동작 프레임 (back_01~12 낚시 뒷모습, front_01~12 앞모습)
 assets/audio      배경음악 bgm, 효과음 sfx (바다 한 접시에서 가져옴)
 assets/data       species.json, recipes.json (바다 한 접시 데이터)
 scripts/autoload  GameState (전역 상태), Sound (배경음악, 효과음)
 scripts/ui        UiKit(디자인 시스템), SeaBackdrop(그림 없을 때 임시 배경), DialogueBox, ArtSlot(그림 자리)
 scripts/util      Josa (조사 처리)
 tests             헤드리스 테스트
-tools             설치, 백업 스크립트
+tools             설치, 백업 스크립트, 그림 자르기 (slice_sheet: 낱개 그림 시트, slice_grid: 동작 시트)
 ```

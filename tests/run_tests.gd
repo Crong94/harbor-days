@@ -12,6 +12,8 @@ func _init() -> void:
 	_test_won()
 	_test_fish_db()
 	_test_fishing()
+	_test_fun()
+	_test_sea_day()
 	_test_locations()
 	_test_gear()
 	_test_realism()
@@ -123,7 +125,10 @@ func _test_fishing() -> void:
 	var S := FishingLogic.State
 	var never := func(_x): return false
 	var always := func(_x): return true
-	var smart := func(x): return x.tension < 0.8
+	# 요령: 장력이 높으면 손을 떼고, 물고기가 옆으로 가면 반대로 끈다
+	var smart := func(x):
+		x.steer = -x.run_dir
+		return x.tension < 0.8
 
 	var l := _new_logic(3)
 	l.press()
@@ -187,6 +192,185 @@ func _test_fishing() -> void:
 			caught += 1
 	_eq(caught >= 16, true, "보통 판정에서도 요령 있게 하면 대부분 잡힘 (%d/20)" % caught)
 
+	# 물고기가 차고 나갈 때 반대로 끌지 않으면 잘 못 잡는다
+	var lazy_caught := 0
+	var lazy := func(x):
+		x.steer = 0.0
+		return x.tension < 0.8
+	for seed_value in 20:
+		var l5 := _new_logic(100 + seed_value)
+		l5.catch_count = 1
+		l5.forgiving = false
+		_cast(l5)
+		_run_until(l5, [S.BITE], never, 20.0)
+		l5.press()
+		_run_until(l5, [S.CAUGHT, S.FAILED], lazy, 60.0)
+		if l5.state == S.CAUGHT:
+			lazy_caught += 1
+	_eq(lazy_caught < caught, true, "반대로 끌어야 더 잘 잡힘 (%d < %d)" % [lazy_caught, caught])
+
+
+## 재미 요소: 캐스팅 포인트, 챔질 판정, 연속 PERFECT, 줄다리기, 희귀도
+func _test_fun() -> void:
+	var S := FishingLogic.State
+	var never := func(_x): return false
+
+	# 포인트에 맞춰 던지면 NICE, 많이 빗나가면 판정 없음
+	var a := _new_logic(31)
+	a.point_depth = 0.5
+	a.press()
+	a.power = 0.5 / a.cast_mult
+	a.release()
+	_eq(a.cast_grade, "nice", "포인트에 딱 맞추면 NICE CAST")
+	var b := _new_logic(31)
+	b.point_depth = 0.9
+	b.press()
+	b.power = 0.2
+	b.release()
+	_eq(b.cast_grade, "", "많이 빗나가면 판정 없음")
+
+	# NICE CAST는 입질이 빠르다 (같은 난수로 비교)
+	var waits := []
+	for depth in [0.5, 0.95]:
+		var l := _new_logic(32)
+		l.catch_count = 1
+		l.forgiving = false
+		l.point_depth = depth
+		l.press()
+		l.power = 0.5
+		l.release()
+		_run_until(l, [S.WAITING], never, 2.0)
+		var t := 0.0
+		while l.state == S.WAITING and t < 30.0:
+			l.update(1.0 / 60.0, false)
+			t += 1.0 / 60.0
+		waits.append(t)
+	_eq(waits[0] < waits[1], true, "NICE CAST면 입질이 빠름 (%.1fs < %.1fs)" % [waits[0], waits[1]])
+
+	# 찌가 잠기는 한가운데에 채면 PERFECT, 너무 일찍 채면 GOOD
+	var grades := []
+	for when in [0.5, 0.1]:
+		var l := _new_logic(33)
+		_cast(l)
+		_run_until(l, [S.BITE], never, 10.0)
+		while l.bite_depth < when:
+			l.update(1.0 / 60.0, false)
+		l.press()
+		grades.append(l.hook_grade)
+		_eq(l.state, S.REELING, "챔질 성공 (%.1f)" % when)
+	_eq(grades, ["perfect", "good"], "챔질 판정")
+
+	# PERFECT로 시작하면 물고기 체력이 깎인 채로 시작
+	var p := _new_logic(34)
+	_cast(p)
+	_run_until(p, [S.BITE], never, 10.0)
+	while p.bite_depth < 0.5:
+		p.update(1.0 / 60.0, false)
+	p.press()
+	_eq(p.fish_hp < 1.0, true, "PERFECT면 물고기 체력이 덜 찬 채로 시작")
+	_eq(p.perfect_streak, 1, "연속 PERFECT 1")
+	p.perfect_streak = FishingLogic.STREAK_HOT
+	_eq(p.is_hot(), true, "연속 PERFECT 3번이면 물 오름")
+
+	# 반대로 끌면 물고기 체력이 더 빨리 깎인다
+	var hp := []
+	for counter in [true, false]:
+		var l := _new_logic(35)
+		l.catch_count = 1
+		l.forgiving = false
+		_cast(l)
+		_run_until(l, [S.BITE], never, 20.0)
+		l.press()
+		l.steer = -1.0 if counter else 0.0
+		l.tension = 0.3
+		for i in 30:
+			l.run_dir = 1
+			l._run_time = 5.0
+			l.update(1.0 / 60.0, true)
+		hp.append(l.fish_hp)
+	_eq(hp[0] < hp[1], true, "반대로 버티면 체력이 더 깎임 (%.2f < %.2f)" % [hp[0], hp[1]])
+
+	# 지친 물고기는 빨리 끌려온다
+	var e := _new_logic(36)
+	_cast(e)
+	_run_until(e, [S.BITE], never, 10.0)
+	e.press()
+	e.fish_hp = 0.0
+	e.update(1.0 / 60.0, true)
+	_eq(e.exhausted, true, "체력이 0이면 지침")
+	var d0 := e.distance
+	for i in 30:
+		e.update(1.0 / 60.0, true)
+	_eq(d0 - e.distance > 0.15, true, "지친 물고기는 빨리 끌려옴 (%.2f)" % (d0 - e.distance))
+
+	# 어종: 학공치는 먼 물, 볼락은 가까운 물. 미끼를 좋아하면 잘 나온다
+	var near := FishDB.weight_of("hakgongchi", {"brightness": 1.0, "depth": 0.05})
+	var far := FishDB.weight_of("hakgongchi", {"brightness": 1.0, "depth": 0.95})
+	_eq(far > near * 3.0, true, "학공치는 먼 물")
+	_eq(FishDB.weight_of("bolak", {"brightness": 0.0, "depth": 0.1}) > FishDB.weight_of("bolak", {"brightness": 0.0, "depth": 0.9}), true, "볼락은 가까운 물")
+	_eq(FishDB.weight_of("ureok", {"bait": "worm"}) > FishDB.weight_of("ureok", {"bait": "krill"}), true, "우럭은 청갯지렁이를 좋아함")
+	_eq(FishDB.weight_of("gamseongdom", {"rare_boost": 2.0}) > FishDB.weight_of("gamseongdom", {}), true, "물 오름은 희귀 어종을 늘림")
+	_eq(FishDB.weight_of("bolak", {"rare_boost": 2.0}), FishDB.weight_of("bolak", {}), "물 오름은 일반 어종엔 영향 없음")
+	for id in FishDB.FISH:
+		var f := FishDB.get_fish(id)
+		_eq(ArtSlot.has_art("fish_" + id), true, "%s 그림" % id)
+		_eq(FishDB.RARITY.has(f.rarity), true, "%s 희귀도" % id)
+		_eq(FishDB.stars(id, f.min_cm), 1, "%s 작으면 별 하나" % id)
+		_eq(FishDB.stars(id, f.max_cm), 3, "%s 크면 별 셋" % id)
+		_eq(FishDB.is_trophy(id, f.max_cm), true, "%s 최대 크기는 대물" % id)
+		_eq(FishDB.value_of(id, f.max_cm) > FishDB.value_of(id, f.min_cm), true, "%s 클수록 비쌈" % id)
+	_eq(FishDB.value_of("gamseongdom", 40.0) > FishDB.value_of("bolak", 20.0), true, "전설 어종은 비쌈")
+	for id in BaitDB.BAITS:
+		_eq(ArtSlot.has_art(BaitDB.icon_art(id)), true, "%s 미끼 그림" % id)
+		for f in BaitDB.bait(id).likes:
+			_eq(FishDB.FISH.has(f), true, "%s 미끼가 좋아하는 %s" % [id, f])
+
+
+## 오늘의 바다 카드, 주문, 미끼 사기
+func _test_sea_day() -> void:
+	_eq(SeaDay.of(5), SeaDay.of(5), "같은 날은 같은 바다")
+	_eq(SeaDay.of(1).tide, "7물", "첫날은 7물")
+	_eq(SeaDay.of(1).weather, "sunny", "첫날은 맑음")
+	var seen := {}
+	for d in range(2, 40):
+		seen[SeaDay.of(d).weather] = true
+	_eq(seen.size() >= 3, true, "날씨가 여러 가지 (%d)" % seen.size())
+	_eq(SeaDay.best_fish(SeaDay.of(1), 0.0, 2).size(), 2, "잘 무는 고기 두 종")
+	_eq(Orders.of(1), {}, "첫날은 주문 없음")
+	var o := Orders.of(3)
+	_eq(FishDB.FISH.has(o.fish), true, "주문 어종")
+	_eq(o.reward > 0, true, "주문 보상")
+	_eq(Orders.matches(o, o.fish, o.min_cm), true, "조건 맞는 물고기")
+	_eq(Orders.matches(o, o.fish, o.min_cm - 1.0), false, "너무 작으면 안 받음")
+
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.day = 3
+	gs.money = 0
+	var got := 0
+	for i in o.count:
+		got = gs.offer_to_order(o.fish, o.min_cm + 1.0)
+	_eq(got, o.reward, "주문을 다 채우면 보상")
+	_eq(gs.order_done, true, "주문 완료")
+	_eq(gs.money, o.reward, "보상만큼 돈")
+	_eq(gs.offer_to_order(o.fish, o.min_cm + 1.0), 0, "완료 뒤에는 더 안 받음")
+	gs.money = 5000
+	_eq(gs.buy_bait("worm"), "", "청갯지렁이 사기")
+	_eq(gs.bait_count("worm"), 10, "10개 들어옴")
+	_eq(gs.buy_bait("krill"), "창고에 많이 있어요.", "크릴은 안 팜")
+	_eq(gs.buy_bait("shrimp"), "돈이 모자라요.", "돈 모자람")
+	gs.equipped_bait = "worm"
+	gs.use_bait()
+	_eq(gs.bait_count("worm"), 9, "미끼 하나 씀")
+	gs.baits["worm"] = 1
+	gs.use_bait()
+	_eq(gs.equipped_bait, "krill", "다 쓰면 크릴로")
+	gs.equipped_bait = "krill"
+	gs.use_bait()
+	_eq(gs.bait_count("krill"), -1, "크릴은 끝이 없음")
+	gs.end_day()
+	_eq(gs.order_filled + int(gs.order_done), 0, "다음 날 주문 새로")
+	gs.free()
+
 
 func _test_locations() -> void:
 	for id in Locations.LIST:
@@ -208,15 +392,27 @@ func _test_locations() -> void:
 
 func _test_gear() -> void:
 	var S := FishingLogic.State
+	_eq(GearDB.RODS.size(), 10, "낚싯대 10단계")
+	_eq(GearDB.REELS.size(), 10, "릴 10단계")
 	for id in GearDB.RODS:
-		var r := GearDB.rod(id)
-		_eq(r.grip < r.seat and r.seat < r.tip and r.tip <= 1.0, true, "%s 낚싯대 위치 순서" % id)
+		_eq(ArtSlot.has_art(GearDB.blank_art(id)), true, "%s 대 몸통 그림" % id)
+		_eq(ArtSlot.has_art(GearDB.float_art(id)), true, "%s 찌 그림" % id)
+	for id in GearDB.REELS:
+		_eq(ArtSlot.has_art(GearDB.butt_art(id)), true, "%s 밑동 그림" % id)
+	var prev := 0.0
+	for i in range(1, 11):
+		var r := GearDB.rod("rod_%d" % i)
+		_eq(r.cast >= prev, true, "낚싯대 %d단계 던지기 거리" % i)
+		prev = r.cast
 	_eq(GearDB.rod("없는것").name, GearDB.rod(GearDB.DEFAULT_ROD).name, "없는 낚싯대는 기본값")
+	_eq(GearDB.shop_list("rod").has(GearDB.DEFAULT_ROD), false, "처음 장비는 진열 안 함")
+	_eq(GearDB.shop_list("rod").has("rod_8"), false, "다음 바다 장비는 진열 안 함")
+	_eq(GearDB.shop_list("reel")[0], "reel_2", "릴 진열 순서")
 
 	var basic := _new_logic(9)
-	GearDB.apply(basic, "old_float", "cheap_spinning")
+	GearDB.apply(basic, "rod_1", "reel_1")
 	var good := _new_logic(9)
-	GearDB.apply(good, "carbon_rock", "lever_brake")
+	GearDB.apply(good, "rod_4", "reel_3")
 	_eq(good.tension_mult < basic.tension_mult, true, "좋은 장비는 장력이 덜 오름")
 	_eq(good.reel_mult > basic.reel_mult, true, "좋은 릴은 빨리 감김")
 
@@ -229,7 +425,7 @@ func _test_gear() -> void:
 
 	# 계속 감기만 할 때 좋은 장비가 더 오래 버틴다
 	var times := []
-	for gear in [["old_float", "cheap_spinning"], ["carbon_rock", "lever_brake"]]:
+	for gear in [["rod_1", "reel_1"], ["rod_4", "reel_3"]]:
 		var l := _new_logic(11)
 		GearDB.apply(l, gear[0], gear[1])
 		_cast(l)
@@ -356,13 +552,13 @@ func _test_cooking() -> void:
 
 func _test_economy() -> void:
 	var gs = load("res://scripts/autoload/game_state.gd").new()
-	gs.money = 50000
-	_eq(gs.buy_gear("rod", "starter_float"), "", "입문용 낚싯대 구매")
+	gs.money = 85000
+	_eq(gs.buy_gear("rod", "rod_2"), "", "갯바위 찌낚싯대 구매")
 	_eq(gs.money, 5000, "값만큼 빠짐")
-	_eq("starter_float" in gs.owned_rods, true, "가진 낚싯대에 추가")
-	_eq(gs.spent_today, 45000, "장부 지출")
-	_eq(gs.buy_gear("rod", "starter_float"), "이미 가지고 있어요.", "중복 구매 막기")
-	_eq(gs.buy_gear("reel", "spinning_2500"), "돈이 모자라요.", "돈 모자람")
+	_eq("rod_2" in gs.owned_rods, true, "가진 낚싯대에 추가")
+	_eq(gs.spent_today, 80000, "장부 지출")
+	_eq(gs.buy_gear("rod", "rod_2"), "이미 가지고 있어요.", "중복 구매 막기")
+	_eq(gs.buy_gear("reel", "reel_2"), "돈이 모자라요.", "돈 모자람")
 	_eq(gs.buy_gear("reel", "없는것"), "없는 물건이에요.", "없는 물건")
 	gs.earn(7000)
 	_eq(gs.money, 12000, "매출")
@@ -387,7 +583,7 @@ func _test_sound() -> void:
 	for id in SoundScript.BGM:
 		_eq(SoundScript.has_bgm(id), true, "배경음악 %s" % id)
 	for id in ["whoosh", "plop", "nibble", "bite", "strike", "reel", "land", "catch", "newfish", "snap", "slip", "bad",
-			"sizzle", "tap", "good", "okay", "door", "coin", "sold"]:
+			"sizzle", "tap", "good", "okay", "door", "coin", "sold", "surge", "pop"]:
 		_eq(SoundScript.has_sfx(id), true, "효과음 %s" % id)
 	_eq(SoundScript.has_sfx("없는소리"), false, "없는 효과음")
 

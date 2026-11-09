@@ -32,6 +32,15 @@ var equipped_rod := GearDB.DEFAULT_ROD
 var equipped_reel := GearDB.DEFAULT_REEL
 var owned_rods: Array = [GearDB.DEFAULT_ROD]
 var owned_reels: Array = [GearDB.DEFAULT_REEL]
+## 미끼: id → 남은 수 (크릴은 -1, 끝이 없다)
+var baits := {BaitDB.DEFAULT: -1}
+var equipped_bait := BaitDB.DEFAULT
+
+## 오늘의 주문 (Orders.of(day)). 잡은 수와 받았는지
+var order_filled := 0
+var order_done := false
+## 가장 길게 이은 연속 PERFECT
+var best_streak := 0
 
 ## 하루 시간 (자정부터 몇 분째인지). 07:00 = 420
 var time_minutes := 7 * 60
@@ -49,6 +58,10 @@ var spent_today := 0
 func _ready() -> void:
 	# 게임 전체 기본 모양 (글꼴, 스크롤바, 툴팁)
 	get_tree().root.theme = UiKit.build_theme()
+
+
+func _exit_tree() -> void:
+	UiKit.clear_fonts()
 
 
 func has_flag(name: String) -> bool:
@@ -82,6 +95,54 @@ func buy_gear(kind: String, id: String) -> String:
 	return ""
 
 
+## 미끼를 산다. 문제가 없으면 빈 문자열, 있으면 안내 문구를 돌려준다.
+func buy_bait(id: String) -> String:
+	if not BaitDB.BAITS.has(id):
+		return "없는 물건이에요."
+	var b := BaitDB.bait(id)
+	if b.amount < 0:
+		return "창고에 많이 있어요."
+	if money < b.price:
+		return "돈이 모자라요."
+	spend(b.price)
+	baits[id] = int(baits.get(id, 0)) + int(b.amount)
+	return ""
+
+
+func bait_count(id: String) -> int:
+	return int(baits.get(id, 0))
+
+
+## 미끼 하나를 쓴다. 다 떨어지면 크릴로 바꾼다.
+func use_bait() -> void:
+	var n := bait_count(equipped_bait)
+	if n < 0:
+		return
+	n -= 1
+	baits[equipped_bait] = n
+	if n <= 0:
+		baits.erase(equipped_bait)
+		equipped_bait = BaitDB.DEFAULT
+
+
+## 오늘 주문
+func today_order() -> Dictionary:
+	return Orders.of(day)
+
+
+## 잡은 물고기를 주문에 넣어 본다. 주문을 막 다 채웠으면 보상 금액, 아니면 0
+func offer_to_order(fish_id: String, size_cm: float) -> int:
+	var o := today_order()
+	if order_done or not Orders.matches(o, fish_id, size_cm):
+		return 0
+	order_filled += 1
+	if order_filled >= o.count:
+		order_done = true
+		earn(o.reward)
+		return o.reward
+	return 0
+
+
 ## 아이스박스에서 그 어종 한 마리를 꺼낸다. 없으면 빈 Dictionary
 func take_fish(id: String) -> Dictionary:
 	for i in inventory.size():
@@ -97,6 +158,8 @@ func end_day(wake_minutes := 6 * 60) -> void:
 	day += 1
 	time_minutes = wake_minutes
 	caught_today.clear()
+	order_filled = 0
+	order_done = false
 	sales_today = 0
 	spent_today = 0
 

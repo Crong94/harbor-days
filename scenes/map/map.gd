@@ -135,7 +135,7 @@ func _build_top_bar() -> void:
 	bar.add_child(h)
 	var name_col := UiKit.vbox(0)
 	var town := UiKit.text("물빛울포", "h2", UiKit.FOAM)
-	town.add_theme_font_override("font", UiKit.font("serif_bold"))
+	town.add_theme_font_override("font", UiKit.font("cute"))
 	town.add_theme_font_size_override("font_size", 26)
 	name_col.add_child(town)
 	_clock = UiKit.text("", "caption", UiKit.FOAM_SOFT)

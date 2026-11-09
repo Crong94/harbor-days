@@ -1,5 +1,6 @@
 extends Control
-## 준호네 낚시방 (세로). 낚싯대와 릴을 사고 바로 장착할 수 있다.
+## 준호네 낚시방 (세로). 낚싯대와 릴(10단계)을 사고 바로 장착하고, 미끼를 산다.
+## 이야기로 받는 장비(unlock story)는 조건만 보여 주고, 다음 바다 장비(later)는 진열하지 않는다.
 ## 그림: 가게 내부 bg_tackle_shop (지금은 바다 한 접시의 임시 그림), 준호 초상화 npc_junho (사용자에게 받음)
 ##       장비 아이콘 gear_icon/* (바다 한 접시에서 가져옴, GearDB의 icon)
 ##
@@ -55,8 +56,7 @@ func _build_top_bar() -> void:
 	bar.add_child(h)
 	var col := UiKit.vbox(0)
 	var title := UiKit.text("준호네 낚시방", "h2", UiKit.FOAM)
-	title.add_theme_font_override("font", UiKit.font("serif_bold"))
-	title.add_theme_font_size_override("font_size", 26)
+	title.add_theme_font_size_override("font_size", 28)
 	col.add_child(title)
 	col.add_child(UiKit.text("장비 · 미끼 · 수리", "caption", UiKit.FOAM_SOFT))
 	h.add_child(col)
@@ -127,7 +127,7 @@ func _make_tabs() -> PanelContainer:
 	track.add_theme_stylebox_override("panel", ts)
 	var h := UiKit.hbox(UiKit.SPACE_XS)
 	track.add_child(h)
-	for kind in [["rod", "낚싯대"], ["reel", "릴"]]:
+	for kind in [["rod", "낚싯대"], ["reel", "릴"], ["bait", "미끼"]]:
 		var b := Button.new()
 		b.text = kind[1]
 		b.toggle_mode = true
@@ -135,10 +135,10 @@ func _make_tabs() -> PanelContainer:
 		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.custom_minimum_size.y = 44
-		b.add_theme_font_override("font", UiKit.font("bold"))
-		b.add_theme_font_size_override("font_size", 18)
+		b.add_theme_font_override("font", UiKit.font("cute"))
+		b.add_theme_font_size_override("font_size", 21)
 		var off := UiKit.box(Color(0, 0, 0, 0), UiKit.RADIUS_PILL, Color.TRANSPARENT, 0, 0)
-		var on := UiKit.elevate(UiKit.box(Color.WHITE, UiKit.RADIUS_PILL, Color.TRANSPARENT, 0, 0), 1)
+		var on := UiKit.chunky(UiKit.SUN, UiKit.RADIUS_PILL, 0, 3)
 		b.add_theme_stylebox_override("normal", off)
 		b.add_theme_stylebox_override("hover", off)
 		b.add_theme_stylebox_override("pressed", on)
@@ -164,13 +164,17 @@ func _refresh() -> void:
 	for c in _list.get_children():
 		c.queue_free()
 	if _tab == "rod":
-		for id in GearDB.RODS:
+		for id in [GearDB.DEFAULT_ROD] + GearDB.shop_list("rod"):
 			var r: Dictionary = GearDB.RODS[id]
 			_list.add_child(_item_card("rod", id, r, ["던지기 %d%%" % int(r.cast * 100), "버티기 +%d%%" % int(r.strength * 100)]))
-	else:
-		for id in GearDB.REELS:
+	elif _tab == "reel":
+		for id in [GearDB.DEFAULT_REEL] + GearDB.shop_list("reel"):
 			var l: Dictionary = GearDB.REELS[id]
 			_list.add_child(_item_card("reel", id, l, ["감기 %d%%" % int(l.speed * 100), "드랙 +%d%%" % int(l.drag * 100)]))
+	else:
+		for id in BaitDB.ORDER:
+			if BaitDB.bait(id).amount > 0:
+				_list.add_child(_bait_card(id))
 
 
 func _item_card(kind: String, id: String, item: Dictionary, stats: Array) -> PanelContainer:
@@ -213,12 +217,59 @@ func _item_card(kind: String, id: String, item: Dictionary, stats: Array) -> Pan
 			_equip(kind, id)
 			_say("좋죠! %s, 손에 착 붙을 거예요." % item.name))
 		h.add_child(eq)
+	elif item.get("unlock", "shop") == "story":
+		var lock := UiKit.vbox(2)
+		lock.alignment = BoxContainer.ALIGNMENT_CENTER
+		lock.add_child(UiKit.badge("잠김", UiKit.INK_MUTED, Color.WHITE))
+		lock.add_child(UiKit.text(item.get("unlock_text", ""), "caption", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
+		h.add_child(lock)
 	else:
 		var buy := UiKit.action(GameState.format_won(item.price), "primary", true)
 		buy.custom_minimum_size.x = 128
 		buy.disabled = GameState.money < item.price
 		buy.pressed.connect(_buy.bind(kind, id))
 		h.add_child(buy)
+	return card
+
+
+## 미끼 한 줄: 아이콘, 이름, 잘 무는 고기, 가진 수, 사기
+func _bait_card(id: String) -> PanelContainer:
+	var b := BaitDB.bait(id)
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", UiKit.inset_box(UiKit.SPACE_LG, UiKit.RADIUS_LG))
+	var h := UiKit.hbox(UiKit.SPACE_LG)
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	card.add_child(h)
+	var thumb := PanelContainer.new()
+	thumb.add_theme_stylebox_override("panel", UiKit.box(Color.WHITE, UiKit.RADIUS_MD, Color.TRANSPARENT, 0, 6))
+	thumb.custom_minimum_size = Vector2(92, 92)
+	var ic := UiKit.icon_rect(BaitDB.icon_art(id), 80)
+	if ic:
+		thumb.add_child(ic)
+	h.add_child(thumb)
+	var info := UiKit.vbox(UiKit.SPACE_XS)
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.add_child(UiKit.text("%s  ·  %d개 묶음" % [b.name, b.amount], "title", UiKit.INK))
+	info.add_child(UiKit.paragraph(b.desc, "caption", UiKit.INK_SOFT))
+	var stat_row := UiKit.hbox(UiKit.SPACE_XS)
+	stat_row.add_child(UiKit.badge("잘 무는 고기: " + BaitDB.liked_names(id), Color(UiKit.SEA, 0.18), UiKit.INK))
+	info.add_child(stat_row)
+	info.add_child(UiKit.text("가진 것 %d개" % maxi(GameState.bait_count(id), 0), "caption", UiKit.INK_SOFT))
+	h.add_child(info)
+	var buy := UiKit.action(GameState.format_won(b.price), "primary", true)
+	buy.custom_minimum_size.x = 128
+	buy.disabled = GameState.money < b.price
+	buy.pressed.connect(func():
+		var err := GameState.buy_bait(id)
+		if not err.is_empty():
+			Sound.play_sfx("bad", 0.0, -6.0)
+			_say("아이고 형, " + err)
+			return
+		Sound.play_sfx("sold")
+		GameState.equipped_bait = id
+		_say("%s 넣어 드렸어요! %s 노리시는 거죠?" % [b.name, BaitDB.liked_names(id)])
+		_refresh())
+	h.add_child(buy)
 	return card
 
 
