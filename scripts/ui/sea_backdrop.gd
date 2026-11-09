@@ -43,6 +43,8 @@ var _t := 0.0
 var art_base := ""
 var art_blend := ""
 var _base_tex: Texture2D
+## 그림에서 화면에 보일 부분 (그림 크기 대비 0~1). 예: Rect2(0.1, 0, 0.8, 0.8)이면 아래쪽 20%를 잘라 내고 확대한다
+var art_view := Rect2(0, 0, 1, 1)
 var _blend_tex: Texture2D
 
 
@@ -70,12 +72,13 @@ func art_point(norm: Vector2) -> Vector2:
 	return r.position + norm * r.size
 
 
-## 화면을 꽉 채우도록 비율을 유지해 늘린 영역
+## 화면을 꽉 채우도록 비율을 유지해 늘린 그림 전체의 영역. art_view 부분이 화면 가운데에 꽉 찬다
 func _cover_rect(tex: Texture2D) -> Rect2:
 	var ts := tex.get_size()
-	var k := maxf(size.x / ts.x, size.y / ts.y)
-	var ds := ts * k
-	return Rect2((size - ds) / 2.0, ds)
+	var vs := ts * art_view.size
+	var k := maxf(size.x / vs.x, size.y / vs.y)
+	var view_pos := (size - vs * k) / 2.0
+	return Rect2(view_pos - art_view.position * ts * k, ts * k)
 
 
 func _process(delta: float) -> void:

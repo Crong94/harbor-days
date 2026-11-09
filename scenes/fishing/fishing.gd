@@ -55,7 +55,9 @@ const BG_ART := "bg_fishing_night"
 const BG_ART_BLEND := "bg_fishing_day"
 const WATER_NEAR_Y := 0.665 # 방파제 바로 앞 바다
 const WATER_FAR_Y := 0.36 # 가장 멀리 던졌을 때 (수평선 0.33 바로 아래)
-const FEET := Vector2(0.5, 0.965) # 주인공 발 위치
+const FEET := Vector2(0.5, 0.765) # 주인공 발 위치 (방파제 끝, 바다 바로 앞)
+## 그림에서 보일 부분. 방파제 아래쪽을 잘라 내고 확대해서 바다를 넓게 보여 준다
+const ART_VIEW := Rect2(0.1, 0.0, 0.8, 0.8)
 const FLOAT_NEAR_SCALE := 1.0
 const FLOAT_FAR_SCALE := 0.4
 
@@ -94,6 +96,7 @@ func _ready() -> void:
 	_bg.mode = SeaBackdrop.Mode.DAWN
 	_bg.art_base = BG_ART
 	_bg.art_blend = BG_ART_BLEND
+	_bg.art_view = ART_VIEW
 	add_child(_bg)
 
 	_player = PlayerRig.new()
