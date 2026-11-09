@@ -54,6 +54,11 @@ var flags := {}
 var sales_today := 0
 var spent_today := 0
 
+## 하루 흐름 (DayFlow). 오늘 가게를 열었는지, 밤 낚시를 했는지(했으면 내일 늦잠), 식당 평판
+var opened_today := false
+var night_fished := false
+var reputation := 0
+
 ## 설정 (메뉴 설정 탭). 바꾸면 SETTINGS_PATH에 저장하고 다음에 켤 때 불러온다
 const SETTINGS_PATH := "user://settings.cfg"
 ## 진동 (Haptics가 본다)
@@ -188,9 +193,12 @@ func take_fish(id: String) -> Dictionary:
 
 
 ## 하루를 마치고 다음 날 아침으로 넘어간다.
-func end_day(wake_minutes := 6 * 60) -> void:
+## wake_minutes를 주지 않으면 DayFlow 규칙대로 (밤 낚시를 했으면 늦잠)
+func end_day(wake_minutes := -1) -> void:
 	day += 1
-	time_minutes = wake_minutes
+	time_minutes = wake_minutes if wake_minutes >= 0 else DayFlow.wake_time(night_fished)
+	opened_today = false
+	night_fished = false
 	caught_today.clear()
 	order_filled = 0
 	order_done = false

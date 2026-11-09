@@ -6,6 +6,7 @@ extends Control
 ## 지도는 화면 높이의 MAP_SCREENS배 크기로 보여 준다. 처음에는 지금 있는 곳을 가운데에 둔다.
 
 const PIN_DOT := 14.0 # 잠긴 장소 점 크기
+const SERVICE_SCENE := "res://scenes/restaurant/service.tscn"
 ## 지도 높이를 화면 높이의 몇 배로 보여 줄지
 const MAP_SCREENS := 1.2
 ## 이만큼 움직여야 끌기로 본다 (그보다 적으면 탭)
@@ -26,6 +27,7 @@ var _go_btn: Button
 var _toast: PanelContainer
 var _toast_label: Label
 var _selected := ""
+var _action := "" # 시트의 큰 버튼이 할 일: go(이동), open(가게 열기), sleep(자기), "" (못 함)
 
 var _press := false
 var _press_at := Vector2.ZERO
@@ -70,6 +72,8 @@ func _ready() -> void:
 	if not GameState.flags.get("map_drag_hint", false):
 		GameState.flags["map_drag_hint"] = true
 		_show_toast.call_deferred("지도를 끌어서 마을을 둘러봐요")
+	else:
+		_show_toast.call_deferred(DayFlow.next_hint(GameState.time_minutes, GameState.opened_today))
 
 
 # ─── 지도 크기와 위치 ───────────────────────────────
@@ -313,12 +317,32 @@ func _select(id: String) -> void:
 	var loc := Locations.get_loc(id)
 	_sheet_title.text = GameState.line(loc.name)
 	_sheet_desc.text = GameState.line(loc.desc)
-	if id == GameState.current_location:
-		UiKit.set_chip(_sheet_time, "지금 여기")
-		_go_btn.text = "들어가기"
-	else:
-		UiKit.set_chip(_sheet_time, "%d분" % Locations.travel_minutes(GameState.current_location, id))
-		_go_btn.text = "가기"
+	var here := id == GameState.current_location
+	var travel := 0 if here else Locations.travel_minutes(GameState.current_location, id)
+	UiKit.set_chip(_sheet_time, "지금 여기" if here else "%d분" % travel)
+	_action = "go"
+	_go_btn.text = "들어가기" if here else "가기"
+	var arrive := GameState.time_minutes + travel
+	match id:
+		"breakwater":
+			if not DayFlow.can_fish(arrive):
+				_action = ""
+				_go_btn.text = "지금은 낚시 시간이 아니에요"
+				_sheet_desc.text = GameState.line(loc.desc) + "
+새벽 5시~11시, 밤 9시~11시 반에 낚시할 수 있어요."
+		"shop":
+			if GameState.has_flag("first_guest_done"):
+				if GameState.opened_today:
+					_action = "go" if not here else ""
+					_go_btn.text = "오늘 장사는 끝났어요" if here else "가기"
+				elif DayFlow.can_open_shop(arrive, false):
+					_action = "open"
+					_go_btn.text = "가게 열기" if arrive >= DayFlow.SHOP_OPEN else "가게 열기 (저녁 6시로)"
+		"home":
+			if GameState.opened_today or GameState.time_minutes >= DayFlow.SHOP_CLOSE:
+				_action = "sleep"
+				_go_btn.text = "집에 가서 자기"
+	_go_btn.disabled = _action.is_empty()
 	var was_open := _sheet.visible
 	_sheet.show()
 	if not was_open:
@@ -336,9 +360,21 @@ func _close_sheet() -> void:
 func _travel() -> void:
 	var id := _selected
 	var loc := Locations.get_loc(id)
+	if _action.is_empty():
+		return
 	GameState.time_minutes += Locations.travel_minutes(GameState.current_location, id)
 	GameState.current_location = id
 	_close_sheet()
+	if _action == "open":
+		UiKit.go_to(self, SERVICE_SCENE)
+		return
+	if _action == "sleep":
+		GameState.end_day()
+		Sound.play_sfx("step")
+		_refresh_hud()
+		_rebuild_pins()
+		_show_toast("푹 잤다. %d일차가 밝았어요" % GameState.day)
+		return
 	var scene: String = loc.get("scene", "")
 	if not scene.is_empty():
 		UiKit.go_to(self, scene)

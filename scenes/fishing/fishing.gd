@@ -1,7 +1,8 @@
 extends Control
 ## 북쪽 방파제 찌낚시.
 ## 첫날(튜토리얼): 챕터 2 새벽 05:00~07:00, 첫 물고기는 볼락, 끝나면 〈첫 번째 손님〉 식당 장면으로 간다.
-## 그 뒤(자유 낚시): 지도에서 들어온 시각부터 시작해 그만하기를 누르거나 밤 11시가 되면 끝나고 지도로 돌아간다.
+## 그 뒤(자유 낚시): 지도에서 들어온 시각의 낚시 시간대(DayFlow: 새벽, 아침, 밤)가 끝나거나 그만하기를 누르면 끝나고 지도로 돌아간다.
+## 밤 낚시를 마치면 잠자리에 들고 다음 날은 늦잠(새벽 낚시 건너뜀)
 ## 규칙은 FishingLogic, 이 스크립트는 입력, 시간, 화면 표시만 맡는다.
 ##
 ## 조작 (휴대폰 기준, PC는 괄호)
@@ -23,7 +24,7 @@ const FREE_NEXT := "res://scenes/map/map.tscn"
 
 const START_MIN := 5 * 60 # 05:00
 const END_MIN := 7 * 60 # 07:00
-const LATE_MIN := 23 * 60 # 자유 낚시는 밤 11시까지
+const LATE_MIN := 23 * 60 + 30 # 시간대를 모를 때 끝나는 시각
 const REAL_SEC_PER_GAME_MIN := 1.2
 
 const HINTS := {
@@ -67,6 +68,9 @@ var logic := FishingLogic.new()
 var minutes := float(START_MIN)
 ## 첫날 새벽 튜토리얼인지. first_fishing_done 표시가 없으면 튜토리얼이다.
 var tutorial := true
+## 자유 낚시가 끝나는 시각 (DayFlow 시간대 끝)
+var session_end := float(LATE_MIN)
+var night := false
 var sea := {}
 var order := {}
 
@@ -171,6 +175,9 @@ func _ready() -> void:
 	tutorial = not GameState.has_flag("first_fishing_done")
 	if not tutorial:
 		minutes = float(GameState.time_minutes)
+		var slot := DayFlow.fishing_slot(GameState.time_minutes)
+		session_end = float(slot.end) if not slot.is_empty() else minf(minutes + 120.0, float(LATE_MIN))
+		night = not slot.is_empty() and slot.id == "night"
 		logic.forgiving = false
 		logic.force_first_fish = ""
 	else:
@@ -340,7 +347,7 @@ func _process(delta: float) -> void:
 		_hitstop -= delta
 		playing = false
 	if playing:
-		minutes = minf(minutes + delta / REAL_SEC_PER_GAME_MIN, END_MIN if tutorial else LATE_MIN)
+		minutes = minf(minutes + delta / REAL_SEC_PER_GAME_MIN, END_MIN if tutorial else session_end)
 		logic.brightness = FishingLogic.brightness_at(minutes)
 		logic.steer = _steer()
 		logic.update(delta, _held, _mend_held)
@@ -419,7 +426,7 @@ func _process(delta: float) -> void:
 	if not _in_story and not _ending and logic.state == FishingLogic.State.READY:
 		if tutorial and minutes >= END_MIN and not GameState.caught_today.is_empty():
 			_start_ending()
-		elif not tutorial and minutes >= LATE_MIN:
+		elif not tutorial and minutes >= session_end:
 			_start_ending()
 
 
@@ -662,7 +669,7 @@ func _start_ending() -> void:
 	var n := GameState.caught_today.size()
 	if not tutorial:
 		_play_story([
-			{"speaker": "{player}", "text": "늦었다. 오늘은 여기까지." if minutes >= LATE_MIN else "오늘 낚시는 여기까지."},
+			{"speaker": "{player}", "text": ("밤이 깊었다. 이제 들어가 자자." if night else "물때가 지났다. 이번 낚시는 여기까지.") if minutes >= session_end else "이번 낚시는 여기까지."},
 		])
 		return
 	_play_story([
@@ -1236,6 +1243,12 @@ func _leave() -> void:
 		GameState.flags["first_fishing_done"] = true
 		GameState.current_location = "shop" # 잡은 볼락을 들고 식당으로 돌아간다
 		UiKit.go_to(self, TUTORIAL_NEXT)
+	elif night:
+		# 밤 낚시를 마치면 잔다. 내일은 늦잠 (새벽 낚시 건너뜀)
+		GameState.night_fished = true
+		GameState.current_location = "home"
+		GameState.end_day()
+		UiKit.go_to(self, FREE_NEXT)
 	else:
 		GameState.current_location = "breakwater"
 		UiKit.go_to(self, FREE_NEXT)
@@ -1257,7 +1270,7 @@ func _show_summary() -> void:
 	if GameState.best_streak >= 2:
 		extra = "  ·  최고 PERFECT %d연속" % GameState.best_streak
 	_summary_total.text = "모두 %s어치%s" % [GameState.format_won(total), extra] if rows > 0 else ""
-	_summary_btn.text = "식당으로" if tutorial else "마을 지도로"
+	_summary_btn.text = "식당으로" if tutorial else ("잠자리에 들기" if night else "마을 지도로")
 	_summary.show()
 	UiKit.fade_in(_summary, UiKit.MOTION_BASE)
 	_summary_btn.grab_focus()

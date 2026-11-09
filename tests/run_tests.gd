@@ -24,6 +24,7 @@ func _init() -> void:
 	_test_cooking()
 	_test_economy()
 	_test_sound()
+	_test_day_flow()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -711,3 +712,60 @@ func _test_header() -> void:
 	_eq(g.bolak.best, 22.5, "가장 큰 볼락")
 	_eq(g.bolak.value, FishDB.value_of("bolak", 18.0) + FishDB.value_of("bolak", 22.5), "볼락 값 합")
 	_eq(HudText.group_inventory([]), {}, "빈 가방")
+
+
+func _test_day_flow() -> void:
+	# 시간대: 새벽 05~07, 아침 07~11, 밤 21~23:30
+	_eq(DayFlow.fishing_slot(5 * 60).get("id", ""), "dawn", "05:00 새벽 낚시")
+	_eq(DayFlow.fishing_slot(7 * 60).get("id", ""), "morning", "07:00 아침 낚시")
+	_eq(DayFlow.can_fish(12 * 60), false, "한낮엔 낚시 못 함")
+	_eq(DayFlow.can_fish(19 * 60), false, "영업 시간엔 낚시 못 함")
+	_eq(DayFlow.fishing_slot(22 * 60).get("id", ""), "night", "22:00 밤 낚시")
+	_eq(DayFlow.fishing_end(6 * 60), 7 * 60, "새벽 낚시는 7시에 끝")
+	_eq(DayFlow.fishing_end(9 * 60), 11 * 60, "아침 낚시는 11시에 끝")
+	# 밤 낚시하면 늦잠
+	_eq(DayFlow.wake_time(false), 5 * 60, "보통은 새벽 5시 기상")
+	_eq(DayFlow.wake_time(true), 7 * 60, "밤 낚시 뒤엔 7시 기상 (새벽 건너뜀)")
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.night_fished = true
+	gs.opened_today = true
+	gs.end_day()
+	_eq(gs.time_minutes, 7 * 60, "end_day: 밤 낚시 다음 날 늦잠")
+	_eq(gs.night_fished or gs.opened_today, false, "end_day: 하루 표시 초기화")
+	gs.end_day()
+	_eq(gs.time_minutes, 5 * 60, "end_day: 그다음 날은 새벽 5시")
+	gs.free()
+	# 가게
+	_eq(DayFlow.can_open_shop(12 * 60, false), true, "낮에도 가게 열기(18시로 건너뜀)")
+	_eq(DayFlow.can_open_shop(19 * 60, true), false, "이미 열었으면 못 엶")
+	_eq(DayFlow.can_open_shop(22 * 60, false), false, "21시 넘으면 못 엶")
+	# 값
+	_eq(DayFlow.dish_price("bolak", 15.0) >= DayFlow.DISH_MIN, true, "구이 최소값")
+	_eq(DayFlow.dish_price("gamseongdom", 40.0) > DayFlow.dish_price("bolak", 15.0), true, "감성돔 구이가 더 비쌈")
+	_eq(DayFlow.special_price("bolak", 20.0, 3) > DayFlow.special_price("bolak", 20.0, 1), true, "별 많을수록 비쌈")
+	var n := DayFlow.guest_count(5)
+	_eq(n >= DayFlow.GUESTS_MIN and n <= DayFlow.GUESTS_MAX, true, "손님 수 범위")
+	_eq(DayFlow.guest_count(5), n, "같은 날 같은 손님 수")
+	# 보통 손님: 생선이 넉넉하면 모두 받고, 모자라면 돌아간다
+	var many := []
+	for i in 8:
+		many.append({"id": "bolak", "size": 14.0 + i})
+	var r := DayFlow.serve_regulars(5, many)
+	_eq(r.served.size(), n, "생선 넉넉하면 다 받음")
+	_eq(r.missed, 0, "돌아간 손님 없음")
+	_eq(r.served[0].size, 21.0, "큰 생선부터 낸다")
+	var sum := 0
+	for g in r.served:
+		sum += g.price
+	_eq(r.sales, sum, "매출 합계")
+	var few := DayFlow.serve_regulars(5, [{"id": "bolak", "size": 15.0}])
+	_eq(few.served.size(), 1, "생선 하나면 한 명만")
+	_eq(few.missed, n - 1, "나머지는 돌아감")
+	_eq(DayFlow.serve_regulars(5, []).sales, 0, "생선 없으면 매출 0")
+	# 특별 손님: 첫날은 없고 둘째 날부터 주문서 낸 사람
+	_eq(DayFlow.special_guest(1).is_empty(), true, "첫날 특별 손님 없음")
+	_eq(DayFlow.special_guest(2).get("name", ""), Orders.of(2).customer, "특별 손님은 주문서 낸 사람")
+	# 안내
+	_eq(DayFlow.next_hint(5 * 60, false).contains("새벽 낚시"), true, "새벽 안내")
+	_eq(DayFlow.next_hint(13 * 60, false).contains("저녁 6시"), true, "낮 안내: 가게 여는 시각")
+	_eq(DayFlow.next_hint(21 * 60 + 30, true).contains("늦잠"), true, "밤 낚시 안내")

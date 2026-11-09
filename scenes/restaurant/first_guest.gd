@@ -247,7 +247,7 @@ func _next_day() -> void:
 	GameState.flags["first_guest_done"] = true
 	GameState.flags["chapter2_done"] = true
 	GameState.current_location = "shop"
-	GameState.end_day(7 * 60)
+	GameState.end_day() # 다음 날 새벽 5시
 	UiKit.go_to(self, NEXT_SCENE)
 
 
