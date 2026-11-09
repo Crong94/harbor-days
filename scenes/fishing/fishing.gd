@@ -36,13 +36,20 @@ var _card_desc: Label
 var _summary: PanelContainer
 var _summary_list: Label
 
-## 낚시 자세 그림(player_fishing.png) 기준 위치. 그림 크기 대비 비율이다.
-const PLAYER_ART_SIZE := Vector2(158.0, 276.0)
-const ART_TIP := Vector2(0.009, 0.005) # 낚싯대 끝
-const ART_HANDS := Vector2(0.47, 0.34) # 손 (기울일 때 중심)
-const ART_FEET_X := 0.73 # 두 발 가운데
+## 뒤쪽 시점 낚시 화면. 아래 위치는 배경 그림(bg_fishing_dawn) 크기 대비 비율이다.
+## 배경 그림이 바뀌면 이 숫자들만 그림에 맞춰 고친다.
+const BG_ART := "bg_fishing_dawn"
+const BG_ART_BLEND := "bg_fishing_morning"
+const WATER_NEAR_Y := 0.84 # 방파제 바로 앞 바다
+const WATER_FAR_Y := 0.40 # 가장 멀리 던졌을 때 (수평선 0.35 바로 아래)
+const FEET := Vector2(0.5, 0.985) # 주인공 발 위치
+const FLOAT_NEAR_SCALE := 1.0
+const FLOAT_FAR_SCALE := 0.4
 
-var _has_art := false
+## SD 주인공 뒷모습 그림(player_sd_back.png) 기준 위치. 그림 크기 대비 비율이다.
+const PLAYER_SIZE := Vector2(150.0, 230.0)
+const SD_TIP := Vector2(0.95, 0.02) # 낚싯대 끝 (그림이 오면 맞춘다)
+
 var _held := false
 var _in_story := true
 var _ending := false
@@ -59,12 +66,11 @@ func _ready() -> void:
 
 	_bg = SeaBackdrop.new()
 	_bg.mode = SeaBackdrop.Mode.DAWN
+	_bg.art_base = BG_ART
+	_bg.art_blend = BG_ART_BLEND
 	add_child(_bg)
 
-	_player = ArtSlot.make("player_fishing", "주인공 (낚시 자세)", Vector2(120, 180))
-	_has_art = ArtSlot.has_art("player_fishing")
-	if _has_art:
-		_player.custom_minimum_size = PLAYER_ART_SIZE
+	_player = ArtSlot.make("player_sd_back", "SD 주인공 뒷모습", PLAYER_SIZE)
 	add_child(_player)
 
 	_layer = Control.new()
@@ -215,9 +221,10 @@ func _build_hud() -> void:
 	add_child(_count)
 
 	_hint = UiKit.shadowed(UiKit.label("", 24, UiKit.CREAM, HORIZONTAL_ALIGNMENT_CENTER), Color(0, 0, 0, 0.6), 2)
-	_hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	_hint.offset_top = -70
-	_hint.offset_bottom = -30
+	# 화면 아래쪽은 주인공 자리라 안내 문구는 위쪽 장력 막대 아래에 둔다
+	_hint.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	_hint.offset_top = 128
+	_hint.offset_bottom = 168
 	add_child(_hint)
 
 
@@ -316,87 +323,77 @@ func _show_summary() -> void:
 
 
 func _place_player() -> void:
-	_player.size = _player.custom_minimum_size
-	if not _has_art:
-		var x := size.x * 0.70
-		_player.position = Vector2(x, _bg.breakwater_top_y(x + 60) - _player.size.y)
-		return
-	var feet_x := size.x * 0.76
-	_player.position = Vector2(feet_x - ART_FEET_X * _player.size.x, _bg.breakwater_top_y(feet_x) - _player.size.y + 4)
-	_player.pivot_offset = ART_HANDS * _player.size
-	# 상태에 따라 몸을 살짝 기울여 낚싯대 움직임을 표현한다 (+는 뒤로 젖힘)
+	_player.size = PLAYER_SIZE
+	var feet := _bg.art_point(FEET)
+	_player.position = feet - Vector2(_player.size.x / 2.0, _player.size.y)
+	_player.pivot_offset = Vector2(_player.size.x / 2.0, _player.size.y)
+	# 상태에 따라 몸을 살짝 기울여 낚싯대 움직임을 표현한다 (-는 뒤로 젖힘)
 	var tilt := 0.0
 	match logic.state:
 		FishingLogic.State.CHARGING:
-			tilt = 12.0 * logic.power
+			tilt = -8.0 * logic.power
 		FishingLogic.State.CASTING:
-			tilt = lerpf(12.0 * logic.cast_power, -6.0, minf(logic.progress * 2.5, 1.0))
+			tilt = lerpf(-8.0 * logic.cast_power, 5.0, minf(logic.progress * 2.5, 1.0))
 		FishingLogic.State.REELING:
-			tilt = 3.0 + logic.fish_pull() * 5.0
+			tilt = -2.0 - logic.fish_pull() * 4.0
 		FishingLogic.State.BITE:
-			tilt = -2.0
+			tilt = 2.0
 	_player.rotation = lerp_angle(_player.rotation, deg_to_rad(tilt), 0.25)
-	# 어두운 새벽에는 캐릭터도 푸르스름하게 어둡게, 밝아질수록 원래 색으로
-	_player.modulate = Color(0.62, 0.62, 0.78).lerp(Color.WHITE, _bg.brightness)
 
 
 # ─── 낚싯대, 줄, 찌 ─────────────────────────────────
-# 낚시 도구는 게임 판정을 보여 주는 요소라 선과 점으로만 그린다.
-
-func _rod_base() -> Vector2:
-	return _player.position + Vector2(20, 70)
-
+# 낚싯줄과 찌는 게임 판정을 보여 주는 요소라 선과 점으로만 그린다.
 
 func _rod_tip() -> Vector2:
-	if _has_art:
-		return _player.get_transform() * (ART_TIP * _player.size)
-	var base := _rod_base()
-	var s := logic.state
-	var rod_len := 150.0
-	var angle := -2.2 # 기본: 바다 쪽으로 비스듬히
-	if s == FishingLogic.State.CHARGING:
-		angle = lerpf(-1.9, -0.9, logic.power) # 뒤로 젖힘
-	elif s == FishingLogic.State.CASTING:
-		angle = lerpf(-0.9, -2.2, minf(logic.progress * 3.0, 1.0))
-	elif s == FishingLogic.State.REELING:
-		angle = -2.45 + logic.fish_pull() * 0.25
-	return base + Vector2(cos(angle), sin(angle)) * rod_len
+	return _player.get_transform() * (SD_TIP * _player.size)
 
 
-func _float_target() -> Vector2:
-	var hy := _bg.horizon_y()
-	var p := logic.cast_power
-	return Vector2(lerpf(size.x * 0.56, size.x * 0.12, p), lerpf(hy + size.y * 0.17, hy + size.y * 0.06, p))
+## 바다 위 깊이(0 = 방파제 앞, 1 = 가장 멀리)를 화면 좌표로 바꾼다.
+func _water_point(depth: float) -> Vector2:
+	var near := _bg.art_point(Vector2(0.48, WATER_NEAR_Y))
+	var far := _bg.art_point(Vector2(0.52, WATER_FAR_Y))
+	# 멀수록 화면에서 덜 움직이도록 (원근감)
+	var k := 1.0 - pow(1.0 - clampf(depth, 0.0, 1.0), 1.6)
+	return near.lerp(far, k)
+
+
+func _depth_scale(depth: float) -> float:
+	return lerpf(FLOAT_NEAR_SCALE, FLOAT_FAR_SCALE, clampf(depth, 0.0, 1.0))
+
+
+## 지금 찌(또는 물고기)가 있는 깊이
+func _float_depth() -> float:
+	if logic.state == FishingLogic.State.REELING:
+		return logic.cast_power * logic.distance
+	return logic.cast_power
 
 
 func _float_pos() -> Vector2:
-	var target := _float_target()
+	var target := _water_point(logic.cast_power)
+	var sc := _depth_scale(logic.cast_power)
 	match logic.state:
 		FishingLogic.State.CASTING:
 			var tip := _rod_tip()
 			var k := logic.progress
 			var p := tip.lerp(target, k)
-			p.y -= sin(k * PI) * 160.0 * (0.4 + logic.cast_power)
+			p.y -= sin(k * PI) * 220.0 * (0.4 + logic.cast_power)
 			return p
 		FishingLogic.State.WAITING:
-			return target + Vector2(0, sin(_t * 2.2) * 2.0 + logic.nibble * 7.0)
+			return target + Vector2(0, (sin(_t * 2.2) * 2.0 + logic.nibble * 7.0) * sc)
 		FishingLogic.State.BITE:
-			return target + Vector2(0, 14)
+			return target + Vector2(0, 14 * sc)
 		FishingLogic.State.REELING:
-			var shore := Vector2(size.x * 0.64, _bg.horizon_y() + size.y * 0.19)
-			return shore.lerp(target, logic.distance)
+			return _water_point(_float_depth())
 	return target
 
 
 func _draw_layer() -> void:
 	var s := logic.state
 	var tip := _rod_tip()
-	if not _has_art:
-		_layer.draw_line(_rod_base(), tip, Color("3b2a1e"), 4.0, true)
 
 	if s in [FishingLogic.State.CASTING, FishingLogic.State.WAITING, FishingLogic.State.BITE, FishingLogic.State.REELING]:
 		var fp := _float_pos()
-		var sag := 0.0 if s == FishingLogic.State.REELING else 40.0
+		var sag := 0.0 if s == FishingLogic.State.REELING else 14.0
 		var tension_col := Color(1, 1, 1, 0.7)
 		if s == FishingLogic.State.REELING:
 			tension_col = Color(1, 1, 1, 0.8).lerp(Color("ff5a4a"), clampf((logic.tension - 0.7) / 0.3, 0.0, 1.0))
@@ -409,11 +406,13 @@ func _draw_layer() -> void:
 		_layer.draw_polyline(pts, tension_col, 1.5, true)
 
 		if s == FishingLogic.State.REELING:
+			var ssc := _depth_scale(_float_depth())
 			for sp in _splashes:
 				var a: float = 1.0 - sp.t / 0.5
-				_layer.draw_arc(fp + sp.off, 6.0 + sp.t * 30.0, PI, TAU, 12, Color(1, 1, 1, a * 0.8), 2.0)
+				_layer.draw_arc(fp + sp.off * ssc, (6.0 + sp.t * 30.0) * ssc, PI, TAU, 12, Color(1, 1, 1, a * 0.8), 2.0)
 		else:
-			_draw_float(fp, s == FishingLogic.State.BITE)
+			var fsc := 1.0 if s == FishingLogic.State.CASTING else _depth_scale(logic.cast_power)
+			_draw_float(fp, s == FishingLogic.State.BITE, fsc)
 
 	if s == FishingLogic.State.CHARGING:
 		_draw_power_gauge()
@@ -421,16 +420,16 @@ func _draw_layer() -> void:
 		_draw_tension_bar()
 
 
-func _draw_float(p: Vector2, sunk: bool) -> void:
+func _draw_float(p: Vector2, sunk: bool, k := 1.0) -> void:
 	if sunk:
-		var r := 8.0 + fmod(_t * 40.0, 24.0)
-		_layer.draw_arc(p + Vector2(0, -6), r, 0, TAU, 24, Color(1, 1, 1, 0.6), 2.0)
-		_layer.draw_circle(p + Vector2(0, -12), 4.0, Color("ff6a3d"))
+		var r := (8.0 + fmod(_t * 40.0, 24.0)) * k
+		_layer.draw_arc(p + Vector2(0, -6) * k, r, 0, TAU, 24, Color(1, 1, 1, 0.6), 2.0)
+		_layer.draw_circle(p + Vector2(0, -12) * k, 4.0 * k, Color("ff6a3d"))
 		return
-	_layer.draw_line(p + Vector2(0, -22), p + Vector2(0, -8), Color("ff6a3d"), 4.0)
-	_layer.draw_circle(p + Vector2(0, -6), 6.0, Color("ff6a3d"))
-	_layer.draw_circle(p + Vector2(0, 2), 6.0, Color("f6efe0"))
-	_layer.draw_line(p + Vector2(-14, 6), p + Vector2(14, 6), Color(1, 1, 1, 0.5), 1.5)
+	_layer.draw_line(p + Vector2(0, -22) * k, p + Vector2(0, -8) * k, Color("ff6a3d"), maxf(1.5, 4.0 * k))
+	_layer.draw_circle(p + Vector2(0, -6) * k, 6.0 * k, Color("ff6a3d"))
+	_layer.draw_circle(p + Vector2(0, 2) * k, 6.0 * k, Color("f6efe0"))
+	_layer.draw_line(p + Vector2(-14, 6) * k, p + Vector2(14, 6) * k, Color(1, 1, 1, 0.5), 1.5)
 
 
 func _draw_power_gauge() -> void:
@@ -462,7 +461,7 @@ func _draw_tension_bar() -> void:
 func _expose_state_for_tests() -> void:
 	if not OS.has_feature("web"):
 		return
-	var key := "%s|%d|%s|%d" % [FishingLogic.State.keys()[logic.state], int(logic.tension * 100), str(_in_story), GameState.caught_today.size()]
+	var key := "%s|%d|%s|%d|%d" % [FishingLogic.State.keys()[logic.state], int(logic.tension * 100), str(_in_story), GameState.caught_today.size(), int(logic.cast_power * 100)]
 	if key != get_meta("_last_key", ""):
 		set_meta("_last_key", key)
 		JavaScriptBridge.eval("window.__fish = '%s';" % key)

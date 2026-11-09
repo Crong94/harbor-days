@@ -20,20 +20,26 @@ static func make(id: String, label: String, min_size: Vector2) -> ArtSlot:
 
 
 static func has_art(id: String) -> bool:
-	return ResourceLoader.exists(ART_DIR + id + ".png")
+	return ResourceLoader.exists(ART_DIR + id + ".png") or ResourceLoader.exists(ART_DIR + id + ".jpg")
+
+
+## 그림 파일 경로 (png 우선, 없으면 jpg)
+static func art_path(id: String) -> String:
+	var png := ART_DIR + id + ".png"
+	return png if ResourceLoader.exists(png) else ART_DIR + id + ".jpg"
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if has_art(art_id):
-		_tex = load(ART_DIR + art_id + ".png")
+		_tex = load(art_path(art_id))
 	queue_redraw()
 
 
 func set_art(id: String, label: String) -> void:
 	art_id = id
 	label_text = label
-	_tex = load(ART_DIR + id + ".png") if has_art(id) else null
+	_tex = load(art_path(id)) if has_art(id) else null
 	queue_redraw()
 
 

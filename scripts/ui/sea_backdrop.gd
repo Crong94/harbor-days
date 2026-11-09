@@ -53,13 +53,21 @@ func _ready() -> void:
 		art_base = "bg_breakwater_dawn"
 		art_blend = "bg_breakwater_morning"
 	if not art_base.is_empty() and ArtSlot.has_art(art_base):
-		_base_tex = load(ArtSlot.ART_DIR + art_base + ".png")
+		_base_tex = load(ArtSlot.art_path(art_base))
 	if not art_blend.is_empty() and ArtSlot.has_art(art_blend):
-		_blend_tex = load(ArtSlot.ART_DIR + art_blend + ".png")
+		_blend_tex = load(ArtSlot.art_path(art_blend))
 
 
 func has_art() -> bool:
 	return _base_tex != null
+
+
+## 배경 그림 위의 비율 위치(0~1)를 화면 좌표로 바꾼다. 그림이 없으면 화면 비율 그대로.
+func art_point(norm: Vector2) -> Vector2:
+	if not _base_tex:
+		return norm * size
+	var r := _cover_rect(_base_tex)
+	return r.position + norm * r.size
 
 
 ## 화면을 꽉 채우도록 비율을 유지해 늘린 영역
