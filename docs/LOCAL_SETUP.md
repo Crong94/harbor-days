@@ -60,7 +60,7 @@ git log --oneline -3
 "/d/tools/godot/Godot_v4.4.1-stable_win64_console.exe" --headless --path . --script res://tests/run_tests.gd
 ```
 
-`결과: 88 통과, 0 실패`가 나오면 정상이다.
+`결과: 171 통과, 0 실패`가 나오면 정상이다.
 
 - 웹 빌드가 필요하면 에디터 메뉴 Editor → Manage Export Templates에서 4.4.1 템플릿을 받은 뒤 Project → Export → Web
 

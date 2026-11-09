@@ -45,4 +45,5 @@ func _ready() -> void:
 	root.add_child(footer_margin)
 
 	start.grab_focus()
+	Sound.play_bgm("title")
 	UiKit.fade_in(self, 1.0)

@@ -1,0 +1,816 @@
+{
+  "flavors": [
+    {
+      "id": "salty",
+      "name": "짠맛",
+      "tool": "소금",
+      "review": [
+        "간이 딱 맞아요",
+        "좀 싱거워요",
+        "너무 짜요"
+      ]
+    },
+    {
+      "id": "sweet",
+      "name": "단맛",
+      "tool": "설탕",
+      "review": [
+        "달큰하니 좋네요",
+        "단맛이 모자라요",
+        "너무 달아요"
+      ]
+    },
+    {
+      "id": "umami",
+      "name": "감칠맛",
+      "tool": "멸치 육수",
+      "review": [
+        "국물이 깊어요",
+        "맛이 밍밍해요",
+        "너무 진해요"
+      ]
+    },
+    {
+      "id": "sour",
+      "name": "신맛",
+      "tool": "식초",
+      "review": [
+        "새콤해서 입맛 돌아요",
+        "새콤함이 부족해요",
+        "너무 시큼해요"
+      ]
+    },
+    {
+      "id": "bitter",
+      "name": "쓴맛",
+      "tool": "쑥갓",
+      "review": [
+        "쌉싸름해서 좋아요",
+        "향이 약해요",
+        "너무 써요"
+      ]
+    }
+  ],
+  "recipes": [
+    {
+      "id": "bollak-gui",
+      "tool": "grill",
+      "name": "볼락구이",
+      "species": "bollak",
+      "price": 13000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.58
+        }
+      ]
+    },
+    {
+      "id": "godeungeo-jorim",
+      "tool": "pot",
+      "name": "고등어조림",
+      "species": "godeungeo",
+      "price": 15000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.62
+        },
+        {
+          "flavor": "sweet",
+          "target": 0.38
+        }
+      ]
+    },
+    {
+      "id": "noraemi-maeun",
+      "tool": "stockpot",
+      "name": "노래미 매운탕",
+      "species": "noraemi",
+      "price": 17000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.5
+        },
+        {
+          "flavor": "umami",
+          "target": 0.72
+        }
+      ]
+    },
+    {
+      "id": "hakgongchi-muchim",
+      "tool": "knife",
+      "name": "학공치 회무침",
+      "species": "hakgongchi",
+      "price": 15000,
+      "raw": true,
+      "steps": [
+        {
+          "flavor": "sweet",
+          "target": 0.45
+        },
+        {
+          "flavor": "sour",
+          "target": 0.66
+        }
+      ]
+    },
+    {
+      "id": "gamseongdom-hoe",
+      "tool": "knife",
+      "name": "감성돔 숙성회",
+      "species": "gamseongdom",
+      "price": 48000,
+      "raw": true,
+      "steps": [
+        {
+          "flavor": "umami",
+          "target": 0.4
+        }
+      ]
+    },
+    {
+      "id": "chamdom-hoe",
+      "tool": "knife",
+      "name": "참돔회",
+      "species": "chamdom",
+      "price": 42000,
+      "raw": true,
+      "steps": [
+        {
+          "flavor": "umami",
+          "target": 0.46
+        }
+      ]
+    },
+    {
+      "id": "dodari-ssukguk",
+      "tool": "stockpot",
+      "name": "도다리쑥국",
+      "species": "dodari",
+      "price": 19000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.44
+        },
+        {
+          "flavor": "bitter",
+          "target": 0.6
+        }
+      ]
+    },
+    {
+      "id": "gabojingeo-sukhoe",
+      "tool": "steamer",
+      "name": "갑오징어숙회",
+      "species": "gabojingeo",
+      "price": 21000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "sour",
+          "target": 0.57
+        },
+        {
+          "flavor": "sweet",
+          "target": 0.42
+        }
+      ]
+    },
+    {
+      "id": "ureok-maeun",
+      "tool": "stockpot",
+      "name": "우럭매운탕",
+      "species": "ureok",
+      "price": 22000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.54
+        },
+        {
+          "flavor": "umami",
+          "target": 0.68
+        }
+      ]
+    },
+    {
+      "id": "nongeo-gui",
+      "tool": "grill",
+      "name": "농어구이",
+      "species": "nongeo",
+      "price": 32000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.5
+        }
+      ]
+    },
+    {
+      "id": "hwangnollaegi-gui",
+      "tool": "grill",
+      "name": "황놀래기구이",
+      "species": "hwangnollaegi",
+      "price": 4000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.52
+        }
+      ]
+    },
+    {
+      "id": "ureok-gui",
+      "tool": "grill",
+      "name": "우럭구이",
+      "species": "ureok",
+      "price": 11000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.56
+        }
+      ]
+    },
+    {
+      "id": "ssombaengi-gui",
+      "tool": "grill",
+      "name": "쏨뱅이구이",
+      "species": "ssombaengi",
+      "price": 9000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.6
+        }
+      ]
+    },
+    {
+      "id": "gaebollak-gui",
+      "tool": "grill",
+      "name": "개볼락구이",
+      "species": "gaebollak",
+      "price": 10000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.55
+        }
+      ]
+    },
+    {
+      "id": "noraemi-gui",
+      "tool": "grill",
+      "name": "노래미구이",
+      "species": "noraemi",
+      "price": 7000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.5
+        }
+      ]
+    },
+    {
+      "id": "dodari-gui",
+      "tool": "grill",
+      "name": "도다리구이",
+      "species": "dodari",
+      "price": 11000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.47
+        }
+      ]
+    },
+    {
+      "id": "gangdodari-gui",
+      "tool": "grill",
+      "name": "강도다리구이",
+      "species": "gangdodari",
+      "price": 12000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.45
+        }
+      ]
+    },
+    {
+      "id": "dolgajami-gui",
+      "tool": "grill",
+      "name": "돌가자미구이",
+      "species": "dolgajami",
+      "price": 14000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.49
+        }
+      ]
+    },
+    {
+      "id": "gwangeo-gui",
+      "tool": "grill",
+      "name": "광어구이",
+      "species": "gwangeo",
+      "price": 25000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.43
+        }
+      ]
+    },
+    {
+      "id": "yangtae-gui",
+      "tool": "grill",
+      "name": "양태구이",
+      "species": "yangtae",
+      "price": 11000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.53
+        }
+      ]
+    },
+    {
+      "id": "godeungeo-gui",
+      "tool": "grill",
+      "name": "고등어구이",
+      "species": "godeungeo",
+      "price": 6000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.64
+        }
+      ]
+    },
+    {
+      "id": "jeongaengi-gui",
+      "tool": "grill",
+      "name": "전갱이구이",
+      "species": "jeongaengi",
+      "price": 5000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.6
+        }
+      ]
+    },
+    {
+      "id": "gamseongdom-gui",
+      "tool": "grill",
+      "name": "감성돔구이",
+      "species": "gamseongdom",
+      "price": 32000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.46
+        }
+      ]
+    },
+    {
+      "id": "chamdom-gui",
+      "tool": "grill",
+      "name": "참돔구이",
+      "species": "chamdom",
+      "price": 29000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.44
+        }
+      ]
+    },
+    {
+      "id": "cheongeo-gui",
+      "tool": "grill",
+      "name": "청어구이",
+      "species": "cheongeo",
+      "price": 4000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.62
+        }
+      ]
+    },
+    {
+      "id": "kkochigogi-gui",
+      "tool": "grill",
+      "name": "꼬치고기구이",
+      "species": "kkochigogi",
+      "price": 8000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.57
+        }
+      ]
+    },
+    {
+      "id": "jeoneo-gui",
+      "tool": "grill",
+      "name": "전어구이",
+      "species": "jeoneo",
+      "price": 4000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.66
+        }
+      ]
+    },
+    {
+      "id": "sungeo-gui",
+      "tool": "grill",
+      "name": "숭어구이",
+      "species": "sungeo",
+      "price": 9000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.54
+        }
+      ]
+    },
+    {
+      "id": "beomdom-gui",
+      "tool": "grill",
+      "name": "범돔구이",
+      "species": "beomdom",
+      "price": 4000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.51
+        }
+      ]
+    },
+    {
+      "id": "baekjogi-gui",
+      "tool": "grill",
+      "name": "백조기구이",
+      "species": "baekjogi",
+      "price": 5000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.55
+        }
+      ]
+    },
+    {
+      "id": "mueuni-gui",
+      "tool": "grill",
+      "name": "무늬오징어 통구이",
+      "species": "mueuni",
+      "price": 29000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.42
+        },
+        {
+          "flavor": "sweet",
+          "target": 0.5
+        }
+      ]
+    },
+    {
+      "id": "gabojingeo-gui",
+      "tool": "grill",
+      "name": "갑오징어구이",
+      "species": "gabojingeo",
+      "price": 14000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.45
+        },
+        {
+          "flavor": "sweet",
+          "target": 0.55
+        }
+      ]
+    },
+    {
+      "id": "muneo-gui",
+      "tool": "grill",
+      "name": "문어구이",
+      "species": "muneo",
+      "price": 23000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.48
+        },
+        {
+          "flavor": "sour",
+          "target": 0.4
+        }
+      ]
+    },
+    {
+      "id": "bungjangeo-gui",
+      "tool": "grill",
+      "name": "붕장어구이",
+      "species": "bungjangeo",
+      "price": 9000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "sweet",
+          "target": 0.62
+        },
+        {
+          "flavor": "salty",
+          "target": 0.48
+        }
+      ]
+    },
+    {
+      "id": "imyeonsueo-gui",
+      "tool": "grill",
+      "name": "임연수어구이",
+      "species": "imyeonsueo",
+      "price": 6000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.58
+        }
+      ]
+    },
+    {
+      "id": "ssugimi-gui",
+      "tool": "grill",
+      "name": "쑤기미구이",
+      "species": "ssugimi",
+      "price": 11000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.5
+        }
+      ]
+    },
+    {
+      "id": "jeongeori-gui",
+      "tool": "grill",
+      "name": "정어리구이",
+      "species": "jeongeori",
+      "price": 4000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.63
+        }
+      ]
+    },
+    {
+      "id": "mangsangeo-gui",
+      "tool": "grill",
+      "name": "망상어구이",
+      "species": "mangsangeo",
+      "price": 4000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.52
+        }
+      ]
+    },
+    {
+      "id": "hakgongchi-gui",
+      "tool": "grill",
+      "name": "학공치구이",
+      "species": "hakgongchi",
+      "price": 5000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.56
+        }
+      ]
+    },
+    {
+      "id": "hwangeo-gui",
+      "tool": "grill",
+      "name": "황어구이",
+      "species": "hwangeo",
+      "price": 5000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.55
+        }
+      ]
+    },
+    {
+      "id": "bengedom-gui",
+      "tool": "grill",
+      "name": "벵에돔구이",
+      "species": "bengedom",
+      "price": 18000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.5
+        }
+      ]
+    },
+    {
+      "id": "jukkumi-bokkeum",
+      "tool": "wok",
+      "name": "주꾸미볶음",
+      "species": "jukkumi",
+      "price": 12000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.5
+        },
+        {
+          "flavor": "sweet",
+          "target": 0.56
+        }
+      ]
+    },
+    {
+      "id": "bungjangeo-twigim",
+      "tool": "fryer",
+      "name": "붕장어튀김",
+      "species": "bungjangeo",
+      "price": 18000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.46
+        }
+      ]
+    },
+    {
+      "id": "mangdung-twigim",
+      "tool": "fryer",
+      "name": "망둥어튀김",
+      "species": "mangdung",
+      "price": 8000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.52
+        }
+      ]
+    },
+    {
+      "id": "muneo-cheolpan",
+      "tool": "griddle",
+      "name": "문어 철판구이",
+      "species": "muneo",
+      "price": 38000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.48
+        },
+        {
+          "flavor": "sweet",
+          "target": 0.36
+        }
+      ]
+    },
+    {
+      "id": "galchi-ttukbaegi",
+      "tool": "ttukbaegi",
+      "name": "갈치 뚝배기조림",
+      "species": "galchi",
+      "price": 26000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.5
+        },
+        {
+          "flavor": "sweet",
+          "target": 0.42
+        }
+      ]
+    },
+    {
+      "id": "kkolttugi-kkochi",
+      "tool": "skewer",
+      "name": "꼴뚜기 꼬치구이",
+      "species": "kkolttugi",
+      "price": 7000,
+      "raw": false,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.55
+        },
+        {
+          "flavor": "sweet",
+          "target": 0.42
+        }
+      ]
+    },
+    {
+      "id": "gwangeo-hoe",
+      "tool": "grater",
+      "name": "광어회",
+      "species": "gwangeo",
+      "price": 42000,
+      "raw": true,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.35
+        }
+      ]
+    },
+    {
+      "id": "jeongaengi-chobap",
+      "tool": "sushitub",
+      "name": "전갱이 초밥",
+      "species": "jeongaengi",
+      "price": 14000,
+      "raw": true,
+      "steps": [
+        {
+          "flavor": "sour",
+          "target": 0.6
+        },
+        {
+          "flavor": "sweet",
+          "target": 0.4
+        }
+      ]
+    },
+    {
+      "id": "sungeo-hoe",
+      "tool": "scaler",
+      "name": "숭어회",
+      "species": "sungeo",
+      "price": 18000,
+      "raw": true,
+      "steps": [
+        {
+          "flavor": "salty",
+          "target": 0.38
+        }
+      ]
+    }
+  ]
+}

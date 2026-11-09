@@ -41,8 +41,59 @@ var current_location := "shop"
 var flags := {}
 
 
+## 하루 장부. 밤에 정리하고 비운다.
+var sales_today := 0
+var spent_today := 0
+
+
 func has_flag(name: String) -> bool:
 	return flags.get(name, false)
+
+
+## 돈을 벌거나 쓴다. 장부에도 적는다.
+func earn(amount: int) -> void:
+	money += amount
+	sales_today += amount
+
+
+func spend(amount: int) -> void:
+	money -= amount
+	spent_today += amount
+
+
+## 장비를 산다. kind는 "rod" 또는 "reel". 문제가 없으면 빈 문자열, 있으면 안내 문구를 돌려준다.
+func buy_gear(kind: String, id: String) -> String:
+	var table: Dictionary = GearDB.RODS if kind == "rod" else GearDB.REELS
+	var owned: Array = owned_rods if kind == "rod" else owned_reels
+	if not table.has(id):
+		return "없는 물건이에요."
+	if id in owned:
+		return "이미 가지고 있어요."
+	var price: int = table[id].price
+	if money < price:
+		return "돈이 모자라요."
+	spend(price)
+	owned.append(id)
+	return ""
+
+
+## 아이스박스에서 그 어종 한 마리를 꺼낸다. 없으면 빈 Dictionary
+func take_fish(id: String) -> Dictionary:
+	for i in inventory.size():
+		if inventory[i].id == id:
+			var e: Dictionary = inventory[i]
+			inventory.remove_at(i)
+			return e
+	return {}
+
+
+## 하루를 마치고 다음 날 아침으로 넘어간다.
+func end_day(wake_minutes := 6 * 60) -> void:
+	day += 1
+	time_minutes = wake_minutes
+	caught_today.clear()
+	sales_today = 0
+	spent_today = 0
 
 
 func clock_text() -> String:

@@ -214,6 +214,21 @@ func _fail(reason: String) -> void:
 	state = State.FAILED
 
 
+## 하루 중 시각(자정부터 분)에 따른 바다 밝기 0~1. 05:00~07:00에 밝아지고 17:30~19:30에 어두워진다.
+## 볼락 입질(FishDB.pick)과 배경 밝기에 쓴다.
+static func brightness_at(minutes: float) -> float:
+	var m := fposmod(minutes, 24.0 * 60.0)
+	if m < 5 * 60:
+		return 0.0
+	if m < 7 * 60:
+		return (m - 5 * 60) / 120.0
+	if m < 17.5 * 60:
+		return 1.0
+	if m < 19.5 * 60:
+		return 1.0 - (m - 17.5 * 60) / 120.0
+	return 0.0
+
+
 static func fail_message(reason: String) -> String:
 	match reason:
 		"nibble":

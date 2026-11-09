@@ -1,11 +1,15 @@
 extends Control
-## 챕터 2: 새벽 북쪽 방파제 찌낚시. 첫 물고기는 볼락.
+## 북쪽 방파제 찌낚시.
+## 첫날(튜토리얼): 챕터 2 새벽 05:00~07:00, 첫 물고기는 볼락, 끝나면 〈첫 번째 손님〉 식당 장면으로 간다.
+## 그 뒤(자유 낚시): 지도에서 들어온 시각부터 시작해 그만하기를 누르거나 밤 11시가 되면 끝나고 지도로 돌아간다.
 ## 규칙은 FishingLogic, 이 스크립트는 입력, 시간, 화면 표시만 맡는다.
 
-const NEXT_SCENE := "res://scenes/map/map.tscn" # 〈첫 번째 손님〉이 생기면 식당으로 바꾼다
+const TUTORIAL_NEXT := "res://scenes/restaurant/first_guest.tscn"
+const FREE_NEXT := "res://scenes/map/map.tscn"
 
 const START_MIN := 5 * 60 # 05:00
 const END_MIN := 7 * 60 # 07:00
+const LATE_MIN := 23 * 60 # 자유 낚시는 밤 11시까지
 const REAL_SEC_PER_GAME_MIN := 1.2
 
 const HINTS := {
@@ -19,6 +23,8 @@ const HINTS := {
 
 var logic := FishingLogic.new()
 var minutes := float(START_MIN)
+## 첫날 새벽 튜토리얼인지. first_fishing_done 표시가 없으면 튜토리얼이다.
+var tutorial := true
 
 var _bg: SeaBackdrop
 var _layer: Control
@@ -34,7 +40,10 @@ var _card_size: Label
 var _card_new: Label
 var _card_desc: Label
 var _summary: PanelContainer
+var _summary_title: Label
 var _summary_list: Label
+var _summary_btn: Button
+var _quit_btn: Button
 
 ## 뒤쪽 시점 낚시 화면. 아래 위치는 배경 그림(bg_fishing_dawn) 크기 대비 비율이다.
 ## 배경 그림이 바뀌면 이 숫자들만 그림에 맞춰 고친다.
@@ -62,12 +71,20 @@ var _met_mansu := false
 var _last_state := -1
 var _t := 0.0
 var _splashes: Array = []
+var _reel_sound := 0.0 # 릴 감는 소리 간격
+var _was_nibble := false
 
 
 func _ready() -> void:
 	# 바깥 노드가 클릭을 먹지 않게 해야 _unhandled_input으로 낚시 입력이 들어온다
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	logic.rng.randomize()
+	tutorial = not GameState.has_flag("first_fishing_done")
+	if not tutorial:
+		minutes = float(GameState.time_minutes)
+		logic.forgiving = false
+		logic.force_first_fish = ""
+	logic.brightness = FishingLogic.brightness_at(minutes)
 
 	_bg = SeaBackdrop.new()
 	_bg.mode = SeaBackdrop.Mode.DAWN
@@ -96,6 +113,13 @@ func _ready() -> void:
 	_dialogue.finished.connect(_on_dialogue_finished)
 
 	UiKit.fade_in(self, 1.0)
+	Sound.play_bgm("sea")
+	if not tutorial:
+		_play_story([
+			{"speaker": "", "text": "북쪽 방파제. 빨간 등대 아래 늘 앉던 자리."},
+			{"speaker": "{player}", "text": "오늘은 뭐가 물려나."},
+		])
+		return
 	_play_story([
 		{"speaker": "", "text": "다음 날 새벽 다섯 시. 물빛울포 북쪽 방파제."},
 		{"speaker": "{player}", "text": "창고에서 찾은 낚싯대 하나에 크릴 한 봉지. 이게 전부다."},
@@ -145,22 +169,25 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	_t += delta
 	if not _in_story and not _summary.visible and logic.state != FishingLogic.State.CAUGHT:
-		minutes = minf(minutes + delta / REAL_SEC_PER_GAME_MIN, END_MIN)
-		logic.brightness = (minutes - START_MIN) / float(END_MIN - START_MIN)
+		minutes = minf(minutes + delta / REAL_SEC_PER_GAME_MIN, END_MIN if tutorial else LATE_MIN)
+		logic.brightness = FishingLogic.brightness_at(minutes)
 		logic.update(delta, _held, _mend_held)
+		_play_loop_sounds(delta)
 	_hook_flash = maxf(0.0, _hook_flash - delta)
 	_slack = maxf(0.0, _slack - delta / 0.6)
 	if _landing > 0.0:
 		_landing -= delta
 		if _landing <= 0.0:
 			_show_card()
-	_bg.brightness = (minutes - START_MIN) / float(END_MIN - START_MIN)
+	_bg.brightness = FishingLogic.brightness_at(minutes)
 
 	if logic.state != _last_state:
 		_on_state_changed()
 		_last_state = logic.state
 
-	_clock.text = "새벽 %02d:%02d" % [int(minutes) / 60, int(minutes) % 60]
+	_clock.text = _clock_text()
+	_quit_btn.visible = not tutorial and not _in_story and not _ending \
+			and logic.state in [FishingLogic.State.READY, FishingLogic.State.WAITING, FishingLogic.State.FAILED]
 	_count.text = "잡은 고기 %d마리" % GameState.caught_today.size()
 
 	if logic.state == FishingLogic.State.REELING and randf() < delta * 6.0:
@@ -173,9 +200,32 @@ func _process(delta: float) -> void:
 	_layer.queue_redraw()
 	_expose_state_for_tests()
 
-	if not _in_story and not _ending and logic.state == FishingLogic.State.READY \
-			and minutes >= END_MIN and not GameState.caught_today.is_empty():
-		_start_ending()
+	if not _in_story and not _ending and logic.state == FishingLogic.State.READY:
+		if tutorial and minutes >= END_MIN and not GameState.caught_today.is_empty():
+			_start_ending()
+		elif not tutorial and minutes >= LATE_MIN:
+			_start_ending()
+
+
+func _clock_text() -> String:
+	var h := int(minutes) / 60
+	var period := "새벽" if h < 6 else ("오전" if h < 12 else ("오후" if h < 18 else ("저녁" if h < 21 else "밤")))
+	return "%s %02d:%02d" % [period, h, int(minutes) % 60]
+
+
+## 찌 톡톡, 릴 감는 소리처럼 상태 안에서 반복되는 소리
+func _play_loop_sounds(delta: float) -> void:
+	var nib := logic.state == FishingLogic.State.WAITING and logic.nibble > 0.0
+	if nib and not _was_nibble:
+		Sound.play_sfx("nibble", 0.1)
+	_was_nibble = nib
+	if logic.state == FishingLogic.State.REELING and _held:
+		_reel_sound -= delta
+		if _reel_sound <= 0.0:
+			Sound.play_sfx("reel", 0.08, -6.0)
+			_reel_sound = 0.32
+	else:
+		_reel_sound = 0.0
 
 
 func _on_state_changed() -> void:
@@ -189,6 +239,7 @@ func _on_state_changed() -> void:
 	else:
 		_hint.text = HINTS.get(s, "")
 		_hint.add_theme_color_override("font_color", UiKit.MUSTARD if s == FishingLogic.State.BITE else UiKit.CREAM)
+	_play_state_sound(s)
 	if s == FishingLogic.State.WAITING:
 		_slack = 1.0
 	if s == FishingLogic.State.CAUGHT:
@@ -197,6 +248,28 @@ func _on_state_changed() -> void:
 		_landing = LANDING_TIME # 들어 올리는 연출 뒤에 카드를 보여 준다
 		var art := "fish_" + logic.fish_id
 		_fish_tex = load(ArtSlot.art_path(art)) if ArtSlot.has_art(art) else null
+
+
+func _play_state_sound(s: int) -> void:
+	match s:
+		FishingLogic.State.CASTING:
+			Sound.play_sfx("whoosh", 0.05)
+		FishingLogic.State.WAITING:
+			Sound.play_sfx("plop", 0.1)
+		FishingLogic.State.BITE:
+			Sound.play_sfx("bite")
+		FishingLogic.State.REELING:
+			Sound.play_sfx("strike")
+		FishingLogic.State.CAUGHT:
+			Sound.play_sfx("land")
+		FishingLogic.State.FAILED:
+			match logic.fail_reason:
+				"broke":
+					Sound.play_sfx("snap")
+				"slack":
+					Sound.play_sfx("slip")
+				_:
+					Sound.play_sfx("bad", 0.0, -6.0)
 
 
 func _record_catch() -> void:
@@ -226,7 +299,13 @@ func _on_dialogue_finished() -> void:
 
 func _start_ending() -> void:
 	_ending = true
+	_held = false
 	var n := GameState.caught_today.size()
+	if not tutorial:
+		_play_story([
+			{"speaker": "{player}", "text": "늦었다. 오늘은 여기까지." if minutes >= LATE_MIN else "오늘 낚시는 여기까지."},
+		])
+		return
 	_play_story([
 		{"speaker": "", "text": "해가 수평선 위로 완전히 올라왔다. 찌 주변이 조용해졌다."},
 		{"speaker": "{player}", "text": "볼락은 밝아지면 숨는다고 했지. 오늘은 여기까지." if n > 0 else "오늘은 여기까지."},
@@ -254,6 +333,17 @@ func _build_hud() -> void:
 	_hint.offset_top = 128
 	_hint.offset_bottom = 168
 	add_child(_hint)
+
+	_quit_btn = UiKit.button("그만하기", false)
+	_quit_btn.custom_minimum_size = Vector2(130, 44)
+	_quit_btn.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	_quit_btn.offset_left = -162
+	_quit_btn.offset_right = -32
+	_quit_btn.offset_top = 64
+	_quit_btn.offset_bottom = 108
+	_quit_btn.pressed.connect(_start_ending)
+	_quit_btn.hide()
+	add_child(_quit_btn)
 
 
 func _build_card() -> void:
@@ -292,6 +382,7 @@ func _show_card() -> void:
 	_card_title.text = f.name
 	_card_size.text = "%.1fcm" % logic.fish_size
 	_card_desc.text = f.desc
+	Sound.play_sfx("newfish" if _card_new.visible else "catch")
 	_card.show()
 	_card.pivot_offset = _card.size / 2
 	_card.scale = Vector2(0.8, 0.8)
@@ -301,7 +392,7 @@ func _show_card() -> void:
 func _close_card() -> void:
 	_card.hide()
 	logic.acknowledge()
-	if not _met_mansu and GameState.caught_today.size() == 1:
+	if tutorial and not _met_mansu and GameState.caught_today.size() == 1:
 		_met_mansu = true
 		_play_story([
 			{"speaker": "{player}", "text": "잡았다...! 진짜 잡았어!"},
@@ -323,31 +414,41 @@ func _build_summary() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 14)
 	_summary.add_child(v)
-	v.add_child(UiKit.label("오늘 새벽의 기록", UiKit.SIZE_HEADING, UiKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+	_summary_title = UiKit.label("", UiKit.SIZE_HEADING, UiKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(_summary_title)
 	_summary_list = UiKit.label("", 22, UiKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(_summary_list)
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	var btn := UiKit.button("마을 지도로")
-	btn.pressed.connect(func():
-		GameState.flags["first_fishing_done"] = true
-		GameState.time_minutes = END_MIN
-		GameState.current_location = "breakwater"
-		UiKit.go_to(self, NEXT_SCENE))
-	row.add_child(btn)
+	_summary_btn = UiKit.button("")
+	_summary_btn.pressed.connect(_leave)
+	row.add_child(_summary_btn)
 	v.add_child(row)
 	_summary.hide()
+
+
+func _leave() -> void:
+	GameState.time_minutes = int(minutes)
+	if tutorial:
+		GameState.flags["first_fishing_done"] = true
+		GameState.current_location = "shop" # 잡은 볼락을 들고 식당으로 돌아간다
+		UiKit.go_to(self, TUTORIAL_NEXT)
+	else:
+		GameState.current_location = "breakwater"
+		UiKit.go_to(self, FREE_NEXT)
 
 
 func _show_summary() -> void:
 	var lines: Array[String] = []
 	for e in GameState.caught_today:
 		lines.append("%s  %.1fcm" % [FishDB.get_fish(e.id).name, e.size])
-	lines.append("")
-	lines.append("다음 이야기 〈첫 번째 손님〉은 준비 중이에요.")
+	if lines.is_empty():
+		lines.append("오늘은 한 마리도 못 잡았다.")
+	_summary_title.text = "오늘 새벽의 기록" if tutorial else "오늘의 조과"
+	_summary_btn.text = "식당으로" if tutorial else "마을 지도로"
 	_summary_list.text = "\n".join(lines)
 	_summary.show()
-	_summary.get_child(0).get_child(2).get_child(0).grab_focus()
+	_summary_btn.grab_focus()
 
 
 func _place_player() -> void:

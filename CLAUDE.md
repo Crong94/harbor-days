@@ -48,6 +48,13 @@ godot --headless --path . --export-release "Web" build/web/index.html  # 웹 빌
 - 뽑는 순서: ① 설정화 ② 낚시 자세 ③ 볼락 ④ 망상어, 노래미 ⑤ 마을 지도 ⑥ 방파제 낮 ⑦ 방파제 밤 ⑧ 식당 외관 ⑨ 식당 내부 낮 ⑩ 식당 내부 밤 ⑪ 항구
 - 화풍: 깔끔한 2D 셀 채색 코지 게임 스타일. 주인공 얼굴 기준은 1차 시안 B(현실적인 청년형) + 옅은 수염
 
+## 바다 한 접시 (이전 게임) 자료
+- 사용자가 직접 만든 이전 게임이라 그림, 소리, 데이터를 가져와 써도 된다. Godot 4 + C# 게임이었다
+- APK와 푼 파일은 레포 바깥 `C:\Users\<USER>\Desktop\오늘의바다_작업\`에 있다 (`hanjeopsi_풀린파일/`에 art, audio, data. `미리보기/`에 묶음 jpg). git에 넣지 않는다
+- 프로젝트 폴더 안 `작업폴더/`, `Yeoul/`은 사용자가 둔 원본이다. `.git/info/exclude`와 `.gdignore`로 git과 Godot 모두에서 빠져 있다
+- 물고기 아이콘(아이콘풍)과 세로 모바일 배경은 화풍과 화면 비율이 달라 가져오지 않았다
+- 장면 실행 검사: `<Godot>_console.exe --headless --path . res://scenes/<장면>.tscn --quit-after 120` (테스트 스크립트 모드에서는 오토로드가 없어서 장면을 불러올 수 없다)
+
 ## 코드 규칙
 - UI는 씬 파일을 최소로 두고 스크립트 `_ready()`에서 만든다. 색, 글자 크기, 버튼은 `scripts/ui/ui_kit.gd`의 상수와 함수만 쓴다.
 - 플레이어명, 가게명이 들어가는 대사는 템플릿으로 쓰고 `GameState.line()`으로 바꾼다.
@@ -62,12 +69,17 @@ assets/fonts      폰트
 docs              기획 문서
 scenes/title      타이틀
 scenes/prologue   사직서(플레이어명 입력), 간판(가게명 입력)
-scenes/fishing    새벽 방파제 찌낚시 (첫 물고기 볼락)
+scenes/fishing    방파제 찌낚시. 첫날은 새벽 튜토리얼(첫 물고기 볼락), 그 뒤는 아무 시간대 자유 낚시
+scenes/restaurant 〈첫 번째 손님〉 식당 장면 (볼락구이, 최순덕)
+scenes/shop       준호네 낚시방 (장비 구매, 장착)
 scenes/map        마을 지도. 장소 선택, 이동 시간, 해금 (scripts/data/locations.gd)
 scripts/fishing   FishingLogic (낚시 규칙, 헤드리스 테스트 가능)
-scripts/data      FishDB (어종 데이터)
-assets/art        사용자에게 받은 그림 (docs/그림_요청_목록.md)
-scripts/autoload  GameState (전역 상태)
+scripts/cooking   CookingLogic (간 맞추기, 굽기 규칙)
+scripts/data      FishDB (어종), GearDB (장비), Locations (장소), Catalog (바다 한 접시 어종 71종, 레시피 50개)
+assets/art        사용자에게 받은 그림 (docs/그림_요청_목록.md). dish, cook_tool, kitchen, ingredient, gear_icon은 바다 한 접시에서 가져옴
+assets/audio      배경음악 bgm, 효과음 sfx (바다 한 접시에서 가져옴)
+assets/data       species.json, recipes.json (바다 한 접시 데이터)
+scripts/autoload  GameState (전역 상태), Sound (배경음악, 효과음)
 scripts/ui        UiKit, SeaBackdrop(임시 배경), DialogueBox, ArtSlot(그림 자리)
 scripts/util      Josa (조사 처리)
 tests             헤드리스 테스트

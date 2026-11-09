@@ -10,24 +10,25 @@ extends RefCounted
 ##
 ## cast: 최대 던지기 거리 배율, strength: 줄 장력이 덜 오르는 정도
 ## speed: 감는 속도 배율, drag: 물고기가 당길 때 장력이 덜 오르는 정도
+## icon: 상점과 장비 창 아이콘 assets/art/gear_icon/<icon>.png (바다 한 접시에서 가져옴)
 
 const RODS := {
 	"old_float": {
 		"name": "낡은 릴찌낚싯대", "price": 0,
 		"desc": "식당 창고에서 찾은 낚싯대. 낡았지만 아직 쓸 만하다.",
-		"cast": 0.75, "strength": 0.0,
+		"cast": 0.75, "strength": 0.0, "icon": "rod-1",
 		"grip": 0.085, "seat": 0.217, "tip": 0.994, "axis": 0.37, "color": Color("3a3a42"),
 	},
 	"starter_float": {
 		"name": "입문용 찌낚싯대", "price": 45000,
 		"desc": "준호네 낚시방 추천 입문 장비. 가볍고 멀리 던지기 쉽다.",
-		"cast": 0.9, "strength": 0.1,
+		"cast": 0.9, "strength": 0.1, "icon": "rod-3",
 		"grip": 0.085, "seat": 0.217, "tip": 0.994, "axis": 0.37, "color": Color("2f5f8a"),
 	},
 	"carbon_rock": {
 		"name": "카본 갯바위 찌낚싯대", "price": 180000,
 		"desc": "갯바위 꾼들이 쓰는 낚싯대. 멀리 던지고 힘센 고기도 버틴다.",
-		"cast": 1.0, "strength": 0.25,
+		"cast": 1.0, "strength": 0.25, "icon": "rod-6",
 		"grip": 0.085, "seat": 0.217, "tip": 0.994, "axis": 0.37, "color": Color("1f1f24"),
 	},
 }
@@ -36,17 +37,17 @@ const REELS := {
 	"cheap_spinning": {
 		"name": "저가형 스피닝릴", "price": 0,
 		"desc": "줄이 가끔 꼬이는 오래된 릴.",
-		"speed": 1.0, "drag": 0.0, "color": Color("8a8f98"),
+		"speed": 1.0, "drag": 0.0, "icon": "reel-1", "color": Color("8a8f98"),
 	},
 	"spinning_2500": {
 		"name": "2500번 스피닝릴", "price": 60000,
 		"desc": "부드럽게 감기는 표준 스피닝릴.",
-		"speed": 1.2, "drag": 0.1, "color": Color("c9a24a"),
+		"speed": 1.2, "drag": 0.1, "icon": "reel-2", "color": Color("c9a24a"),
 	},
 	"lever_brake": {
 		"name": "레버 브레이크 릴", "price": 220000,
 		"desc": "갯바위 찌낚시 전용 릴. 물고기가 차고 나갈 때 줄을 풀어 준다.",
-		"speed": 1.3, "drag": 0.25, "color": Color("b5463a"),
+		"speed": 1.3, "drag": 0.25, "icon": "reel-5", "color": Color("b5463a"),
 	},
 }
 
@@ -69,3 +70,7 @@ static func apply(logic: FishingLogic, rod_id: String, reel_id: String) -> void:
 	logic.cast_mult = r.cast
 	logic.reel_mult = l.speed
 	logic.tension_mult = clampf(1.0 - r.strength * 0.5 - l.drag * 0.5, 0.5, 1.0)
+
+
+static func icon_art(item: Dictionary) -> String:
+	return "gear_icon/" + item.get("icon", "")

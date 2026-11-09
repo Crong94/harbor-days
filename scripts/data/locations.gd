@@ -17,9 +17,7 @@ const LIST := {
 	},
 	"breakwater": {
 		"name": "북쪽 방파제", "pos": Vector2(0.50, 0.14), "unlock": "",
-		"scene": "", "desc": "빨간 등대가 있는 입문 낚시터",
-		# 지금 낚시 장면은 첫날 새벽 튜토리얼 전용이라 아직 연결하지 않는다.
-		# 아무 시간대에나 낚시할 수 있게 바꾸면 "res://scenes/fishing/fishing.tscn"을 넣는다.
+		"scene": "res://scenes/fishing/fishing.tscn", "desc": "빨간 등대가 있는 입문 낚시터",
 	},
 	"market": {
 		"name": "물빛 수산시장", "pos": Vector2(0.70, 0.36), "unlock": "",
@@ -27,7 +25,7 @@ const LIST := {
 	},
 	"tackle": {
 		"name": "준호네 낚시방", "pos": Vector2(0.52, 0.50), "unlock": "",
-		"scene": "", "desc": "장비, 미끼, 수리",
+		"scene": "res://scenes/shop/tackle_shop.tscn", "desc": "장비, 미끼, 수리",
 	},
 	"diner": {
 		"name": "복자네 밥집", "pos": Vector2(0.41, 0.50), "unlock": "",

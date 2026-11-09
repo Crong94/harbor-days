@@ -1,6 +1,6 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=2 format=3 uid="uid://bj54ara1acja4"]
 
-[ext_resource type="Script" path="res://scenes/title/title.gd" id="1"]
+[ext_resource type="Script" uid="uid://bjhfmk5dg276h" path="res://scenes/title/title.gd" id="1"]
 
 [node name="Title" type="Control"]
 layout_mode = 3

@@ -15,6 +15,11 @@ func _init() -> void:
 	_test_locations()
 	_test_gear()
 	_test_realism()
+	_test_brightness()
+	_test_catalog()
+	_test_cooking()
+	_test_economy()
+	_test_sound()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -274,3 +279,115 @@ func _test_realism() -> void:
 	for i in 20:
 		b.update(1.0 / 60.0, false)
 	_eq(b.bite_depth > d0, true, "입질 중 찌가 점점 잠김")
+
+
+func _test_brightness() -> void:
+	_eq(FishingLogic.brightness_at(3 * 60), 0.0, "새벽 3시는 어두움")
+	_eq(FishingLogic.brightness_at(6 * 60), 0.5, "새벽 6시는 반쯤 밝음")
+	_eq(FishingLogic.brightness_at(12 * 60), 1.0, "낮 12시는 밝음")
+	_eq(FishingLogic.brightness_at(18.5 * 60), 0.5, "저녁 6시 반은 반쯤 어두움")
+	_eq(FishingLogic.brightness_at(22 * 60), 0.0, "밤 10시는 어두움")
+	_eq(FishingLogic.brightness_at(25 * 60), 0.0, "자정 넘김도 처리")
+
+
+## 바다 한 접시에서 가져온 어종, 레시피 데이터
+func _test_catalog() -> void:
+	_eq(Catalog.species_ids().size(), 71, "어종 71종")
+	_eq(Catalog.recipe_ids().size(), 50, "레시피 50개")
+	_eq(Catalog.species("bollak").get("name", ""), "볼락", "볼락 데이터")
+	_eq(Catalog.flavor("salty").get("name", ""), "짠맛", "짠맛 데이터")
+	_eq(Catalog.month_factor("bollak", 7) < Catalog.month_factor("bollak", 12), true, "볼락은 여름보다 겨울")
+	for id in Catalog.recipe_ids():
+		var r := Catalog.recipe(id)
+		if not Catalog.species(r.species).has("id"):
+			_eq(r.species, "있는 어종", "%s 레시피 어종" % id)
+		if not ArtSlot.has_art(Catalog.dish_art(id)):
+			_eq(id, "그림 있음", "요리 그림")
+		if not ArtSlot.has_art(Catalog.tool_art(r.tool)):
+			_eq(r.tool, "그림 있음", "조리도구 그림")
+	for id in FishDB.FISH:
+		var f := FishDB.get_fish(id)
+		_eq(Catalog.species(f.catalog).has("id"), true, "%s 카탈로그 연결" % id)
+		_eq(Catalog.recipe(f.grill).get("species", ""), f.catalog, "%s 구이 레시피" % id)
+	_eq(ArtSlot.has_art("kitchen/grill"), true, "화로 그림")
+
+
+func _test_cooking() -> void:
+	var P := CookingLogic.Phase
+	_eq(CookingLogic.judge_season(0.58, 0.58), "good", "간 딱 맞음")
+	_eq(CookingLogic.judge_season(0.2, 0.58), "bland", "싱거움")
+	_eq(CookingLogic.judge_season(0.9, 0.58), "strong", "짬")
+	_eq(CookingLogic.judge_grill(0.3), "raw", "덜 익음")
+	_eq(CookingLogic.judge_grill(0.75), "good", "노릇함")
+	_eq(CookingLogic.judge_grill(0.95), "burnt", "탐")
+
+	var c := CookingLogic.new()
+	c.setup(Catalog.recipe("bollak-gui"))
+	_eq(c.flavor, "salty", "볼락구이는 짠맛")
+	_eq(is_equal_approx(c.target, 0.58), true, "볼락구이 목표 간")
+	c.update(1.0, true)
+	_eq(c.amount, 0.0, "누르기 전에는 간이 안 들어감")
+	c.press()
+	var t := 0.0
+	while c.amount < c.target and t < 5.0:
+		c.update(1.0 / 60.0, true)
+		t += 1.0 / 60.0
+	c.release()
+	_eq(c.phase, P.GRILL, "간 맞추면 굽기로")
+	_eq(c.seasoning, "good", "목표만큼 뿌리면 딱 맞음")
+	_eq(c.flavor_review(), "간이 딱 맞아요", "손님 평")
+	while c.doneness < 0.74:
+		c.update(1.0 / 60.0, false)
+	c.press()
+	_eq(c.phase, P.DONE, "불에서 내리면 끝")
+	_eq(c.cooking, "good", "노릇하게 구움")
+	_eq(c.stars(), 3, "별 셋")
+
+	var b := CookingLogic.new()
+	b.press()
+	for i in 600:
+		b.update(1.0 / 60.0, true)
+	_eq(b.seasoning, "strong", "계속 누르면 짬")
+	for i in 1200:
+		b.update(1.0 / 60.0, false)
+	_eq(b.cooking, "burnt", "내버려 두면 탐")
+	_eq(b.stars(), 1, "별 하나")
+
+
+func _test_economy() -> void:
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.money = 50000
+	_eq(gs.buy_gear("rod", "starter_float"), "", "입문용 낚싯대 구매")
+	_eq(gs.money, 5000, "값만큼 빠짐")
+	_eq("starter_float" in gs.owned_rods, true, "가진 낚싯대에 추가")
+	_eq(gs.spent_today, 45000, "장부 지출")
+	_eq(gs.buy_gear("rod", "starter_float"), "이미 가지고 있어요.", "중복 구매 막기")
+	_eq(gs.buy_gear("reel", "spinning_2500"), "돈이 모자라요.", "돈 모자람")
+	_eq(gs.buy_gear("reel", "없는것"), "없는 물건이에요.", "없는 물건")
+	gs.earn(7000)
+	_eq(gs.money, 12000, "매출")
+	gs.inventory = [{"id": "mangsang", "size": 20.0}, {"id": "bolak", "size": 16.0}]
+	_eq(gs.take_fish("bolak").get("size", 0.0), 16.0, "볼락 꺼내기")
+	_eq(gs.inventory.size(), 1, "아이스박스에서 빠짐")
+	_eq(gs.take_fish("noraemi"), {}, "없는 어종")
+	gs.caught_today = [{"id": "bolak", "size": 16.0}]
+	gs.end_day(6 * 60)
+	_eq(gs.day, 2, "다음 날")
+	_eq(gs.time_minutes, 360, "아침 6시")
+	_eq(gs.caught_today.size() + gs.sales_today + gs.spent_today, 0, "하루 기록 비움")
+	gs.free()
+	for id in GearDB.RODS:
+		_eq(ArtSlot.has_art(GearDB.icon_art(GearDB.rod(id))), true, "%s 아이콘" % id)
+	for id in GearDB.REELS:
+		_eq(ArtSlot.has_art(GearDB.icon_art(GearDB.reel(id))), true, "%s 아이콘" % id)
+
+
+func _test_sound() -> void:
+	var SoundScript = load("res://scripts/autoload/sound.gd")
+	for id in SoundScript.BGM:
+		_eq(SoundScript.has_bgm(id), true, "배경음악 %s" % id)
+	for id in ["whoosh", "plop", "nibble", "bite", "strike", "reel", "land", "catch", "newfish", "snap", "slip", "bad",
+			"sizzle", "tap", "good", "okay", "door", "coin", "sold"]:
+		_eq(SoundScript.has_sfx(id), true, "효과음 %s" % id)
+	_eq(SoundScript.has_sfx("없는소리"), false, "없는 효과음")
+

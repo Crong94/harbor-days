@@ -39,6 +39,7 @@ func _ready() -> void:
 	_build_panel()
 	resized.connect(_layout_pins)
 	_layout_pins.call_deferred()
+	Sound.play_bgm("town")
 	UiKit.fade_in(self)
 
 
@@ -210,13 +211,13 @@ func _open_gear() -> void:
 	v.add_child(UiKit.label("낚싯대", 22, UiKit.TEAL))
 	for id in GameState.owned_rods:
 		var r := GearDB.rod(id)
-		v.add_child(_gear_row(r.name, "던지기 %d%%  버티기 +%d%%" % [int(r.cast * 100), int(r.strength * 100)], id == GameState.equipped_rod, func():
+		v.add_child(_gear_row(GearDB.icon_art(r), r.name, "던지기 %d%%  버티기 +%d%%" % [int(r.cast * 100), int(r.strength * 100)], id == GameState.equipped_rod, func():
 			GameState.equipped_rod = id
 			_open_gear()))
 	v.add_child(UiKit.label("릴", 22, UiKit.TEAL))
 	for id in GameState.owned_reels:
 		var l := GearDB.reel(id)
-		v.add_child(_gear_row(l.name, "감기 %d%%  드랙 +%d%%" % [int(l.speed * 100), int(l.drag * 100)], id == GameState.equipped_reel, func():
+		v.add_child(_gear_row(GearDB.icon_art(l), l.name, "감기 %d%%  드랙 +%d%%" % [int(l.speed * 100), int(l.drag * 100)], id == GameState.equipped_reel, func():
 			GameState.equipped_reel = id
 			_open_gear()))
 	v.add_child(UiKit.label("새 장비는 준호네 낚시방에서 살 수 있어요.", 18, UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
@@ -230,9 +231,10 @@ func _open_gear() -> void:
 	v.add_child(row)
 
 
-func _gear_row(title: String, stats: String, equipped: bool, on_pick: Callable) -> HBoxContainer:
+func _gear_row(icon: String, title: String, stats: String, equipped: bool, on_pick: Callable) -> HBoxContainer:
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 12)
+	h.add_child(ArtSlot.make(icon, title, Vector2(48, 48)))
 	var name_label := UiKit.label(title, 20, UiKit.INK)
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(name_label)
