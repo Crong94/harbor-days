@@ -29,9 +29,10 @@ const HINTS := {
 
 ## 뒤쪽 시점 세로 낚시 화면. 아래 위치는 배경 그림 크기 대비 비율이다.
 ## 배경 그림이 바뀌면 이 숫자들만 그림에 맞춰 고친다.
-## 그림: 오늘의 바다 전용 세로 새벽 그림 (2026-11-09 받음). 아침 그림(bg_fishing_morning_v)이 오면 BG_ART_BLEND에 넣어 밝기만큼 겹친다.
+## 그림: 오늘의 바다 전용 세로 새벽, 아침 그림 (2026-11-09 받음, 같은 구도). 밝기만큼 아침 그림을 겹친다.
+## 밤 그림이 오면 어두운 시간(저녁 이후)에 쓸 수 있게 SeaBackdrop에 한 장 더 붙인다.
 const BG_ART := "bg_fishing_dawn_v"
-const BG_ART_BLEND := ""
+const BG_ART_BLEND := "bg_fishing_morning_v"
 const WATER_NEAR_Y := 0.665 # 방파제 끝 바로 앞 바다 (테트라포드 사이)
 const WATER_FAR_Y := 0.37 # 가장 멀리 던졌을 때 (수평선 0.338 바로 아래)
 const FEET := Vector2(0.5, 0.875) # 주인공 발 위치 (방파제 끝 콘크리트 바닥 가운데)
