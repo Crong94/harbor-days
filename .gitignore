@@ -1,0 +1,11 @@
+# Godot 캐시와 빌드 결과
+.godot/
+build/
+*.tmp
+
+# 내보내기 인증 정보
+export_credentials.cfg
+
+# OS
+.DS_Store
+Thumbs.db

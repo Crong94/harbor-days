@@ -1,0 +1,31 @@
+; Engine configuration file.
+config_version=5
+
+[application]
+
+config/name="오늘의 바다"
+config/description="오늘 잡은 물고기로 내일을 살아간다."
+run/main_scene="res://scenes/title/title.tscn"
+config/features=PackedStringArray("4.4", "GL Compatibility")
+
+[autoload]
+
+GameState="*res://scripts/autoload/game_state.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[gui]
+
+theme/custom_font="res://assets/fonts/NotoSansKR-Regular.ttf"
+theme/default_font_antialiasing=1
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.07, 0.16, 0.22, 1)
