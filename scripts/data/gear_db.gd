@@ -5,6 +5,7 @@ extends RefCounted
 ##
 ## 낚싯대 그림 규칙: 가로로 곧게 눕힌 모습, 손잡이가 왼쪽, 낚싯대 끝이 오른쪽.
 ##   grip: 손으로 쥐는 곳, seat: 릴이 붙는 곳, tip: 낚싯대 끝 (그림 가로 길이 대비 비율)
+##   axis: 낚싯대 몸통 중심선 높이 (그림 세로 길이 대비 비율, 아래로 달린 가이드 고리 때문에 0.5가 아니다)
 ## 릴 그림 규칙: 옆모습, 위쪽 가운데가 낚싯대에 붙는 다리.
 ##
 ## cast: 최대 던지기 거리 배율, strength: 줄 장력이 덜 오르는 정도
@@ -15,19 +16,19 @@ const RODS := {
 		"name": "낡은 릴찌낚싯대", "price": 0,
 		"desc": "식당 창고에서 찾은 낚싯대. 낡았지만 아직 쓸 만하다.",
 		"cast": 0.75, "strength": 0.0,
-		"grip": 0.06, "seat": 0.2, "tip": 0.99, "color": Color("3a3a42"),
+		"grip": 0.085, "seat": 0.217, "tip": 0.994, "axis": 0.37, "color": Color("3a3a42"),
 	},
 	"starter_float": {
 		"name": "입문용 찌낚싯대", "price": 45000,
 		"desc": "준호네 낚시방 추천 입문 장비. 가볍고 멀리 던지기 쉽다.",
 		"cast": 0.9, "strength": 0.1,
-		"grip": 0.06, "seat": 0.2, "tip": 0.99, "color": Color("2f5f8a"),
+		"grip": 0.085, "seat": 0.217, "tip": 0.994, "axis": 0.37, "color": Color("2f5f8a"),
 	},
 	"carbon_rock": {
 		"name": "카본 갯바위 찌낚싯대", "price": 180000,
 		"desc": "갯바위 꾼들이 쓰는 낚싯대. 멀리 던지고 힘센 고기도 버틴다.",
 		"cast": 1.0, "strength": 0.25,
-		"grip": 0.06, "seat": 0.2, "tip": 0.99, "color": Color("1f1f24"),
+		"grip": 0.085, "seat": 0.217, "tip": 0.994, "axis": 0.37, "color": Color("1f1f24"),
 	},
 }
 

@@ -12,7 +12,6 @@ const BODY_ART := "player_sd_body"
 ## 몸 그림 크기 대비 오른손 위치 (그림이 오면 맞춘다)
 const HAND := Vector2(0.92, 0.375)
 const ROD_LENGTH := 300.0 # 화면에서 낚싯대 길이 (px)
-const ROD_THICK := 26.0 # 낚싯대 그림을 그릴 높이 (px)
 const REEL_SIZE := 46.0
 
 var rod_id := GearDB.DEFAULT_ROD
@@ -77,8 +76,10 @@ func _draw() -> void:
 	var start := _rod_point(0.0)
 	var ang := deg_to_rad(rod_angle + lean)
 	if _rod_tex:
+		var ts := _rod_tex.get_size()
+		var h := ROD_LENGTH * ts.y / ts.x # 그림 비율대로
 		draw_set_transform(start, ang)
-		draw_texture_rect(_rod_tex, Rect2(0, -ROD_THICK / 2.0, ROD_LENGTH, ROD_THICK), false)
+		draw_texture_rect(_rod_tex, Rect2(0, -r.get("axis", 0.5) * h, ROD_LENGTH, h), false)
 		draw_set_transform_matrix(Transform2D.IDENTITY)
 	else:
 		draw_line(start, _rod_point(r.tip), r.color, 4.0, true)
