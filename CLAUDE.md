@@ -12,7 +12,7 @@
 - Git은 로컬 커밋만 한다.
 - 작업이 끝나면 `tools/backup.sh`로 bundle과 zip을 만들고 사용자의 개인 구글 드라이브 `오늘의바다_백업` 폴더에 올린다.
 
-## 다음 세션에서 이어 받는 법
+## 다음 세션에서 이어 받는 법 (자세한 내용은 docs/HANDOFF.md)
 1. 구글 드라이브 `오늘의바다_백업` 폴더에서 가장 최근 `oneului-bada-*.bundle`을 받는다.
 2. `git clone oneului-bada-YYYYMMDD-HHMM.bundle oneului-bada`
 3. Godot가 없으면 `tools/setup_godot.sh` 실행.
