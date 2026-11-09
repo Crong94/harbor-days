@@ -35,7 +35,7 @@ godot --headless --path . --export-release "Web" build/web/index.html  # 웹 빌
 - 사용자는 **ChatGPT**로 그림을 뽑는다. Midjourney 설정(`--ar`, `--no`)은 넣지 않고, 비율은 프롬프트 문장 안에 적는다 (예: `세로로 긴 2:3 비율`, `vertical 2:3 aspect ratio`)
 - **이미지 → 프롬프트 순서로 하나씩** 준다. 첨부할 이미지는 이름만 적지 말고 **실제 이미지 파일을 먼저 보내고**, 바로 아래에 그 이미지와 쓸 프롬프트를 준다
 - 한 번에 다 주지 않는다. 앞 그림 결과물이 뒤 그림의 참조가 되므로 사용자가 결과를 보내면 그 그림을 다음 참조 이미지로 보내며 다음 단계를 준다
-- 참조 이미지는 `docs/ref/`에 보관한다
+- 참조 이미지는 `docs/ref/`에 보관한다. 용량이 커서 git에는 넣지 않고 구글 드라이브 `오늘의바다_백업/ref` 폴더에 따로 올린다 (드라이브 업로드 한도 10MB). 새 세션에서는 그 폴더에서 받아 `docs/ref/`에 넣는다
 - 투명 배경이 필요한 그림(캐릭터, 물고기, 소품, 초상화, SD)은 프롬프트에 알파 채널 문구를 넣는다
   - 한국어: `배경은 완전히 투명한 PNG(알파 채널). 배경 없이 대상만.`
   - English: `Transparent background, PNG with alpha channel, isolated subject with no background.`
