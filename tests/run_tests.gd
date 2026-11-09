@@ -14,6 +14,7 @@ func _init() -> void:
 	_test_fishing()
 	_test_locations()
 	_test_gear()
+	_test_realism()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -235,3 +236,41 @@ func _test_gear() -> void:
 			t += 1.0 / 60.0
 		times.append(t)
 	_eq(times[1] > times[0], true, "좋은 장비가 더 오래 버팀 (%.1fs > %.1fs)" % [times[1], times[0]])
+
+
+## 실제 찌낚시 규칙 (docs/찌낚시_동작_조사.md)
+func _test_realism() -> void:
+	var S := FishingLogic.State
+	# 견제하면 입질이 빨리 온다
+	var waits := []
+	for mend in [false, true]:
+		var l := _new_logic(21)
+		l.catch_count = 1
+		l.forgiving = false
+		_cast(l)
+		var t := 0.0
+		while l.state == S.WAITING and t < 30.0:
+			l.update(1.0 / 60.0, false, mend)
+			t += 1.0 / 60.0
+		waits.append(t)
+	_eq(waits[1] < waits[0], true, "견제하면 입질이 빨라짐 (%.1fs < %.1fs)" % [waits[1], waits[0]])
+
+	# 견제하지 않으면 찌가 흘러가고, 견제하면 멈춘다
+	var a := _new_logic(22)
+	_cast(a)
+	for i in 60:
+		a.update(1.0 / 60.0, false, false)
+	var drifted := a.drift
+	for i in 60:
+		a.update(1.0 / 60.0, false, true)
+	_eq(drifted > 0.0, true, "찌가 조류에 흘러감")
+	_eq(is_equal_approx(a.drift, drifted) or a.state != S.WAITING, true, "견제하면 흐름이 멈춤")
+
+	# 입질 중에는 찌가 점점 깊이 잠긴다
+	var b := _new_logic(23)
+	_cast(b)
+	_run_until(b, [S.BITE], func(_x): return false, 10.0)
+	var d0 := b.bite_depth
+	for i in 20:
+		b.update(1.0 / 60.0, false)
+	_eq(b.bite_depth > d0, true, "입질 중 찌가 점점 잠김")

@@ -9,12 +9,12 @@ const END_MIN := 7 * 60 # 07:00
 const REAL_SEC_PER_GAME_MIN := 1.2
 
 const HINTS := {
-	FishingLogic.State.READY: "꾹 눌러 힘을 모으고, 손을 떼서 던져요",
-	FishingLogic.State.CHARGING: "적당하다 싶을 때 손을 떼요",
+	FishingLogic.State.READY: "꾹 누르면 낚싯대를 머리 뒤로 넘기며 힘을 모아요. 손을 떼면 던져요",
+	FishingLogic.State.CHARGING: "적당하다 싶을 때 손을 떼서 앞으로 휘둘러요",
 	FishingLogic.State.CASTING: "",
-	FishingLogic.State.WAITING: "찌를 지켜봐요. 쑥 잠기면 바로 누르기",
-	FishingLogic.State.BITE: "지금!",
-	FishingLogic.State.REELING: "누르고 있으면 감고, 떼면 풀어 줘요. 줄이 빨개지면 잠깐 손을 떼요",
+	FishingLogic.State.WAITING: "찌를 지켜봐요. 오른쪽 클릭이나 Shift를 누르고 있으면 뒷줄 견제",
+	FishingLogic.State.BITE: "찌가 계속 잠겨요. 지금 챔질!",
+	FishingLogic.State.REELING: "누르면 낚싯대를 숙이며 감고, 떼면 낚싯대를 세워 버텨요",
 }
 
 var logic := FishingLogic.new()
@@ -50,6 +50,12 @@ const FLOAT_FAR_SCALE := 0.4
 const PLAYER_SIZE := Vector2(100.0, 240.0)
 
 var _held := false
+var _mend_held := false # 뒷줄 견제 버튼
+var _hook_flash := 0.0 # 챔질 순간 낚싯대를 확 세우는 연출 시간
+var _slack := 0.0 # 착수 직후 늘어진 줄 (베일을 닫고 여유줄을 감으며 줄어든다)
+var _landing := 0.0 # 잡은 물고기를 들어 올리는 연출 남은 시간
+const LANDING_TIME := 0.8
+var _fish_tex: Texture2D
 var _in_story := true
 var _ending := false
 var _met_mansu := false
@@ -103,6 +109,12 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _in_story or _summary.visible:
 		return
+	# 견제: 오른쪽 클릭 또는 Shift
+	if (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT) \
+			or (event is InputEventKey and event.keycode == KEY_SHIFT and not event.echo):
+		get_viewport().set_input_as_handled()
+		_mend_held = event.pressed
+		return
 	var is_action := false
 	var pressed := false
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
@@ -117,9 +129,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	_held = pressed
 	if pressed:
 		if logic.state == FishingLogic.State.CAUGHT:
-			_close_card()
+			if _landing <= 0.0:
+				_close_card()
 		else:
+			var was_bite := logic.state == FishingLogic.State.BITE
 			logic.press()
+			if was_bite and logic.state == FishingLogic.State.REELING:
+				_hook_flash = 0.22
 	else:
 		logic.release()
 
@@ -131,7 +147,13 @@ func _process(delta: float) -> void:
 	if not _in_story and not _summary.visible and logic.state != FishingLogic.State.CAUGHT:
 		minutes = minf(minutes + delta / REAL_SEC_PER_GAME_MIN, END_MIN)
 		logic.brightness = (minutes - START_MIN) / float(END_MIN - START_MIN)
-		logic.update(delta, _held)
+		logic.update(delta, _held, _mend_held)
+	_hook_flash = maxf(0.0, _hook_flash - delta)
+	_slack = maxf(0.0, _slack - delta / 0.6)
+	if _landing > 0.0:
+		_landing -= delta
+		if _landing <= 0.0:
+			_show_card()
 	_bg.brightness = (minutes - START_MIN) / float(END_MIN - START_MIN)
 
 	if logic.state != _last_state:
@@ -167,10 +189,14 @@ func _on_state_changed() -> void:
 	else:
 		_hint.text = HINTS.get(s, "")
 		_hint.add_theme_color_override("font_color", UiKit.MUSTARD if s == FishingLogic.State.BITE else UiKit.CREAM)
+	if s == FishingLogic.State.WAITING:
+		_slack = 1.0
 	if s == FishingLogic.State.CAUGHT:
 		_held = false
 		_record_catch()
-		_show_card()
+		_landing = LANDING_TIME # 들어 올리는 연출 뒤에 카드를 보여 준다
+		var art := "fish_" + logic.fish_id
+		_fish_tex = load(ArtSlot.art_path(art)) if ArtSlot.has_art(art) else null
 
 
 func _record_catch() -> void:
@@ -328,25 +354,38 @@ func _place_player() -> void:
 	_player.size = PLAYER_SIZE
 	var feet := _bg.art_point(FEET)
 	_player.position = feet - Vector2(_player.size.x / 2.0, _player.size.y)
-	# 상태에 따라 낚싯대 각도와 몸 기울기를 바꾼다 (낚싯대 -90은 수직 위)
-	var rod := -70.0
+	# 실제 찌낚시 자세 (docs/찌낚시_동작_조사.md)
+	# pitch: 낚싯대 높이 (0 바다 쪽 수평, 90 수직, 120 머리 뒤 1시 방향)
+	var pitch := 55.0
 	var lean := 0.0
 	match logic.state:
+		FishingLogic.State.READY:
+			pitch = 60.0 # 베일을 열고 검지에 줄을 건 준비 자세
 		FishingLogic.State.CHARGING:
-			rod = lerpf(-70.0, -105.0, logic.power) # 머리 뒤로 젖힘
+			pitch = lerpf(75.0, 125.0, logic.power) # 머리 뒤 1시 방향으로 넘긴다
 			lean = -4.0 * logic.power
 		FishingLogic.State.CASTING:
-			var k := minf(logic.progress * 2.5, 1.0)
-			rod = lerpf(-105.0, -55.0, k) # 앞으로 휘두름
+			# 앞으로 휘둘러 10~11시 방향에서 줄을 놓고, 앞쪽 30도 정도에서 멈춘다
+			var k := minf(logic.progress * 3.0, 1.0)
+			pitch = lerpf(125.0, 30.0, k)
 			lean = lerpf(-4.0, 3.0, k)
 		FishingLogic.State.WAITING:
-			rod = -64.0
+			# 찌를 볼 때는 45도. 견제할 때는 뒷줄을 잡고 70도까지 천천히 세운다
+			pitch = 70.0 if logic.mending else 45.0
 		FishingLogic.State.BITE:
-			rod = -60.0
+			pitch = 45.0
 		FishingLogic.State.REELING:
-			rod = -82.0 + logic.fish_pull() * 14.0 # 세우고 버티다 당기면 숙여짐
+			# 펌핑: 떼면 낚싯대를 세워 버티고, 누르면 숙이며 감는다. 물고기가 당기면 끌려 숙여진다
+			pitch = (42.0 if _held else 68.0) - logic.fish_pull() * 8.0
 			lean = -2.0
-	_player.rod_angle = lerpf(_player.rod_angle, rod, 0.3)
+		FishingLogic.State.CAUGHT:
+			pitch = 82.0 # 들어 올리기
+		FishingLogic.State.FAILED:
+			pitch = 55.0
+	if _hook_flash > 0.0:
+		pitch = 85.0 # 챔질: 팔 전체로 낚싯대를 45도 이상 확 세운다 (귀 뒤로 넘기지 않는다)
+	var follow := 0.45 if _hook_flash > 0.0 or logic.state == FishingLogic.State.CASTING else 0.2
+	_player.pitch = lerpf(_player.pitch, pitch, follow)
 	_player.lean = lerpf(_player.lean, lean, 0.25)
 
 
@@ -364,6 +403,11 @@ func _water_point(depth: float) -> Vector2:
 	# 멀수록 화면에서 덜 움직이도록 (원근감)
 	var k := 1.0 - pow(1.0 - clampf(depth, 0.0, 1.0), 1.6)
 	return near.lerp(far, k)
+
+
+## 찌가 조류에 흘러간 거리 (화면 px)
+func _drift_px() -> float:
+	return logic.drift * size.x * _depth_scale(logic.cast_power)
 
 
 func _depth_scale(depth: float) -> float:
@@ -388,9 +432,9 @@ func _float_pos() -> Vector2:
 			p.y -= sin(k * PI) * 220.0 * (0.4 + logic.cast_power)
 			return p
 		FishingLogic.State.WAITING:
-			return target + Vector2(0, (sin(_t * 2.2) * 2.0 + logic.nibble * 7.0) * sc)
+			return target + Vector2(_drift_px(), (sin(_t * 2.2) * 2.0 + logic.nibble * 7.0) * sc)
 		FishingLogic.State.BITE:
-			return target + Vector2(0, 14 * sc)
+			return target + Vector2(_drift_px(), 18.0 * logic.bite_depth * sc)
 		FishingLogic.State.REELING:
 			return _water_point(_float_depth())
 	return target
@@ -402,7 +446,9 @@ func _draw_layer() -> void:
 
 	if s in [FishingLogic.State.CASTING, FishingLogic.State.WAITING, FishingLogic.State.BITE, FishingLogic.State.REELING]:
 		var fp := _float_pos()
-		var sag := 0.0 if s == FishingLogic.State.REELING else 14.0
+		var sag := 0.0 if s == FishingLogic.State.REELING else 10.0 + 50.0 * _slack
+		if logic.mending:
+			sag = 2.0 # 견제: 뒷줄을 잡아 팽팽하게
 		var tension_col := Color(1, 1, 1, 0.7)
 		if s == FishingLogic.State.REELING:
 			tension_col = Color(1, 1, 1, 0.8).lerp(Color("ff5a4a"), clampf((logic.tension - 0.7) / 0.3, 0.0, 1.0))
@@ -423,10 +469,37 @@ func _draw_layer() -> void:
 			var fsc := 1.0 if s == FishingLogic.State.CASTING else _depth_scale(logic.cast_power)
 			_draw_float(fp, s == FishingLogic.State.BITE, fsc)
 
+	if s == FishingLogic.State.CAUGHT and _landing > 0.0:
+		_draw_landing(tip)
+
 	if s == FishingLogic.State.CHARGING:
 		_draw_power_gauge()
 	if s == FishingLogic.State.REELING:
 		_draw_tension_bar()
+
+
+## 들어 올리기: 발 앞까지 끌려온 물고기를 낚싯대 탄력으로 방파제 위로 올린다
+func _draw_landing(tip: Vector2) -> void:
+	var k := 1.0 - _landing / LANDING_TIME
+	k = 1.0 - pow(1.0 - k, 2.0)
+	var start := _water_point(0.0)
+	var end := tip + Vector2(0, 70)
+	var pos := start.lerp(end, k) + Vector2(0, -sin(k * PI) * 40.0)
+	_layer.draw_line(tip, pos, Color(1, 1, 1, 0.8), 1.5, true)
+	var w := 72.0
+	var h := 36.0
+	if _fish_tex:
+		var ts := _fish_tex.get_size()
+		h = w * ts.y / ts.x
+		# 바늘에 걸려 머리가 위로 가게 매달린 모습 (그림은 머리가 왼쪽)
+		_layer.draw_set_transform(pos, PI / 2.0 + sin(_t * 18.0) * 0.25)
+		_layer.draw_texture_rect(_fish_tex, Rect2(0, -h / 2.0, w, h), false)
+		_layer.draw_set_transform_matrix(Transform2D.IDENTITY)
+	else:
+		_layer.draw_circle(pos + Vector2(0, 20), 10.0, Color("6b5a4a"))
+	# 물보라
+	if k < 0.3:
+		_layer.draw_arc(start, 10.0 + k * 60.0, PI, TAU, 12, Color(1, 1, 1, 1.0 - k * 3.0), 2.0)
 
 
 func _draw_float(p: Vector2, sunk: bool, k := 1.0) -> void:

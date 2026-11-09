@@ -4,6 +4,11 @@ extends RefCounted
 ##
 ## 흐름: READY → (누르기) CHARGING → (떼기) CASTING → WAITING → BITE → (누르기) REELING → CAUGHT
 ## 실패하면 FAILED 상태로 잠깐 머문 뒤 READY로 돌아간다.
+##
+## 실제 찌낚시 기준 (docs/찌낚시_동작_조사.md)
+## - 순간적인 찌 떨림(톡톡)에 채면 헛챔질. 찌가 계속 잠길 때 챈다
+## - 기다리는 동안 찌는 조류에 흘러간다. 뒷줄을 잡아 견제하면 흐름이 멈추고 입질이 빨라진다
+## - 챔질 뒤에는 곧바로 감기 시작해야 한다. 줄이 느슨하면 바늘이 빠진다
 
 enum State { READY, CHARGING, CASTING, WAITING, BITE, REELING, CAUGHT, FAILED }
 
@@ -13,8 +18,12 @@ const WAIT_MIN := 2.5
 const WAIT_MAX := 6.0
 const NIBBLE_CHANCE := 0.45 # 대기 중 초당 '톡톡' 확률
 const NIBBLE_TIME := 0.3
-const BITE_WINDOW := 0.75
-const BITE_WINDOW_FORGIVING := 1.3
+const BITE_WINDOW := 1.0 # 찌가 잠기기 시작해서 다시 떠오를 때까지
+const BITE_WINDOW_FORGIVING := 1.6
+const MEND_SPEEDUP := 0.6 # 견제 중에는 입질까지 남은 시간이 이만큼 더 빨리 줄어든다
+const MEND_NIBBLE := 1.6 # 견제 중 톡톡 입질 배율
+const DRIFT_SPEED := 0.018 # 견제하지 않으면 찌가 옆으로 흘러가는 속도
+const DRIFT_MAX := 0.22
 const TENSION_DOWN := 0.85
 const REEL_SPEED := 0.2
 const BREAK_HOLD := 0.35 # 장력이 최대인 채로 버티면 줄이 끊기는 시간
@@ -36,6 +45,9 @@ var brightness := 0.0
 var forgiving := true # 첫 물고기를 잡기 전까지 판정을 너그럽게
 var force_first_fish := "bolak" # 첫 물고기 고정
 var catch_count := 0
+var drift := 0.0 # 찌가 조류에 흘러간 정도 (화면 가로 비율)
+var mending := false # 지금 뒷줄 견제 중인지
+var bite_depth := 0.0 # 입질 때 찌가 잠긴 정도 0~1
 
 ## 장비 능력치 (GearDB.apply로 넣는다)
 var cast_mult := 1.0 # 최대 던지기 거리
@@ -79,8 +91,10 @@ func acknowledge() -> void:
 		state = State.READY
 
 
-func update(dt: float, held: bool) -> void:
+## held: 주 버튼을 누르고 있는지, mend: 견제 버튼을 누르고 있는지
+func update(dt: float, held: bool, mend := false) -> void:
 	_t += dt
+	mending = mend and state == State.WAITING
 	match state:
 		State.CHARGING:
 			power += _power_dir * POWER_SPEED * dt
@@ -96,20 +110,24 @@ func update(dt: float, held: bool) -> void:
 				progress = 1.0
 				_start_waiting()
 		State.WAITING:
-			_timer -= dt
+			_timer -= dt * (1.0 + (MEND_SPEEDUP if mending else 0.0))
+			if not mending:
+				drift = minf(drift + DRIFT_SPEED * dt, DRIFT_MAX)
 			if _nibble_timer > 0.0:
 				_nibble_timer -= dt
 				nibble = sin(clampf(1.0 - _nibble_timer / NIBBLE_TIME, 0.0, 1.0) * PI)
 			else:
 				nibble = 0.0
-				if _timer > 0.8 and rng.randf() < NIBBLE_CHANCE * dt:
+				if _timer > 0.8 and rng.randf() < NIBBLE_CHANCE * (MEND_NIBBLE if mending else 1.0) * dt:
 					_nibble_timer = NIBBLE_TIME
 			if _timer <= 0.0:
 				nibble = 0.0
 				state = State.BITE
-				_timer = BITE_WINDOW_FORGIVING if forgiving else BITE_WINDOW
+				bite_depth = 0.0
+				_timer = _bite_window()
 		State.BITE:
 			_timer -= dt
+			bite_depth = clampf(1.0 - _timer / _bite_window(), 0.0, 1.0)
 			if _timer <= 0.0:
 				_fail("missed")
 		State.REELING:
@@ -120,8 +138,13 @@ func update(dt: float, held: bool) -> void:
 				state = State.READY
 
 
+func _bite_window() -> float:
+	return BITE_WINDOW_FORGIVING if forgiving else BITE_WINDOW
+
+
 func _start_waiting() -> void:
 	state = State.WAITING
+	drift = 0.0
 	nibble = 0.0
 	_nibble_timer = 0.0
 	# 밝아질수록 입질이 늦어진다
@@ -194,13 +217,13 @@ func _fail(reason: String) -> void:
 static func fail_message(reason: String) -> String:
 	match reason:
 		"nibble":
-			return "톡톡 건드리는 건 아직 입질이 아니다. 찌가 쑥 잠길 때까지 기다리자."
+			return "찌가 살짝 떨린 순간에 챘다. 찌가 계속 잠겨 들어갈 때 채야 한다."
 		"early":
 			return "너무 일찍 챘다. 미끼만 날아갔다."
 		"missed":
-			return "찌가 들어갔다 올라왔다. 미끼만 뺏겼다."
+			return "찌가 잠겼다가 다시 떠올랐다. 미끼만 뺏겼다."
 		"broke":
-			return "팽팽하게 버티던 줄이 끊어졌다. 줄이 빨개지면 잠깐 손을 떼자."
+			return "줄이 끊어졌다. 줄이 빨개지면 손을 떼고 낚싯대를 세워 버티자."
 		"slack":
-			return "줄이 느슨해진 사이 바늘이 빠졌다."
+			return "줄이 느슨해진 사이 바늘이 빠졌다. 챔질하고 바로 감아야 한다."
 	return ""

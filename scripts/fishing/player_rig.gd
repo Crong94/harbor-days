@@ -16,8 +16,14 @@ const REEL_SIZE := 46.0
 
 var rod_id := GearDB.DEFAULT_ROD
 var reel_id := GearDB.DEFAULT_REEL
-## 낚싯대 각도 (도). 0은 오른쪽 수평, -90은 수직 위
-var rod_angle := -70.0
+## 낚싯대를 든 높이 (도). 뒤에서 보는 시점이라 화면 회전이 아니라 원근으로 표현한다.
+##   0: 바다 쪽으로 수평 (화면에서는 짧게 보임)
+##   45: 찌를 보는 기본 자세
+##   90: 하늘로 수직 (가장 길게 보임)
+##   120 이상: 머리 뒤로 넘김 (캐스팅 준비, 시계로 1시 방향)
+var pitch := 45.0
+## 낚싯대가 오른쪽으로 벌어진 정도 (도). 오른손으로 쥐어서 몸 오른쪽으로 비스듬하다
+var roll := 22.0
 ## 몸 기울기 (도)
 var lean := 0.0
 
@@ -55,14 +61,25 @@ func _hand() -> Vector2:
 	return _body_xform() * (HAND * size)
 
 
+## 화면에서 낚싯대가 향하는 각도 (라디안). 머리 뒤로 넘기면 끝이 살짝 몸쪽으로 돌아온다
+func _screen_angle() -> float:
+	var back := maxf(pitch - 90.0, 0.0)
+	return deg_to_rad(-90.0 + roll + lean + back * 1.3)
+
+
 func _rod_dir() -> Vector2:
-	return Vector2.from_angle(deg_to_rad(rod_angle + lean))
+	return Vector2.from_angle(_screen_angle())
+
+
+## 원근: 바다 쪽으로 누울수록, 머리 뒤로 넘길수록 화면에서 짧아 보인다
+func _foreshorten() -> float:
+	return 0.32 + 0.68 * sin(deg_to_rad(clampf(pitch, 0.0, 180.0)))
 
 
 ## 낚싯대 위 비율 위치(0 손잡이 끝 ~ 1 낚싯대 끝)를 이 노드 좌표로
 func _rod_point(t: float) -> Vector2:
 	var r := GearDB.rod(rod_id)
-	return _hand() + _rod_dir() * (t - r.grip) * ROD_LENGTH
+	return _hand() + _rod_dir() * (t - r.grip) * ROD_LENGTH * _foreshorten()
 
 
 ## 낚싯대 끝의 화면 좌표. 낚싯줄이 여기서 나간다.
@@ -74,12 +91,13 @@ func _draw() -> void:
 	# 낚싯대
 	var r := GearDB.rod(rod_id)
 	var start := _rod_point(0.0)
-	var ang := deg_to_rad(rod_angle + lean)
+	var ang := _screen_angle()
+	var shown := ROD_LENGTH * _foreshorten()
 	if _rod_tex:
 		var ts := _rod_tex.get_size()
-		var h := ROD_LENGTH * ts.y / ts.x # 그림 비율대로
+		var h := ROD_LENGTH * ts.y / ts.x # 굵기는 그림 비율대로, 길이만 원근으로 줄인다
 		draw_set_transform(start, ang)
-		draw_texture_rect(_rod_tex, Rect2(0, -r.get("axis", 0.5) * h, ROD_LENGTH, h), false)
+		draw_texture_rect(_rod_tex, Rect2(0, -r.get("axis", 0.5) * h, shown, h), false)
 		draw_set_transform_matrix(Transform2D.IDENTITY)
 	else:
 		draw_line(start, _rod_point(r.tip), r.color, 4.0, true)
