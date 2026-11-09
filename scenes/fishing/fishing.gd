@@ -29,15 +29,14 @@ const HINTS := {
 
 ## 뒤쪽 시점 세로 낚시 화면. 아래 위치는 배경 그림 크기 대비 비율이다.
 ## 배경 그림이 바뀌면 이 숫자들만 그림에 맞춰 고친다.
-## 지금 그림은 바다 한 접시에서 가져온 임시 그림(방파제 밤, 낮). 밝기만큼 낮 그림을 겹친다.
-## 오늘의 바다 전용 세로 그림(bg_fishing_dawn_v, bg_fishing_morning_v)이 오면 이름과 비율을 바꾼다.
-const BG_ART := "bg_fishing_night"
-const BG_ART_BLEND := "bg_fishing_day"
-const WATER_NEAR_Y := 0.665 # 방파제 바로 앞 바다
-const WATER_FAR_Y := 0.36 # 가장 멀리 던졌을 때 (수평선 0.33 바로 아래)
-const FEET := Vector2(0.5, 0.765) # 주인공 발 위치 (방파제 끝, 바다 바로 앞)
-## 그림에서 보일 부분. 방파제 아래쪽을 잘라 내고 확대해서 바다를 넓게 보여 준다
-const ART_VIEW := Rect2(0.1, 0.0, 0.8, 0.8)
+## 그림: 오늘의 바다 전용 세로 새벽 그림 (2026-11-09 받음). 아침 그림(bg_fishing_morning_v)이 오면 BG_ART_BLEND에 넣어 밝기만큼 겹친다.
+const BG_ART := "bg_fishing_dawn_v"
+const BG_ART_BLEND := ""
+const WATER_NEAR_Y := 0.665 # 방파제 끝 바로 앞 바다 (테트라포드 사이)
+const WATER_FAR_Y := 0.37 # 가장 멀리 던졌을 때 (수평선 0.338 바로 아래)
+const FEET := Vector2(0.5, 0.875) # 주인공 발 위치 (방파제 끝 콘크리트 바닥 가운데)
+## 그림에서 보일 부분 (세로 9:16 그림이라 전부)
+const ART_VIEW := Rect2(0.0, 0.0, 1.0, 1.0)
 const FLOAT_NEAR_SCALE := 1.0
 const FLOAT_FAR_SCALE := 0.42
 const FLOAT_H := 70.0 # 가까이 있을 때 찌 그림 높이 (물 위로 보이는 부분 기준 아님, 그림 전체)
@@ -71,7 +70,8 @@ var _quit_btn: Button
 var _order_card: PanelContainer
 var _order_text: Label
 var _order_prog: Label
-var _streak_badge: PanelContainer
+var _top_bar: HBoxContainer
+var _calm_row: HBoxContainer
 var _hint_pill: PanelContainer
 var _hint: Label
 var _bait_btn: Button
@@ -82,7 +82,6 @@ var _fight_panel: PanelContainer
 var _fight_dist: Label
 var _hp_slot: Control # 줄다리기 패널 안 게이지 자리 (그리기는 _draw_fight_gauges)
 var _tension_slot: Control
-var _steer_slot: Control
 var _hint_row: CenterContainer
 var _bait_sheet: Control
 var _bait_list: VBoxContainer
@@ -309,17 +308,18 @@ func _process(delta: float) -> void:
 
 	UiKit.set_chip(_clock, _clock_text())
 	UiKit.set_chip(_count, "%d마리" % GameState.caught_today.size())
-	var calm := logic.state in [FishingLogic.State.READY, FishingLogic.State.WAITING, FishingLogic.State.FAILED]
-	_quit_btn.visible = not tutorial and not _in_story and not _ending and calm
-	_bait_btn.visible = not _in_story and not _ending and logic.state in [FishingLogic.State.READY, FishingLogic.State.FAILED]
+	# 화면은 지금 할 일만 보여 준다: 조용할 때는 주문과 오늘의 바다, 싸울 때는 줄다리기 카드 하나
+	var calm := logic.state in [FishingLogic.State.READY, FishingLogic.State.FAILED] and not _in_story and not _ending
+	var fighting := logic.state == FishingLogic.State.REELING
+	_top_bar.visible = not fighting
+	_calm_row.visible = calm
+	_quit_btn.visible = not tutorial
+	_order_card.visible = calm and not order.is_empty()
+	_bait_btn.visible = calm
 	_mend_btn.visible = not _in_story and logic.state == FishingLogic.State.WAITING
-	_fight_panel.visible = logic.state == FishingLogic.State.REELING
-	_hint_row.offset_top = (_fight_panel.position.y + _fight_panel.size.y + 12.0) if _fight_panel.visible else 222.0
+	_fight_panel.visible = fighting
+	_hint_row.offset_top = (_fight_panel.position.y + _fight_panel.size.y + 14.0) if fighting else (214.0 if _order_card.visible else 150.0)
 	_hint_pill.visible = not _hint.text.is_empty() and not _in_story
-	_streak_badge.visible = logic.perfect_streak >= 2 and not _in_story
-	if _streak_badge.visible:
-		var hot := logic.is_hot()
-		(_streak_badge.get_child(0) as Label).text = ("PERFECT %d연속 · 물 오름!" if hot else "PERFECT %d연속") % logic.perfect_streak
 	_update_order_card()
 	if _fight_panel.visible:
 		_fight_dist.text = "%dm" % int(ceil(logic.distance * logic.cast_power * 30.0))
@@ -327,7 +327,7 @@ func _process(delta: float) -> void:
 	for s in _splashes:
 		s.t += delta
 	_splashes = _splashes.filter(func(s): return s.t < 0.5)
-	if logic.state == FishingLogic.State.REELING and randf() < delta * (10.0 if logic.run_dir != 0 else 4.0):
+	if logic.state == FishingLogic.State.REELING and randf() < delta * (5.0 if logic.run_dir != 0 else 2.0):
 		_splashes.append({"t": 0.0, "off": Vector2(randf_range(-18, 18), randf_range(-4, 4))})
 
 	# 화면 흔들림 (바다와 주인공만)
@@ -382,11 +382,10 @@ func _watch_fight_events() -> void:
 		_shake = maxf(_shake, 0.35)
 		if tutorial and not _tutor_fight_shown:
 			_tutor_fight_shown = true
-			_set_hint("물고기가 %s으로 가요! 누른 채로 %s으로 끌어요" % ["왼쪽" if logic.run_dir < 0 else "오른쪽", "오른쪽" if logic.run_dir < 0 else "왼쪽"], UiKit.SUN)
+			_set_hint("물고기가 %s으로 가요! 누른 채로 %s으로 끌어요" % ["왼쪽" if logic.run_dir < 0 else "오른쪽", "오른쪽" if logic.run_dir < 0 else "왼쪽"], UiKit.CORAL_DEEP)
 	_last_run = logic.run_dir
 	if logic.exhausted and not _was_exhausted:
 		Sound.play_sfx("pop")
-		_pop_text("지쳤다! 쭉 감아요", UiKit.LEAF, _fish_point() + Vector2(0, -70), 40)
 	_was_exhausted = logic.exhausted
 
 
@@ -396,9 +395,11 @@ func _on_state_changed() -> void:
 		_hint.text = ""
 		return
 	if s == FishingLogic.State.FAILED:
-		_set_hint(FishingLogic.fail_message(logic.fail_reason), UiKit.PINK)
+		_set_hint(FishingLogic.fail_message(logic.fail_reason), UiKit.CORAL_DEEP)
+	elif tutorial:
+		_set_hint(HINTS.get(s, ""), UiKit.CORAL_DEEP if s == FishingLogic.State.BITE else UiKit.INK)
 	else:
-		_set_hint(HINTS.get(s, ""), UiKit.SUN if s == FishingLogic.State.BITE else UiKit.FOAM)
+		_set_hint("", UiKit.INK)
 	_play_state_sound(s)
 	match s:
 		FishingLogic.State.WAITING:
@@ -505,123 +506,115 @@ func _start_ending() -> void:
 # ─── 화면 구성 ──────────────────────────────────────
 
 func _build_hud() -> void:
-	# 위: 시계와 잡은 수
-	var bar := UiKit.hbox(UiKit.SPACE_SM)
-	bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	bar.offset_left = 20
-	bar.offset_right = -20
-	bar.offset_top = 24
-	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(bar)
-	_clock = UiKit.chip("", "", "icon_clock")
-	bar.add_child(_clock)
-	bar.add_child(UiKit.spacer())
-	_count = UiKit.chip("", "", "icon_fish")
-	bar.add_child(_count)
+	# 위: 시계와 잡은 수 (크림 알약). 줄다리기 중에는 줄다리기 카드가 이 자리를 쓴다
+	_top_bar = UiKit.hbox(UiKit.SPACE_SM)
+	_top_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	_top_bar.offset_left = 20
+	_top_bar.offset_right = -20
+	_top_bar.offset_top = 24
+	_top_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_top_bar)
+	_clock = UiKit.chip("", "", "icon_clock", false)
+	_top_bar.add_child(_clock)
+	_top_bar.add_child(UiKit.spacer())
+	_count = UiKit.chip("", "", "icon_fish", false)
+	_top_bar.add_child(_count)
 
-	# 둘째 줄: 오늘의 바다 (물때, 날씨)와 그만하기
-	var row2 := UiKit.hbox(UiKit.SPACE_SM)
-	row2.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	row2.offset_left = 20
-	row2.offset_right = -20
-	row2.offset_top = 86
-	row2.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(row2)
-	_sea_pill = UiKit.chip("오늘의 바다", SeaDay.summary(sea))
-	row2.add_child(_sea_pill)
-	row2.add_child(UiKit.spacer())
+	# 둘째 줄 (조용할 때만): 오늘의 바다와 그만하기
+	_calm_row = UiKit.hbox(UiKit.SPACE_SM)
+	_calm_row.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	_calm_row.offset_left = 20
+	_calm_row.offset_right = -20
+	_calm_row.offset_top = 84
+	_calm_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_calm_row)
+	_sea_pill = UiKit.chip("", SeaDay.summary(sea), "", false)
+	_calm_row.add_child(_sea_pill)
+	_calm_row.add_child(UiKit.spacer())
 	_quit_btn = UiKit.action("그만하기", "secondary", true)
 	_quit_btn.pressed.connect(_start_ending)
-	_quit_btn.hide()
-	row2.add_child(_quit_btn)
+	_calm_row.add_child(_quit_btn)
 
-	# 주문서 쪽지
+	# 주문서 쪽지 (조용할 때만)
 	_order_card = PanelContainer.new()
 	_order_card.add_theme_stylebox_override("panel", UiKit.chunky(UiKit.PAPER, UiKit.RADIUS_MD, 12, 4))
 	_order_card.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	_order_card.position = Vector2(20, 150)
+	_order_card.position = Vector2(20, 146)
 	_order_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_order_card)
 	var oh := UiKit.hbox(UiKit.SPACE_SM)
 	oh.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_order_card.add_child(oh)
 	if not order.is_empty():
-		var oi := UiKit.icon_rect("fish_" + order.fish, 40)
+		var oi := UiKit.icon_rect("fish_" + order.fish, 36)
 		if oi:
-			oi.custom_minimum_size = Vector2(64, 40)
+			oi.custom_minimum_size = Vector2(58, 36)
 			oh.add_child(oi)
-	var ov := UiKit.vbox(0)
+	var ov := UiKit.vbox(-2)
 	ov.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	oh.add_child(ov)
 	ov.add_child(UiKit.text("%s의 주문" % order.get("customer", ""), "caption", UiKit.INK_SOFT))
 	_order_text = UiKit.text(Orders.goal_text(order), "label", UiKit.INK)
 	ov.add_child(_order_text)
 	_order_prog = UiKit.text("", "number", UiKit.CORAL)
-	oh.add_child(UiKit.gap(6))
+	oh.add_child(UiKit.gap(4))
 	oh.add_child(_order_prog)
-	_order_card.visible = not order.is_empty()
+	_order_card.visible = false
 
-	# 연속 PERFECT 배지
-	_streak_badge = UiKit.badge("", UiKit.SUN, UiKit.INK)
-	_streak_badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	_streak_badge.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_streak_badge.offset_left = -300
-	_streak_badge.offset_right = -20
-	_streak_badge.offset_top = 156
-	_streak_badge.offset_bottom = 196
-	_streak_badge.hide()
-	add_child(_streak_badge)
-
-	# 줄다리기 패널: 물고기 체력과 거리 (게이지는 _draw_hud에서 그린다)
-	_fight_panel = UiKit.glass_panel(0, UiKit.RADIUS_LG)
-	var fs: StyleBoxFlat = _fight_panel.get_theme_stylebox("panel")
-	fs.content_margin_left = 20
-	fs.content_margin_right = 20
+	# 줄다리기 카드 (위 가운데, 한 장): 물고기 힘과 줄 장력 두 줄, 거리
+	_fight_panel = PanelContainer.new()
+	var fs := UiKit.chunky(UiKit.PAPER, UiKit.RADIUS_LG, 0, 4)
+	fs.content_margin_left = 18
+	fs.content_margin_right = 18
 	fs.content_margin_top = 10
 	fs.content_margin_bottom = 14
-	_fight_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_fight_panel.offset_left = 20
-	_fight_panel.offset_right = -20
-	_fight_panel.offset_top = 222
+	_fight_panel.add_theme_stylebox_override("panel", fs)
+	_fight_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_fight_panel.offset_left = -230
+	_fight_panel.offset_right = 230
+	_fight_panel.offset_top = 22
 	_fight_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_fight_panel)
 	var fv := UiKit.vbox(6)
 	fv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fight_panel.add_child(fv)
-	var fh := UiKit.hbox(UiKit.SPACE_SM)
-	fh.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	fv.add_child(fh)
-	fh.add_child(UiKit.text("물고기 힘", "label", UiKit.FOAM))
-	fh.add_child(UiKit.spacer())
-	_fight_dist = UiKit.text("", "number", UiKit.FOAM)
-	fh.add_child(_fight_dist)
-	_hp_slot = UiKit.gap(24)
-	fv.add_child(_hp_slot)
-	fv.add_child(UiKit.text("줄 장력", "label", UiKit.FOAM))
-	_tension_slot = UiKit.gap(24)
-	fv.add_child(_tension_slot)
-	_steer_slot = UiKit.gap(64)
-	fv.add_child(_steer_slot)
+	var make_row := func(caption: String) -> Control:
+		var row := UiKit.hbox(UiKit.SPACE_SM)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var cap := UiKit.text(caption, "label", UiKit.INK_SOFT)
+		cap.custom_minimum_size.x = 64
+		row.add_child(cap)
+		var slot := UiKit.gap(20)
+		slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		slot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(slot)
+		fv.add_child(row)
+		return slot
+	_hp_slot = make_row.call("물고기")
+	_tension_slot = make_row.call("장력")
+	_fight_dist = UiKit.text("", "number", UiKit.INK)
+	_fight_dist.add_theme_font_size_override("font_size", 20)
+	(_hp_slot.get_parent() as HBoxContainer).add_child(_fight_dist)
 	_fight_panel.hide()
 
-	# 안내 알약 (위쪽. 아래는 주인공 자리)
+	# 안내 말풍선 (위쪽. 아래는 주인공 자리). 튜토리얼이나 실패했을 때만 뜬다
 	_hint_row = CenterContainer.new()
 	_hint_row.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_hint_row.offset_top = 222
+	_hint_row.offset_top = 150
 	_hint_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_hint_row)
-	var hint_row := _hint_row
-	_hint_pill = UiKit.glass_panel(0, UiKit.RADIUS_LG)
-	var hs: StyleBoxFlat = _hint_pill.get_theme_stylebox("panel")
+	_hint_pill = PanelContainer.new()
+	var hs := UiKit.chunky(UiKit.PAPER, UiKit.RADIUS_LG, 0, 4)
 	hs.content_margin_left = 22
 	hs.content_margin_right = 22
-	hs.content_margin_top = 12
-	hs.content_margin_bottom = 15
+	hs.content_margin_top = 10
+	hs.content_margin_bottom = 14
+	_hint_pill.add_theme_stylebox_override("panel", hs)
 	_hint_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hint_row.add_child(_hint_pill)
-	_hint = UiKit.paragraph("", "body", UiKit.FOAM, 0.0, HORIZONTAL_ALIGNMENT_CENTER)
+	_hint_row.add_child(_hint_pill)
+	_hint = UiKit.paragraph("", "body", UiKit.INK, 0.0, HORIZONTAL_ALIGNMENT_CENTER)
 	_hint.add_theme_font_size_override("font_size", 19)
-	_hint.custom_minimum_size.x = 520
+	_hint.custom_minimum_size.x = 500
 	_hint_pill.add_child(_hint)
 	_hint_pill.hide()
 
@@ -631,8 +624,8 @@ func _build_hud() -> void:
 	_bait_btn.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	_bait_btn.offset_left = 20
 	_bait_btn.offset_right = 170
-	_bait_btn.offset_top = -250
-	_bait_btn.offset_bottom = -180
+	_bait_btn.offset_top = -130
+	_bait_btn.offset_bottom = -60
 	_bait_btn.pressed.connect(_open_bait_sheet)
 	add_child(_bait_btn)
 	var bh := UiKit.hbox(6)
@@ -663,8 +656,8 @@ func _build_hud() -> void:
 	_mend_btn.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	_mend_btn.offset_left = -150
 	_mend_btn.offset_right = -20
-	_mend_btn.offset_top = -250
-	_mend_btn.offset_bottom = -180
+	_mend_btn.offset_top = -130
+	_mend_btn.offset_bottom = -60
 	_mend_btn.button_down.connect(func(): _mend_held = true)
 	_mend_btn.button_up.connect(func(): _mend_held = false)
 	_mend_btn.hide()
@@ -691,7 +684,6 @@ func _refresh_bait() -> void:
 func _update_order_card() -> void:
 	if order.is_empty():
 		return
-	_order_card.visible = not _in_story or _ending
 	if GameState.order_done:
 		_order_prog.text = "완료!"
 		_order_prog.add_theme_color_override("font_color", UiKit.SEA)
@@ -1140,9 +1132,7 @@ func _draw_layer() -> void:
 		var ssc := _depth_scale(_float_depth())
 		for sp in _splashes:
 			var a: float = 1.0 - sp.t / 0.5
-			_draw_ellipse_arc(fp + sp.off * ssc, (8.0 + sp.t * 34.0) * ssc, Color(1, 1, 1, a * 0.85), 2.5)
-		if logic.run_dir != 0:
-			_draw_chevrons(fp + Vector2(logic.run_dir * 46.0 * ssc, -18.0 * ssc), logic.run_dir, ssc, Color(UiKit.PINK, 0.95))
+			_draw_ellipse_arc(fp + sp.off * ssc * 0.5, (6.0 + sp.t * 26.0) * ssc, Color(1, 1, 1, a * 0.6), 2.0)
 
 
 func _draw_point() -> void:
@@ -1203,16 +1193,6 @@ func _draw_bite_ring(p: Vector2, k: float) -> void:
 	_layer.draw_arc(c, target_r, 0, TAU, 40, Color(UiKit.SUN, 0.9), 4.0, true)
 	if r > 4.0:
 		_layer.draw_arc(c, r, 0, TAU, 48, UiKit.SUN.lightened(0.3) if in_zone else Color(1, 1, 1, 0.9), 5.0 if in_zone else 3.5, true)
-
-
-## 물고기가 가는 쪽 화살표
-func _draw_chevrons(c: Vector2, dir: int, k: float, col: Color) -> void:
-	for i in 2:
-		var o := c + Vector2(dir * (i * 16.0 + fmod(_t * 40.0, 16.0)) * k, 0)
-		var a := 10.0 * maxf(k, 0.6)
-		var pts := PackedVector2Array([o + Vector2(-dir * a * 0.6, -a), o + Vector2(dir * a * 0.6, 0), o + Vector2(-dir * a * 0.6, a)])
-		_layer.draw_polyline(pts, UiKit.OUTLINE, 8.0, true)
-		_layer.draw_polyline(pts, col, 4.5, true)
 
 
 ## 줄과 날아가는 찌 (주인공 앞): 낚싯대 끝에서 나가야 해서 몸보다 나중에 그린다
@@ -1305,45 +1285,50 @@ func _draw_cast_gauge() -> void:
 
 ## 줄다리기 게이지: 위 패널 안에 물고기 체력, 아래에 줄 장력과 끄는 방향
 func _draw_fight_gauges() -> void:
-	# 물고기 체력
-	var pr := _hp_slot.get_global_rect()
+	# 카드 안 두 줄: 물고기 힘(분홍, 지치면 연두)과 줄 장력(빨간 구간에 오래 있으면 끊어진다)
 	var hp_col := UiKit.LEAF if logic.exhausted else UiKit.PINK
-	UiKit.draw_bar(_hud_draw, pr, logic.fish_hp, hp_col)
-
-	# 줄 장력. 빨간 구간에 오래 있으면 끊어진다
-	var tr := _tension_slot.get_global_rect()
+	UiKit.draw_bar(_hud_draw, _hp_slot.get_global_rect(), logic.fish_hp, hp_col, false)
 	var col := UiKit.SEA
 	if logic.tension > 0.85:
 		col = UiKit.DANGER
 	elif logic.tension > 0.62:
 		col = UiKit.SUN
-	UiKit.draw_bar(_hud_draw, tr, logic.tension, col, true, Vector2(0.86, 1.0), Color(UiKit.DANGER, 0.35))
-	var font := UiKit.font("cute")
+	UiKit.draw_bar(_hud_draw, _tension_slot.get_global_rect(), logic.tension, col, false, Vector2(0.86, 1.0), Color(UiKit.DANGER, 0.3))
 
-	# 끄는 방향 (누른 자리 기준 좌우). 물고기가 가는 쪽 반대편이 정답
-	var sr := _steer_slot.get_global_rect()
-	var cx := sr.get_center().x
-	var y := sr.end.y - 16.0
-	var half := minf(190.0, sr.size.x / 2.0 - 20.0)
-	var track := Rect2(cx - half, y - 14, half * 2, 28)
-	_hud_draw.draw_style_box(UiKit.box(Color(0.12, 0.1, 0.2, 0.7), 14, UiKit.OUTLINE, UiKit.OUTLINE_W, 0), track)
-	if logic.run_dir != 0:
-		# 버텨야 하는 쪽을 민트로 칠한다
-		var want := -logic.run_dir
-		var zr := Rect2(cx if want > 0 else cx - half, y - 11, half, 22)
-		var a := 0.45 + 0.35 * sin(_t * 10.0)
-		_hud_draw.draw_style_box(UiKit.box(Color(UiKit.SEA, a), 11, Color.TRANSPARENT, 0, 0), zr)
-		var label := ("◀ 왼쪽으로 끌어요" if want < 0 else "오른쪽으로 끌어요 ▶") if not logic.countering else "좋아요! 버텨요"
-		if not logic.countering and logic.escape > 0.55:
-			label = "바위틈으로 파고들어요! " + ("◀" if want < 0 else "▶")
-		var fs := 26
-		var w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		var lc := UiKit.LEAF if logic.countering else UiKit.SUN
-		_hud_draw.draw_string_outline(font, Vector2(cx - w / 2.0, y - 26), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 10, UiKit.OUTLINE)
-		_hud_draw.draw_string(font, Vector2(cx - w / 2.0, y - 26), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, lc)
-	var kx := cx + _steer() * half
-	_hud_draw.draw_circle(Vector2(kx, y), 17.0, UiKit.OUTLINE)
-	_hud_draw.draw_circle(Vector2(kx, y), 13.0, UiKit.FOAM if _held else Color(UiKit.FOAM, 0.5))
+	# 끌 방향: 물고기가 차고 나가면 반대쪽 화면 가장자리에 큰 화살표 하나
+	if logic.run_dir == 0:
+		if logic.exhausted:
+			_sticker("지쳤어요! 쭉 감아요", Vector2(size.x / 2.0, 560), UiKit.LEAF, 34)
+		return
+	var want := -logic.run_dir
+	var pulse := 1.0 + 0.08 * sin(_t * 12.0)
+	var c := Vector2(size.x / 2.0 + want * (size.x / 2.0 - 96.0), 560)
+	var col2 := UiKit.LEAF if logic.countering else UiKit.SUN
+	_draw_big_arrow(c, want, 46.0 * pulse, col2)
+	var label := "버텨요!" if logic.countering else ("놓치겠어요!" if logic.escape > 0.55 else "이쪽으로 끌어요")
+	_sticker(label, c + Vector2(-want * 20.0, 74), UiKit.CORAL if (logic.escape > 0.55 and not logic.countering) else col2, 28)
+
+
+## 굵은 외곽선 화살표 (끌 방향)
+func _draw_big_arrow(c: Vector2, dir: int, r: float, col: Color) -> void:
+	var pts := PackedVector2Array([
+		c + Vector2(dir * r, 0), c + Vector2(-dir * r * 0.2, -r * 0.85), c + Vector2(-dir * r * 0.2, -r * 0.35),
+		c + Vector2(-dir * r, -r * 0.35), c + Vector2(-dir * r, r * 0.35), c + Vector2(-dir * r * 0.2, r * 0.35),
+		c + Vector2(-dir * r * 0.2, r * 0.85),
+	])
+	var outline := pts.duplicate()
+	outline.append(pts[0])
+	_hud_draw.draw_colored_polygon(pts, col)
+	_hud_draw.draw_polyline(outline, UiKit.OUTLINE, 5.0, true)
+
+
+## 굵은 외곽선 글자 (가운데 정렬)
+func _sticker(t: String, center: Vector2, col: Color, fs := 28) -> void:
+	var font := UiKit.font("cute")
+	var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var x := clampf(center.x - w / 2.0, 12.0, size.x - w - 12.0)
+	_hud_draw.draw_string_outline(font, Vector2(x, center.y), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 12, UiKit.OUTLINE)
+	_hud_draw.draw_string(font, Vector2(x, center.y), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)
 
 
 ## 웹 빌드 자동 테스트용으로 현재 상태를 페이지에 알려 준다.
