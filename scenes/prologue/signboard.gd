@@ -1,7 +1,7 @@
 extends Control
 ## 챕터 1: 낡은 나무판에 가게 이름을 쓰고 간판을 다는 장면. 여기서 {shop}이 정해진다.
 
-const TITLE_SCENE := "res://scenes/title/title.tscn"
+const NEXT_SCENE := "res://scenes/fishing/fishing.tscn"
 
 var _board: PanelContainer
 var _shop_edit: LineEdit
@@ -71,8 +71,8 @@ func _ready() -> void:
 
 	_end_buttons = HBoxContainer.new()
 	_end_buttons.alignment = BoxContainer.ALIGNMENT_CENTER
-	var back_btn := UiKit.button("처음으로")
-	back_btn.pressed.connect(func(): UiKit.go_to(self, TITLE_SCENE))
+	var back_btn := UiKit.button("다음 날 새벽으로")
+	back_btn.pressed.connect(func(): UiKit.go_to(self, NEXT_SCENE, 0.8))
 	_end_buttons.add_child(back_btn)
 	_end_buttons.hide()
 	v.add_child(_end_buttons)
@@ -111,8 +111,7 @@ func _hang_sign() -> void:
 	tw.tween_callback(func(): _dialogue.play([
 		{"speaker": "{player}", "text": "{shop}. 오늘부터 여기가 내 자리다."},
 		{"speaker": "{player}", "text": "통장에는 %s, 갚아야 할 대출은 %s." % [GameState.format_won(GameState.money), GameState.format_won(GameState.debt)]},
-		{"speaker": "{player}", "text": "...일단 팔 게 있어야 하는데. 방파제에 가 보자."},
-		{"speaker": "", "text": "다음 이야기 〈첫 번째 손님〉은 준비 중이에요."},
+		{"speaker": "{player}", "text": "...일단 팔 게 있어야 하는데. 내일 새벽에 방파제로 가 보자."},
 	]))
 
 

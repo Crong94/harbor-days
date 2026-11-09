@@ -21,6 +21,12 @@ var debt := 30_000_000
 var monthly_repayment := 550_000
 var day := 1
 
+## 낚시 기록. 항목 형식: {"id": "bolak", "size": 18.3}
+var caught_today: Array = []
+var inventory: Array = []
+## 어종 도감: 어종 id → 가장 큰 기록(cm)
+var dex := {}
+
 var _player_regex := RegEx.create_from_string("^[가-힣a-zA-Z0-9]+$")
 var _shop_regex := RegEx.create_from_string("^[가-힣a-zA-Z0-9 ]+$")
 

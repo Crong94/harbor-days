@@ -24,6 +24,11 @@ godot --headless --path . --script res://tests/run_tests.gd        # 테스트
 godot --headless --path . --export-release "Web" build/web/index.html  # 웹 빌드
 ```
 
+## 그림 규칙 (중요)
+- 그림, 일러스트, 캐릭터, 배경 이미지는 **직접 만들지 않는다.** 필요한 그림은 `docs/그림_요청_목록.md`에 적고 사용자에게 요청한다.
+- 그림 자리는 `ArtSlot`으로 비워 둔다. `assets/art/<id>.png`가 들어오면 자동으로 표시된다.
+- 낚싯대, 줄, 찌, 게이지처럼 판정을 보여 주는 요소만 코드로 선을 그린다. 지금 배경(SeaBackdrop)은 그림이 오기 전까지 쓰는 임시 도형이다.
+
 ## 코드 규칙
 - UI는 씬 파일을 최소로 두고 스크립트 `_ready()`에서 만든다. 색, 글자 크기, 버튼은 `scripts/ui/ui_kit.gd`의 상수와 함수만 쓴다.
 - 플레이어명, 가게명이 들어가는 대사는 템플릿으로 쓰고 `GameState.line()`으로 바꾼다.
@@ -38,8 +43,12 @@ assets/fonts      폰트
 docs              기획 문서
 scenes/title      타이틀
 scenes/prologue   사직서(플레이어명 입력), 간판(가게명 입력)
+scenes/fishing    새벽 방파제 찌낚시 (첫 물고기 볼락)
+scripts/fishing   FishingLogic (낚시 규칙, 헤드리스 테스트 가능)
+scripts/data      FishDB (어종 데이터)
+assets/art        사용자에게 받은 그림 (docs/그림_요청_목록.md)
 scripts/autoload  GameState (전역 상태)
-scripts/ui        UiKit, SeaBackdrop(임시 배경), DialogueBox
+scripts/ui        UiKit, SeaBackdrop(임시 배경), DialogueBox, ArtSlot(그림 자리)
 scripts/util      Josa (조사 처리)
 tests             헤드리스 테스트
 tools             설치, 백업 스크립트

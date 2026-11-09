@@ -10,6 +10,8 @@ func _init() -> void:
 	_test_format()
 	_test_validation()
 	_test_won()
+	_test_fish_db()
+	_test_fishing()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -67,3 +69,112 @@ func _test_won() -> void:
 	_eq(gs.format_won(500), "500원", "원 3")
 	_eq(gs.format_won(-7000), "-7,000원", "원 4")
 	gs.free()
+
+
+func _test_fish_db() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1
+	for id in FishDB.FISH:
+		var f := FishDB.get_fish(id)
+		for i in 200:
+			var s := FishDB.roll_size(rng, id)
+			if s < f.min_cm or s > f.max_cm:
+				_eq(s, "범위 안", "%s 크기 범위" % id)
+				return
+	_eq(Josa.attach("볼락", "을/를"), "볼락을", "볼락 조사")
+	var dark := 0
+	var bright := 0
+	for i in 3000:
+		if FishDB.pick(rng, 0.0) == "bolak": dark += 1
+		if FishDB.pick(rng, 1.0) == "bolak": bright += 1
+	_eq(dark > bright + 300, true, "밝아지면 볼락이 덜 잡힘 (%d vs %d)" % [dark, bright])
+
+
+## 상태가 바뀔 때까지 시간을 돌린다. 최대 max_sec초.
+func _run_until(l: FishingLogic, states: Array, held_fn: Callable, max_sec := 60.0) -> void:
+	var t := 0.0
+	while t < max_sec and not (l.state in states):
+		l.update(1.0 / 60.0, held_fn.call(l))
+		t += 1.0 / 60.0
+
+
+func _new_logic(seed_value: int) -> FishingLogic:
+	var l := FishingLogic.new()
+	l.rng.seed = seed_value
+	return l
+
+
+func _cast(l: FishingLogic) -> void:
+	l.press()
+	_run_until(l, [], func(_x): return true, 0.5)
+	l.release()
+	_run_until(l, [FishingLogic.State.WAITING], func(_x): return false, 2.0)
+
+
+func _test_fishing() -> void:
+	var S := FishingLogic.State
+	var never := func(_x): return false
+	var always := func(_x): return true
+	var smart := func(x): return x.tension < 0.8
+
+	var l := _new_logic(3)
+	l.press()
+	_eq(l.state, S.CHARGING, "누르면 힘 모으기")
+	_run_until(l, [], always, 0.5)
+	l.release()
+	_eq(l.state, S.CASTING, "떼면 던지기")
+	_eq(l.cast_power > 0.4 and l.cast_power < 0.7, true, "0.5초 힘 (%.2f)" % l.cast_power)
+	_run_until(l, [S.WAITING], never, 2.0)
+	_eq(l.state, S.WAITING, "던진 뒤 기다리기")
+
+	l.press()
+	_eq(l.state, S.FAILED, "기다리는 중 누르면 실패")
+	_eq(l.fail_reason in ["early", "nibble"], true, "일찍 챈 이유")
+	_run_until(l, [S.READY], never, 3.0)
+	_eq(l.state, S.READY, "실패 후 다시 준비")
+
+	_cast(l)
+	_run_until(l, [S.BITE], never, 10.0)
+	_eq(l.state, S.BITE, "입질")
+	_run_until(l, [S.FAILED], never, 3.0)
+	_eq(l.fail_reason, "missed", "입질 놓침")
+	_run_until(l, [S.READY], never, 3.0)
+
+	_cast(l)
+	_run_until(l, [S.BITE], never, 10.0)
+	l.press()
+	_eq(l.state, S.REELING, "챔질 성공")
+	_eq(l.fish_id, "bolak", "첫 물고기는 볼락")
+	_run_until(l, [S.CAUGHT, S.FAILED], smart, 60.0)
+	_eq(l.state, S.CAUGHT, "장력 조절하면 잡힌다")
+	_eq(l.catch_count, 1, "잡은 수")
+	_eq(l.forgiving, false, "첫 물고기 뒤엔 판정 정상화")
+	l.acknowledge()
+	_eq(l.state, S.READY, "카드 닫기")
+
+	var l2 := _new_logic(5)
+	_cast(l2)
+	_run_until(l2, [S.BITE], never, 10.0)
+	l2.press()
+	_run_until(l2, [S.CAUGHT, S.FAILED], always, 30.0)
+	_eq(l2.fail_reason, "broke", "계속 감으면 줄이 끊김")
+
+	var l3 := _new_logic(6)
+	_cast(l3)
+	_run_until(l3, [S.BITE], never, 10.0)
+	l3.press()
+	_run_until(l3, [S.CAUGHT, S.FAILED], never, 30.0)
+	_eq(l3.fail_reason, "slack", "안 감으면 바늘이 빠짐")
+
+	var caught := 0
+	for seed_value in 20:
+		var l4 := _new_logic(100 + seed_value)
+		l4.catch_count = 1
+		l4.forgiving = false
+		_cast(l4)
+		_run_until(l4, [S.BITE], never, 20.0)
+		l4.press()
+		_run_until(l4, [S.CAUGHT, S.FAILED], smart, 60.0)
+		if l4.state == S.CAUGHT:
+			caught += 1
+	_eq(caught >= 16, true, "보통 판정에서도 요령 있게 하면 대부분 잡힘 (%d/20)" % caught)
