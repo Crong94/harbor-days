@@ -18,6 +18,7 @@
 3. Godot가 없으면 `tools/setup_godot.sh` 실행.
 
 ## 명령
+로컬 Windows에서는 `godot` 대신 Godot 콘솔 실행 파일 경로를 쓴다 (`docs/LOCAL_SETUP.md`). 백업 스크립트는 Git Bash에서 실행.
 ```
 godot --headless --path . --import                                 # 리소스 가져오기 (처음 한 번)
 godot --headless --path . --script res://tests/run_tests.gd        # 테스트
