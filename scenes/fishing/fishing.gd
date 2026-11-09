@@ -36,6 +36,13 @@ var _card_desc: Label
 var _summary: PanelContainer
 var _summary_list: Label
 
+## 낚시 자세 그림(player_fishing.png) 기준 위치. 그림 크기 대비 비율이다.
+const PLAYER_ART_SIZE := Vector2(158.0, 276.0)
+const ART_TIP := Vector2(0.009, 0.005) # 낚싯대 끝
+const ART_HANDS := Vector2(0.47, 0.34) # 손 (기울일 때 중심)
+const ART_FEET_X := 0.73 # 두 발 가운데
+
+var _has_art := false
 var _held := false
 var _in_story := true
 var _ending := false
@@ -55,6 +62,9 @@ func _ready() -> void:
 	add_child(_bg)
 
 	_player = ArtSlot.make("player_fishing", "주인공 (낚시 자세)", Vector2(120, 180))
+	_has_art = ArtSlot.has_art("player_fishing")
+	if _has_art:
+		_player.custom_minimum_size = PLAYER_ART_SIZE
 	add_child(_player)
 
 	_layer = Control.new()
@@ -306,9 +316,28 @@ func _show_summary() -> void:
 
 
 func _place_player() -> void:
-	var x := size.x * 0.70
 	_player.size = _player.custom_minimum_size
-	_player.position = Vector2(x, _bg.breakwater_top_y(x + 60) - _player.size.y)
+	if not _has_art:
+		var x := size.x * 0.70
+		_player.position = Vector2(x, _bg.breakwater_top_y(x + 60) - _player.size.y)
+		return
+	var feet_x := size.x * 0.76
+	_player.position = Vector2(feet_x - ART_FEET_X * _player.size.x, _bg.breakwater_top_y(feet_x) - _player.size.y + 4)
+	_player.pivot_offset = ART_HANDS * _player.size
+	# 상태에 따라 몸을 살짝 기울여 낚싯대 움직임을 표현한다 (+는 뒤로 젖힘)
+	var tilt := 0.0
+	match logic.state:
+		FishingLogic.State.CHARGING:
+			tilt = 12.0 * logic.power
+		FishingLogic.State.CASTING:
+			tilt = lerpf(12.0 * logic.cast_power, -6.0, minf(logic.progress * 2.5, 1.0))
+		FishingLogic.State.REELING:
+			tilt = 3.0 + logic.fish_pull() * 5.0
+		FishingLogic.State.BITE:
+			tilt = -2.0
+	_player.rotation = lerp_angle(_player.rotation, deg_to_rad(tilt), 0.25)
+	# 어두운 새벽에는 캐릭터도 푸르스름하게 어둡게, 밝아질수록 원래 색으로
+	_player.modulate = Color(0.62, 0.62, 0.78).lerp(Color.WHITE, _bg.brightness)
 
 
 # ─── 낚싯대, 줄, 찌 ─────────────────────────────────
@@ -319,6 +348,8 @@ func _rod_base() -> Vector2:
 
 
 func _rod_tip() -> Vector2:
+	if _has_art:
+		return _player.get_transform() * (ART_TIP * _player.size)
 	var base := _rod_base()
 	var s := logic.state
 	var rod_len := 150.0
@@ -360,7 +391,8 @@ func _float_pos() -> Vector2:
 func _draw_layer() -> void:
 	var s := logic.state
 	var tip := _rod_tip()
-	_layer.draw_line(_rod_base(), tip, Color("3b2a1e"), 4.0, true)
+	if not _has_art:
+		_layer.draw_line(_rod_base(), tip, Color("3b2a1e"), 4.0, true)
 
 	if s in [FishingLogic.State.CASTING, FishingLogic.State.WAITING, FishingLogic.State.BITE, FishingLogic.State.REELING]:
 		var fp := _float_pos()
@@ -402,11 +434,11 @@ func _draw_float(p: Vector2, sunk: bool) -> void:
 
 
 func _draw_power_gauge() -> void:
-	var r := Rect2(_player.position + Vector2(-46, 10), Vector2(20, 150))
+	# 머리 위 가로 게이지
+	var r := Rect2(_player.position + Vector2(_player.size.x * 0.25, -10), Vector2(_player.size.x * 0.7, 14))
 	_layer.draw_rect(r, Color(0, 0, 0, 0.45))
-	var fill := r.size.y * logic.power
 	var col := UiKit.TEAL.lerp(UiKit.MUSTARD, logic.power)
-	_layer.draw_rect(Rect2(r.position.x, r.end.y - fill, r.size.x, fill), col)
+	_layer.draw_rect(Rect2(r.position, Vector2(r.size.x * logic.power, r.size.y)), col)
 	_layer.draw_rect(r, Color(1, 1, 1, 0.8), false, 2.0)
 
 
