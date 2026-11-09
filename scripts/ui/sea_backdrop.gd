@@ -38,10 +38,36 @@ var mode := Mode.DUSK
 var brightness := 0.0
 var _t := 0.0
 
+## 사용자에게 받은 배경 그림. 있으면 코드로 그린 임시 배경 대신 이 그림을 쓴다.
+## art_base는 기본 그림, art_blend는 brightness만큼 위에 겹치는 그림 (예: 새벽 → 아침).
+var art_base := ""
+var art_blend := ""
+var _base_tex: Texture2D
+var _blend_tex: Texture2D
+
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	if mode == Mode.DAWN and art_base.is_empty():
+		art_base = "bg_breakwater_dawn"
+		art_blend = "bg_breakwater_morning"
+	if not art_base.is_empty() and ArtSlot.has_art(art_base):
+		_base_tex = load(ArtSlot.ART_DIR + art_base + ".png")
+	if not art_blend.is_empty() and ArtSlot.has_art(art_blend):
+		_blend_tex = load(ArtSlot.ART_DIR + art_blend + ".png")
+
+
+func has_art() -> bool:
+	return _base_tex != null
+
+
+## 화면을 꽉 채우도록 비율을 유지해 늘린 영역
+func _cover_rect(tex: Texture2D) -> Rect2:
+	var ts := tex.get_size()
+	var k := maxf(size.x / ts.x, size.y / ts.y)
+	var ds := ts * k
+	return Rect2((size - ds) / 2.0, ds)
 
 
 func _process(delta: float) -> void:
@@ -75,6 +101,11 @@ func _palette() -> Dictionary:
 
 
 func _draw() -> void:
+	if _base_tex:
+		draw_texture_rect(_base_tex, _cover_rect(_base_tex), false)
+		if _blend_tex and brightness > 0.0:
+			draw_texture_rect(_blend_tex, _cover_rect(_blend_tex), false, Color(1, 1, 1, clampf(brightness, 0.0, 1.0)))
+		return
 	var w := size.x
 	var h := size.y
 	var hy := horizon_y()
