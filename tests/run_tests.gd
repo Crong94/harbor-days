@@ -12,6 +12,7 @@ func _init() -> void:
 	_test_won()
 	_test_fish_db()
 	_test_fishing()
+	_test_fishing_feel()
 	_test_fun()
 	_test_sea_day()
 	_test_header()
@@ -120,6 +121,85 @@ func _cast(l: FishingLogic) -> void:
 	_run_until(l, [], func(_x): return true, 0.5)
 	l.release()
 	_run_until(l, [FishingLogic.State.WAITING], func(_x): return false, 2.0)
+
+
+## 낚시 손맛: 진동 패턴, 진동과 화면 흔들림 설정 저장, 장력 단계, 실패 뒤 바로 다시 던지기
+func _test_fishing_feel() -> void:
+	var S := FishingLogic.State
+	# 진동 패턴: [세기, 울림, 쉼, 울림 ...]. 울림으로 끝나고 길이와 세기가 알맞다
+	for kind in Haptics.PATTERNS:
+		var p: Array = Haptics.pattern(kind)
+		_eq(p.size() >= 2 and p.size() % 2 == 0, true, "진동 %s 울림으로 끝남" % kind)
+		_eq(Haptics.amplitude(kind) > 0.0 and Haptics.amplitude(kind) <= 1.0, true, "진동 %s 세기" % kind)
+		var ok := true
+		for i in range(1, p.size()):
+			ok = ok and int(p[i]) >= Haptics.MIN_MS and int(p[i]) <= Haptics.MAX_MS
+		_eq(ok, true, "진동 %s 길이" % kind)
+	for kind in ["bite", "hook", "perfect", "pull", "danger", "broke", "lost", "catch"]:
+		_eq(Haptics.PATTERNS.has(kind), true, "낚시 진동 %s 있음" % kind)
+	_eq(Haptics.pulses("bite"), [[0, 45], [100, 75]], "입질 진동은 쿵쿵 두 번")
+	_eq(Haptics.total_ms("bite"), 175, "입질 진동 전체 길이")
+	_eq(Haptics.amplitude("pull") < Haptics.amplitude("hook"), true, "당김은 챔질보다 약하게")
+	_eq(Haptics.amplitude("hook") < Haptics.amplitude("perfect"), true, "PERFECT는 챔질보다 세게")
+	_eq(Haptics.total_ms("broke") > Haptics.total_ms("lost"), true, "끊김은 놓침보다 길게")
+	_eq(Haptics.should_play("bite", true), true, "진동 켜짐이면 울림")
+	_eq(Haptics.should_play("bite", false), false, "진동 꺼짐이면 안 울림")
+	_eq(Haptics.should_play("없는진동", true), false, "없는 진동은 안 울림")
+	_eq(Haptics.pattern("없는진동"), [], "없는 진동 패턴은 빈 배열")
+
+	# 진동, 화면 흔들림 설정 저장과 불러오기 (테스트용 파일)
+	var path := "user://test_settings_fishing.cfg"
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	_eq(gs.vibration_on, true, "진동 기본 켜짐")
+	_eq(gs.screen_shake_on, true, "화면 흔들림 기본 켜짐")
+	gs.vibration_on = false
+	gs.screen_shake_on = false
+	gs.save_settings(path)
+	var gs2 = load("res://scripts/autoload/game_state.gd").new()
+	gs2.load_settings(path)
+	_eq(gs2.vibration_on, false, "진동 꺼짐 저장됨")
+	_eq(gs2.screen_shake_on, false, "화면 흔들림 꺼짐 저장됨")
+	var gs3 = load("res://scripts/autoload/game_state.gd").new()
+	gs3.load_settings("user://없는_설정.cfg")
+	_eq(gs3.vibration_on, true, "설정 파일이 없으면 기본값")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	gs.free()
+	gs2.free()
+	gs3.free()
+
+	# 장력 단계: 안전 / 주의 / 위험
+	_eq(FishingLogic.tension_level(0.3), 0, "장력 낮으면 안전")
+	_eq(FishingLogic.tension_level(0.7), 1, "장력 중간이면 주의")
+	_eq(FishingLogic.tension_level(0.9), 2, "장력 높으면 위험")
+	_eq(FishingLogic.tension_level(FishingLogic.TENSION_DANGER), 2, "위험 경계값")
+
+	# 실패 뒤: 바로 누르면 그대로, 조금 지나 누르면 바로 힘 모으기
+	var l := _new_logic(5)
+	_cast(l)
+	l.press()
+	_eq(l.state, S.FAILED, "기다리다 누르면 실패")
+	_eq(l.can_skip_fail(), false, "실패 직후엔 못 건너뜀")
+	l.press()
+	_eq(l.state, S.FAILED, "실패 직후 누르면 그대로")
+	l.update(FishingLogic.FAIL_SKIP_AFTER + 0.05, false)
+	_eq(l.can_skip_fail(), true, "조금 지나면 건너뛸 수 있음")
+	l.press()
+	_eq(l.state, S.CHARGING, "실패 안내 건너뛰고 바로 힘 모으기")
+	_eq(l.power, 0.0, "힘은 0부터")
+	_eq(l.break_progress(), 0.0, "줄다리기 아닐 때 끊김 진행 0")
+	for r in ["nibble", "early", "missed", "broke", "slack", "escaped"]:
+		_eq(FishingLogic.fail_short(r).is_empty(), false, "실패 짧은 글자 %s" % r)
+		_eq(FishingLogic.fail_message(r).is_empty(), false, "실패 안내 %s" % r)
+
+	# 줄이 끊어지기 직전: 장력이 끝까지 찬 채로 버티면 끊김 진행이 차오른다
+	var b := _new_logic(9)
+	_cast(b)
+	_run_until(b, [S.BITE], func(_x): return false, 30.0)
+	b.press()
+	_eq(b.state, S.REELING, "챔질하면 줄다리기")
+	b.tension = 1.0
+	b.update(FishingLogic.BREAK_HOLD * 0.5, true)
+	_eq(b.state == S.REELING and b.break_progress() > 0.0, true, "장력 끝까지면 끊김 진행 (%.2f)" % b.break_progress())
 
 
 func _test_fishing() -> void:

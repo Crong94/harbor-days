@@ -6,7 +6,7 @@ extends CanvasLayer
 ## 가방: 아이스박스(GameState.inventory)를 어종별로 묶어 마리 수, 최대 크기, 값
 ## 도감: FishDB 어종. 잡은 건 그림과 최대 기록, 못 잡은 건 어두운 그림자와 "???"
 ## 장비: 가진 낚싯대, 릴, 미끼 중 고르기 (바꾸면 gear_changed)
-## 설정: 배경음악, 효과음 켜고 끄기, 타이틀로
+## 설정: 배경음악, 효과음, 진동, 화면 흔들림 켜고 끄기, 타이틀로
 
 signal closed
 signal gear_changed
@@ -277,6 +277,10 @@ func _gear_row(icon: String, title: String, stats: String, equipped: bool, on_pi
 func _build_settings() -> void:
 	_list.add_child(_toggle_row("배경음악", Sound.bgm_on, func(on: bool): Sound.set_bgm_on(on)))
 	_list.add_child(_toggle_row("효과음", Sound.sfx_on, func(on: bool): Sound.set_sfx_on(on)))
+	_list.add_child(_toggle_row("진동", GameState.vibration_on, func(on: bool):
+		GameState.set_vibration(on)
+		Haptics.play("hook"))) # 켰을 때 어떤 느낌인지 바로 알 수 있게 (끄면 울리지 않는다)
+	_list.add_child(_toggle_row("화면 흔들림", GameState.screen_shake_on, func(on: bool): GameState.set_screen_shake(on)))
 	_list.add_child(UiKit.gap(8))
 	var title_btn := UiKit.action("한 번 더 누르면 타이틀로 가요" if _title_armed else "타이틀로", "secondary")
 	title_btn.pressed.connect(func():

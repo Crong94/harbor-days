@@ -54,10 +54,44 @@ var flags := {}
 var sales_today := 0
 var spent_today := 0
 
+## 설정 (메뉴 설정 탭). 바꾸면 SETTINGS_PATH에 저장하고 다음에 켤 때 불러온다
+const SETTINGS_PATH := "user://settings.cfg"
+## 진동 (Haptics가 본다)
+var vibration_on := true
+## 화면 흔들림 (낚시 입질, 챔질, 줄다리기 때 화면이 흔들리고 살짝 확대된다)
+var screen_shake_on := true
+
 
 func _ready() -> void:
 	# 게임 전체 기본 모양 (글꼴, 스크롤바, 툴팁)
 	get_tree().root.theme = UiKit.build_theme()
+	load_settings()
+
+
+func set_vibration(on: bool) -> void:
+	vibration_on = on
+	save_settings()
+
+
+func set_screen_shake(on: bool) -> void:
+	screen_shake_on = on
+	save_settings()
+
+
+func save_settings(path := SETTINGS_PATH) -> void:
+	var c := ConfigFile.new()
+	c.set_value("feel", "vibration", vibration_on)
+	c.set_value("feel", "screen_shake", screen_shake_on)
+	c.save(path)
+
+
+## 저장된 설정을 불러온다. 파일이 없으면 지금 값(기본 켜짐)을 그대로 둔다
+func load_settings(path := SETTINGS_PATH) -> void:
+	var c := ConfigFile.new()
+	if c.load(path) != OK:
+		return
+	vibration_on = bool(c.get_value("feel", "vibration", vibration_on))
+	screen_shake_on = bool(c.get_value("feel", "screen_shake", screen_shake_on))
 
 
 func _exit_tree() -> void:

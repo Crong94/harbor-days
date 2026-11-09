@@ -50,6 +50,10 @@ const BREAK_HOLD := 0.35 # 장력이 최대인 채로 버티면 줄이 끊기는
 const SLACK_LIMIT := 2.2
 const SLACK_LIMIT_FORGIVING := 3.5
 const FAIL_SHOW_TIME := 2.0
+const FAIL_SKIP_AFTER := 0.45 # 실패 안내가 뜬 뒤 이만큼 지나면 눌러서 바로 다음 캐스팅을 시작할 수 있다
+## 장력 단계 (화면 색, 깜빡임, 진동에 쓴다)
+const TENSION_WARN := 0.62
+const TENSION_DANGER := 0.85
 const STREAK_HOT := 3 # 연속 PERFECT 몇 번부터 물 오름
 
 var state := State.READY
@@ -132,6 +136,12 @@ func press() -> void:
 			_fail("nibble" if nibble > 0.0 else "early")
 		State.BITE:
 			_hook()
+		State.FAILED:
+			# 실패 안내를 잠깐 보여 준 뒤에는 다시 누르면 기다리지 않고 바로 힘 모으기를 시작한다
+			if can_skip_fail():
+				state = State.CHARGING
+				power = 0.0
+				_power_dir = 1.0
 
 
 func release() -> void:
@@ -252,6 +262,25 @@ func _hook() -> void:
 	_over_time = 0.0
 	_slack_time = 0.0
 	state = State.REELING
+
+
+## 실패 안내를 건너뛰고 다시 던질 수 있는지
+func can_skip_fail() -> bool:
+	return state == State.FAILED and _timer <= FAIL_SHOW_TIME - FAIL_SKIP_AFTER
+
+
+## 장력 단계: 0 안전, 1 주의(노랑), 2 위험(빨강, 줄 끊김 직전)
+static func tension_level(t: float) -> int:
+	if t >= TENSION_DANGER:
+		return 2
+	if t >= TENSION_WARN:
+		return 1
+	return 0
+
+
+## 줄이 끊어지기까지 얼마나 버텼는지 0~1 (장력이 끝까지 찬 채로 있는 시간). 1이면 끊어진다
+func break_progress() -> float:
+	return clampf(_over_time / BREAK_HOLD, 0.0, 1.0) if state == State.REELING else 0.0
 
 
 ## 물고기의 힘 (어종 힘 + 크기). 0~1.2
@@ -391,9 +420,27 @@ static func fail_message(reason: String) -> String:
 		"missed":
 			return "찌가 잠겼다가 다시 떠올랐어요. 미끼만 뺏겼어요"
 		"broke":
-			return "줄이 끊어졌어요. 물고기가 차고 나가면 반대쪽으로 끌어서 버텨요"
+			return "줄이 끊어졌어요. 장력 게이지가 빨개지면 잠깐 손을 떼요"
 		"slack":
 			return "줄이 느슨해진 사이 바늘이 빠졌어요. 손을 너무 오래 뗐어요"
 		"escaped":
 			return "물고기가 바위틈으로 파고들었어요. 옆으로 차고 나가면 반대로 끌어요"
+	return ""
+
+
+## 실패 순간 찌 위에 튀어 오르는 짧은 글자
+static func fail_short(reason: String) -> String:
+	match reason:
+		"nibble":
+			return "헛챔질!"
+		"early":
+			return "너무 일찍!"
+		"missed":
+			return "놓쳤어요"
+		"broke":
+			return "툭! 줄이 끊어졌어요"
+		"slack":
+			return "바늘이 빠졌어요"
+		"escaped":
+			return "도망갔어요"
 	return ""

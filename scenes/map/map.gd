@@ -1,13 +1,21 @@
 extends Control
-## 물빛울포 마을 지도 (세로). 장소 핀을 골라 이동하면 거리만큼 시간이 흐른다.
-## 지도 그림: assets/art/map_village (지금은 바다 한 접시의 임시 그림). 핀 위치는 scripts/data/locations.gd
+## 물빛울포 마을 지도. 화면보다 큰 가로 지도를 손가락(마우스)으로 끌어 둘러보고, 장소 핀을 골라 이동한다.
+## 지도 그림: assets/art/map_village.png (가로 3:2, 위가 북쪽, 오른쪽이 동쪽 바다). 핀 위치는 scripts/data/locations.gd
 ##
-## 구성: 맨 위 공통 헤더(날짜와 시각, 날씨, 돈, 메뉴: 가방, 도감, 장비, 설정) / 마을 이름 / 지도와 핀 / 아래 종이 시트(장소 정보와 이동)
+## 구성: 맨 위 공통 헤더(고정) / 끌어서 움직이는 지도와 핀 / 아래 종이 시트(장소 정보와 이동)
+## 지도는 화면 높이의 MAP_SCREENS배 크기로 보여 준다. 처음에는 지금 있는 곳을 가운데에 둔다.
 
 const PIN_DOT := 14.0 # 잠긴 장소 점 크기
+## 지도 높이를 화면 높이의 몇 배로 보여 줄지
+const MAP_SCREENS := 1.2
+## 이만큼 움직여야 끌기로 본다 (그보다 적으면 탭)
+const DRAG_START := 12.0
+## 손을 뗀 뒤 미끄러짐이 줄어드는 정도 (1초에 남는 비율)
+const FLING_KEEP := 0.02
 
-var _map: ArtSlot
-var _pins_root: Control
+var _view: Control # 지도를 잘라 보여 주는 창
+var _world: Control # 지도 그림과 핀을 담고 통째로 움직인다
+var _map: TextureRect
 var _pins := {} # id → Control
 var _header: GameHeader
 var _sheet: PanelContainer
@@ -19,33 +27,153 @@ var _toast: PanelContainer
 var _toast_label: Label
 var _selected := ""
 
+var _press := false
+var _press_at := Vector2.ZERO
+var _dragging := false
+var _moved := false # 이번 누름이 끌기였으면 핀 탭을 무시한다
+var _velocity := Vector2.ZERO
+var _focus_tween: Tween
+
 
 func _ready() -> void:
 	var sea := ColorRect.new()
-	sea.color = Color("2a6f9e")
+	sea.color = Color("2f86b8")
 	sea.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(sea)
 
-	_map = ArtSlot.make("map_village", "마을 지도", Vector2.ZERO)
-	_map.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_map.cover = true
-	_map.clip_contents = true
-	add_child(_map)
-	# 위아래 글자가 잘 읽히게 살짝 어둡게
-	add_child(UiKit.shade([[0.0, 0.45], [0.16, 0.0], [0.82, 0.0], [1.0, 0.35]]))
-
-	_pins_root = Control.new()
-	_pins_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_pins_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_pins_root)
+	_view = Control.new()
+	_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_view.clip_contents = true
+	_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_view)
+	_world = Control.new()
+	_world.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_view.add_child(_world)
+	_map = TextureRect.new()
+	_map.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_map.stretch_mode = TextureRect.STRETCH_SCALE
+	_map.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if ArtSlot.has_art("map_village"):
+		_map.texture = load(ArtSlot.art_path("map_village"))
+	_world.add_child(_map)
 	_rebuild_pins()
 
+	# 헤더 아래 글자가 잘 읽히게 위쪽만 살짝 어둡게
+	add_child(UiKit.shade([[0.0, 0.45], [0.14, 0.0], [1.0, 0.0]]))
 	_build_top_bar()
 	_build_sheet()
 	_build_toast()
-	resized.connect(_layout_pins)
+	resized.connect(_layout_world)
+	_layout_world.call_deferred()
 	Sound.play_bgm("town")
 	UiKit.fade_in(self)
+	if not GameState.flags.get("map_drag_hint", false):
+		GameState.flags["map_drag_hint"] = true
+		_show_toast.call_deferred("지도를 끌어서 마을을 둘러봐요")
+
+
+# ─── 지도 크기와 위치 ───────────────────────────────
+
+func _map_size() -> Vector2:
+	var ts := _map.texture.get_size() if _map.texture else Vector2(1536, 1024)
+	var k := size.y * MAP_SCREENS / ts.y
+	return ts * k
+
+
+func _layout_world() -> void:
+	var ms := _map_size()
+	_world.size = ms
+	_map.size = ms
+	_layout_pins()
+	_center_on(GameState.current_location, false)
+
+
+## 지도를 끌 수 있는 범위로 묶는다 (지도 밖 빈 곳이 보이지 않게)
+func _clamp_pos(p: Vector2) -> Vector2:
+	var ms := _world.size
+	return Vector2(clampf(p.x, minf(size.x - ms.x, 0.0), 0.0), clampf(p.y, minf(size.y - ms.y, 0.0), 0.0))
+
+
+## 장소를 보이는 영역(헤더 아래, 시트 위) 가운데로 옮긴다
+func _center_on(id: String, animate := true) -> void:
+	var loc := Locations.get_loc(id)
+	if loc.is_empty():
+		return
+	var top := GameHeader.BOTTOM
+	var bottom := size.y - (_sheet.size.y + 32.0 if _sheet and _sheet.visible else 0.0)
+	var target_screen := Vector2(size.x / 2.0, (top + bottom) / 2.0 + 30.0)
+	var target := _clamp_pos(target_screen - loc.pos * _world.size)
+	_velocity = Vector2.ZERO
+	if _focus_tween:
+		_focus_tween.kill()
+	if not animate:
+		_world.position = target
+		return
+	_focus_tween = create_tween()
+	_focus_tween.tween_property(_world, "position", target, UiKit.MOTION_SLOW).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+
+# ─── 끌기 ───────────────────────────────────────────
+# 핀(버튼)이 누름을 먼저 받아도 끌 수 있게 _input에서 직접 본다. 헤더와 시트, 메뉴 위에서 시작한 누름은 무시한다
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT:
+			if mb.pressed:
+				if _can_drag_from(mb.position):
+					_press = true
+					_press_at = mb.position
+					_dragging = false
+					_moved = false
+					_velocity = Vector2.ZERO
+					if _focus_tween:
+						_focus_tween.kill()
+			else:
+				_press = false
+				if _dragging:
+					_dragging = false
+					get_viewport().set_input_as_handled() # 끌기가 끝난 곳의 핀이 눌리지 않게
+		elif mb.pressed and _can_drag_from(mb.position):
+			# 휠: 위아래, Shift+휠이나 가로 휠: 좌우
+			var step := 60.0
+			var d := Vector2.ZERO
+			match mb.button_index:
+				MOUSE_BUTTON_WHEEL_UP: d = Vector2(step, 0) if mb.shift_pressed else Vector2(0, step)
+				MOUSE_BUTTON_WHEEL_DOWN: d = Vector2(-step, 0) if mb.shift_pressed else Vector2(0, -step)
+				MOUSE_BUTTON_WHEEL_LEFT: d = Vector2(step, 0)
+				MOUSE_BUTTON_WHEEL_RIGHT: d = Vector2(-step, 0)
+			if d != Vector2.ZERO:
+				_world.position = _clamp_pos(_world.position + d)
+	elif event is InputEventMouseMotion and _press:
+		var mm := event as InputEventMouseMotion
+		if not _dragging and mm.position.distance_to(_press_at) > DRAG_START:
+			_dragging = true
+			_moved = true
+		if _dragging:
+			_world.position = _clamp_pos(_world.position + mm.relative)
+			_velocity = _velocity.lerp(mm.relative / maxf(get_process_delta_time(), 0.001), 0.5)
+			get_viewport().set_input_as_handled()
+
+
+func _can_drag_from(p: Vector2) -> bool:
+	if _header.is_menu_open():
+		return false
+	if p.y < GameHeader.BOTTOM:
+		return false
+	if _sheet.visible and _sheet.get_global_rect().has_point(p):
+		return false
+	return true
+
+
+func _process(delta: float) -> void:
+	# 손을 떼면 조금 미끄러지다 멈춘다
+	if _press or _velocity.length() < 5.0:
+		if not _press:
+			_velocity = Vector2.ZERO
+		return
+	_world.position = _clamp_pos(_world.position + _velocity * delta)
+	_velocity *= pow(FLING_KEEP, delta)
 
 
 # ─── 핀 ─────────────────────────────────────────────
@@ -57,7 +185,7 @@ func _rebuild_pins() -> void:
 	for id in Locations.LIST:
 		var p := _make_pin(id)
 		_pins[id] = p
-		_pins_root.add_child(p)
+		_world.add_child(p)
 	_layout_pins.call_deferred()
 
 
@@ -70,49 +198,58 @@ func _make_pin(id: String) -> Control:
 		dot.size = Vector2(PIN_DOT, PIN_DOT)
 		dot.add_theme_stylebox_override("panel", UiKit.box(Color(UiKit.NAVY_DEEP, 0.55), UiKit.RADIUS_PILL, Color(1, 1, 1, 0.5), 2, 0))
 		dot.tooltip_text = "아직 갈 수 없어요"
+		dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		return dot
 	var here := id == GameState.current_location
 	var b := Button.new()
-	b.text = GameState.line(loc.name)
+	b.text = ("● " if here else "") + GameState.line(loc.name)
 	b.focus_mode = Control.FOCUS_ALL
 	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	b.add_theme_font_override("font", UiKit.font("bold"))
-	b.add_theme_font_size_override("font_size", 16)
+	b.add_theme_font_override("font", UiKit.font("cute"))
+	b.add_theme_font_size_override("font_size", 19)
 	var bg := UiKit.CORAL if here else UiKit.GLASS_STRONG
-	var normal := UiKit.box(bg, UiKit.RADIUS_PILL, Color(1, 1, 1, 0.35) if not here else Color.WHITE, 2, 0)
-	normal.content_margin_left = 14
-	normal.content_margin_right = 14
-	normal.content_margin_top = 7
-	normal.content_margin_bottom = 8
+	var normal := UiKit.chunky(bg, UiKit.RADIUS_PILL, 0, 3)
+	normal.content_margin_left = 16
+	normal.content_margin_right = 16
+	normal.content_margin_top = 6
+	normal.content_margin_bottom = 9
 	UiKit.elevate(normal, 1)
 	var hover := normal.duplicate()
 	hover.bg_color = bg.lightened(0.1)
 	var sel := normal.duplicate()
-	sel.border_color = UiKit.SUN
-	sel.set_border_width_all(3)
+	sel.bg_color = UiKit.SUN
+	var focus := UiKit.box(Color.TRANSPARENT, UiKit.RADIUS_PILL, UiKit.SUN, 3, 0)
+	focus.set_expand_margin_all(4)
 	b.add_theme_stylebox_override("normal", normal)
 	b.add_theme_stylebox_override("hover", hover)
 	b.add_theme_stylebox_override("pressed", sel)
-	b.add_theme_stylebox_override("focus", sel)
-	for st in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+	b.add_theme_stylebox_override("focus", focus)
+	for st in ["font_color", "font_hover_color", "font_focus_color"]:
 		b.add_theme_color_override(st, Color.WHITE)
+	b.add_theme_color_override("font_pressed_color", UiKit.INK)
+	b.add_theme_color_override("font_hover_pressed_color", UiKit.INK)
 	b.tooltip_text = GameState.line(loc.desc)
-	b.pressed.connect(_select.bind(id))
+	b.pressed.connect(_on_pin_pressed.bind(id))
 	UiKit._add_press_motion(b)
 	return b
 
 
 ## 장소 핀을 지도 그림 위 비율 위치에 놓는다. 핀의 가운데 아래가 그 위치를 가리킨다
 func _layout_pins() -> void:
-	var r := _map.content_rect()
 	for id in _pins:
 		var c: Control = _pins[id]
 		c.reset_size()
-		var at: Vector2 = r.position + Locations.get_loc(id).pos * r.size
+		var at: Vector2 = Locations.get_loc(id).pos * _world.size
 		if c is Button:
 			c.position = at - Vector2(c.size.x / 2.0, c.size.y)
 		else:
 			c.position = at - c.size / 2.0
+
+
+func _on_pin_pressed(id: String) -> void:
+	if _moved:
+		return # 끌다가 손을 뗀 것
+	_select(id)
 
 
 # ─── 상단 ───────────────────────────────────────────
@@ -187,6 +324,8 @@ func _select(id: String) -> void:
 	if not was_open:
 		UiKit.rise_in(_sheet, 0.0, 40.0)
 	_go_btn.grab_focus()
+	# 시트 크기가 정해진 뒤 고른 곳을 보이는 영역 가운데로
+	_center_on.call_deferred(id)
 
 
 func _close_sheet() -> void:
