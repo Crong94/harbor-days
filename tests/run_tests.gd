@@ -478,6 +478,22 @@ func _test_realism() -> void:
 
 
 func _test_brightness() -> void:
+	_eq(SeaBackdrop.sun_path(4 * 60).z, 0.0, "새벽 4시에는 해 없음")
+	_eq(SeaBackdrop.sun_path(6 * 60).y < SeaBackdrop.sun_path(5 * 60 + 10).y, true, "해가 떠오름")
+	_eq(SeaBackdrop.sun_path(10 * 60).y < SeaBackdrop.sun_path(7 * 60).y, true, "아침 내내 올라감")
+	_eq(SeaBackdrop.sun_path(10 * 60).x > SeaBackdrop.sun_path(6 * 60).x, true, "동쪽을 보니 해는 오른쪽(남쪽)으로 감")
+	_eq(SeaBackdrop.sun_path(15 * 60).z, 0.0, "오후에는 해가 등 뒤(서쪽)로 넘어가 안 보임")
+	_eq(SeaBackdrop.sun_path(21 * 60).z, 0.0, "밤에는 해 없음")
+	var z := SeaBackdrop.sun_path(5 * 60 + 30).z
+	_eq(z > 0.0 and z < 1.0, true, "해는 서서히 나타남 (%.2f)" % z)
+	var prev := SeaBackdrop.sun_path(5 * 60)
+	var smooth := true
+	for m in range(5 * 60 + 1, 19 * 60 + 30):
+		var p := SeaBackdrop.sun_path(m)
+		if Vector2(p.x, p.y).distance_to(Vector2(prev.x, prev.y)) > 0.01:
+			smooth = false
+		prev = p
+	_eq(smooth, true, "해가 1분에 조금씩만 움직임 (갑자기 튀지 않음)")
 	_eq(FishingLogic.brightness_at(3 * 60), 0.0, "새벽 3시는 어두움")
 	_eq(FishingLogic.brightness_at(6 * 60), 0.5, "새벽 6시는 반쯤 밝음")
 	_eq(FishingLogic.brightness_at(12 * 60), 1.0, "낮 12시는 밝음")

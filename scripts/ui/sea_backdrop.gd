@@ -47,6 +47,19 @@ var _base_tex: Texture2D
 var art_view := Rect2(0, 0, 1, 1)
 var _blend_tex: Texture2D
 
+## 해: 배경과 따로 받은 해 그림(sun.png)을 시각(minutes)에 따라 움직인다.
+## 새벽에는 산 바로 위에서 서서히 나타나며(투명도) 떠오르고, 저녁에는 서서히 사라지며 진다. 잘린 해는 보이지 않는다.
+## 좌표는 배경 그림 크기 대비 비율. sun_art가 비어 있으면 해를 그리지 않는다.
+var sun_art := ""
+var minutes := -1.0
+var sun_size := 0.17 # 해 그림(빛무리 포함) 크기, 화면 가로 대비
+var _sun_tex: Texture2D
+var _sun_node: Control # 해는 물결 셰이더가 안 먹게 자식 노드에 그린다
+
+## 물결: 배경 그림의 바다 부분(그림 세로 비율 x 위 ~ y 아래)을 셰이더로 일렁이게 한다. ZERO면 끈다
+var water_band := Vector2.ZERO
+const WATER_SHADER := "res://scripts/ui/sea_water.gdshader"
+
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -58,6 +71,41 @@ func _ready() -> void:
 		_base_tex = load(ArtSlot.art_path(art_base))
 	if not art_blend.is_empty() and ArtSlot.has_art(art_blend):
 		_blend_tex = load(ArtSlot.art_path(art_blend))
+	if not sun_art.is_empty() and ArtSlot.has_art(sun_art):
+		_sun_tex = load(ArtSlot.art_path(sun_art))
+		_sun_node = Control.new()
+		_sun_node.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_sun_node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_sun_node.draw.connect(_draw_sun)
+		add_child(_sun_node)
+	if _base_tex and water_band != Vector2.ZERO:
+		var mat := ShaderMaterial.new()
+		mat.shader = load(WATER_SHADER)
+		mat.set_shader_parameter("water_top", water_band.x)
+		mat.set_shader_parameter("water_bottom", water_band.y)
+		material = mat
+
+
+## 시각(자정부터 분)에 따른 해 위치 (배경 그림 비율). z는 0이면 산 아래로 완전히 숨음.
+## 05:00 산 뒤에서 떠올라 11:00 오른쪽 위 높이까지 오르고, 17:30부터 오른쪽 끝으로 내려가 19:30에 진다.
+static func sun_path(m: float) -> Vector3:
+	# 방향: 북쪽 방파제 끝에서 동쪽 바다를 본다. 화면 왼쪽이 북쪽, 오른쪽이 남쪽, 등 뒤가 서쪽.
+	# 해는 정면(동쪽) 수평선 바로 위에서 서서히 나타나 떠오르고, 남쪽(오른쪽 위)으로 높이 올라가다
+	# 정오 무렵 머리 위를 지나 등 뒤(서쪽)로 넘어가며 화면 위로 사라진다. 저녁 해넘이는 등 뒤라 보이지 않는다.
+	m = fposmod(m, 24.0 * 60.0)
+	var low := Vector2(0.55, 0.285) # 산 바로 위 (해가 처음 나타나는 자리)
+	var gone := Vector2(0.92, -0.06) # 화면 위로 넘어간 자리
+	var start := 5 * 60 + 15.0
+	var end := 13 * 60.0
+	if m < start:
+		return Vector3(low.x, low.y, 0.0)
+	if m >= end:
+		return Vector3(gone.x, gone.y, 0.0)
+	var k := (m - start) / (end - start)
+	var e := 1.0 - pow(1.0 - k, 1.6) # 처음엔 빠르게 떠오르고 점점 느리게
+	var fade_in := clampf((m - start) / 30.0, 0.0, 1.0)
+	var fade_out := clampf((end - m) / 50.0, 0.0, 1.0)
+	return Vector3(lerpf(low.x, gone.x, k), lerpf(low.y, gone.y, e), minf(fade_in, fade_out))
 
 
 func has_art() -> bool:
@@ -84,6 +132,8 @@ func _cover_rect(tex: Texture2D) -> Rect2:
 func _process(delta: float) -> void:
 	_t += delta
 	queue_redraw()
+	if _sun_node:
+		_sun_node.queue_redraw()
 
 
 func horizon_y() -> float:
@@ -208,6 +258,20 @@ func _draw_breakwater_and_lighthouse(w: float, h: float, hy: float, p: Dictionar
 	if dark > 0.0:
 		var glow := 0.6 + 0.4 * sin(_t * 2.0)
 		draw_circle(top + Vector2(0, -h * 0.018), h * 0.05, Color(1, 0.9, 0.55, 0.18 * glow * dark))
+
+
+## 해 그림을 산 위쪽만 보이게 잘라 그린다. 새벽에는 주황빛, 밝아지면 흰빛
+func _draw_sun() -> void:
+	if _sun_tex == null or minutes < 0.0:
+		return
+	var p := sun_path(minutes)
+	if p.z <= 0.0:
+		return
+	var c := art_point(Vector2(p.x, p.y))
+	var sz := size.x * sun_size
+	var tint := Color(1.0, 0.72, 0.5).lerp(Color.WHITE, clampf(brightness, 0.0, 1.0))
+	tint.a = p.z
+	_sun_node.draw_texture_rect(_sun_tex, Rect2(c - Vector2(sz, sz) / 2.0, Vector2(sz, sz)), false, tint)
 
 
 func _vertical_gradient(rect: Rect2, top: Color, bottom: Color, steps: int) -> void:

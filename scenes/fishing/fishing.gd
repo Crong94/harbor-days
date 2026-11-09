@@ -27,14 +27,19 @@ const HINTS := {
 	FishingLogic.State.REELING: "누르고 있으면 감겨요. 물고기가 옆으로 가면 누른 채 반대로 끌어요",
 }
 
-## 뒤쪽 시점 세로 낚시 화면. 아래 위치는 배경 그림 크기 대비 비율이다.
+## 뒤쪽 시점 세로 낚시 화면. 북쪽 방파제 끝에서 동쪽 바다를 본다 (왼쪽 북, 오른쪽 남, 등 뒤 서).
+## 아래 위치는 배경 그림 크기 대비 비율이다.
 ## 배경 그림이 바뀌면 이 숫자들만 그림에 맞춰 고친다.
-## 그림: 오늘의 바다 전용 세로 새벽, 아침 그림 (2026-11-09 받음, 같은 구도). 밝기만큼 아침 그림을 겹친다.
+## 그림: 오늘의 바다 전용 세로 새벽, 아침 그림 (2026-11-09 받음, 같은 구도, 해 없음). 밝기만큼 아침 그림을 겹친다.
+## 해는 따로 받은 sun.png를 SeaBackdrop이 시각에 따라 움직인다 (sun_path).
 ## 밤 그림이 오면 어두운 시간(저녁 이후)에 쓸 수 있게 SeaBackdrop에 한 장 더 붙인다.
 const BG_ART := "bg_fishing_dawn_v"
 const BG_ART_BLEND := "bg_fishing_morning_v"
 const WATER_NEAR_Y := 0.665 # 방파제 끝 바로 앞 바다 (테트라포드 사이)
 const WATER_FAR_Y := 0.37 # 가장 멀리 던졌을 때 (수평선 0.338 바로 아래)
+## 물결이 일렁이는 바다 범위 (그림 세로 비율). 수평선 바로 아래부터 방파제 끝까지
+const WATER_TOP_Y := 0.345
+const WATER_BOTTOM_Y := 0.70
 const FEET := Vector2(0.5, 0.875) # 주인공 발 위치 (방파제 끝 콘크리트 바닥 가운데)
 ## 그림에서 보일 부분 (세로 9:16 그림이라 전부)
 const ART_VIEW := Rect2(0.0, 0.0, 1.0, 1.0)
@@ -160,6 +165,9 @@ func _ready() -> void:
 	_bg.art_base = BG_ART
 	_bg.art_blend = BG_ART_BLEND
 	_bg.art_view = ART_VIEW
+	_bg.sun_art = "sun"
+	_bg.water_band = Vector2(WATER_TOP_Y, WATER_BOTTOM_Y)
+	_bg.minutes = minutes
 	_world.add_child(_bg)
 
 	_layer = Control.new()
@@ -302,6 +310,7 @@ func _process(delta: float) -> void:
 		if _landing <= 0.0:
 			_show_card()
 	_bg.brightness = FishingLogic.brightness_at(minutes)
+	_bg.minutes = minutes
 
 	if logic.state != _last_state:
 		_on_state_changed()
