@@ -12,6 +12,9 @@ const BGM := ["title", "sea", "town", "market", "truck"]
 
 var bgm_volume_db := -8.0
 var sfx_volume_db := -4.0
+## 설정 메뉴에서 켜고 끈다
+var bgm_on := true
+var sfx_on := true
 
 var _music: AudioStreamPlayer
 var _music_id := ""
@@ -58,7 +61,21 @@ func play_bgm(id: String, fade := 0.8) -> void:
 		_music.stream = s
 		_music.volume_db = -40.0
 		_music.play())
-	tw.tween_property(_music, "volume_db", bgm_volume_db, fade)
+	tw.tween_property(_music, "volume_db", _bgm_db(), fade)
+
+
+func _bgm_db() -> float:
+	return bgm_volume_db if bgm_on else -80.0
+
+
+func set_bgm_on(on: bool) -> void:
+	bgm_on = on
+	if _music:
+		_music.volume_db = _bgm_db()
+
+
+func set_sfx_on(on: bool) -> void:
+	sfx_on = on
 
 
 func stop_bgm(fade := 0.8) -> void:
@@ -67,7 +84,7 @@ func stop_bgm(fade := 0.8) -> void:
 
 ## 효과음을 한 번 튼다. pitch_jitter를 주면 같은 소리가 반복돼도 덜 단조롭다.
 func play_sfx(id: String, pitch_jitter := 0.0, volume_offset_db := 0.0) -> void:
-	if not has_sfx(id):
+	if not sfx_on or not has_sfx(id):
 		return
 	var p := _voices[_next_voice]
 	_next_voice = (_next_voice + 1) % _voices.size()

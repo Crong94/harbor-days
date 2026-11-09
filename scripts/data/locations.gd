@@ -3,65 +3,65 @@ extends RefCounted
 ## 물빛울포 장소 목록과 지도 규칙.
 ##
 ## pos는 지도 그림 위의 위치를 0~1 비율로 적는다 (왼쪽 위가 0,0).
-## 지금 지도 그림은 바다 한 접시에서 가져온 임시 그림(map_village.jpg)이고, 핀은 그 그림 속 건물에 맞췄다.
-## 오늘의 바다 전용 지도 그림을 받으면 그림 속 건물 위치에 맞춰 pos만 고치면 된다.
+## 지도 그림: 오늘의 바다 전용 세로 지도 map_village.png (2026-11-10). 위가 북쪽, 바다와 항구는 동쪽.
+## 핀은 그림 속 건물에 맞췄다. 그림을 바꾸면 pos만 고치면 된다.
 ## unlock은 GameState.flags 이름이다. 빈 문자열이면 처음부터 열려 있다.
 
 const LIST := {
 	"shop": {
-		"name": "{shop}", "pos": Vector2(0.73, 0.40), "unlock": "",
+		"name": "{shop}", "pos": Vector2(0.43, 0.40), "unlock": "",
 		"scene": "", "desc": "내 작은 식당",
 	},
 	"home": {
-		"name": "우리 집", "pos": Vector2(0.36, 0.27), "unlock": "",
+		"name": "우리 집", "pos": Vector2(0.21, 0.32), "unlock": "",
 		"scene": "", "desc": "오래된 작은 단층집",
 	},
 	"breakwater": {
-		"name": "북쪽 방파제", "pos": Vector2(0.82, 0.84), "unlock": "",
+		"name": "북쪽 방파제", "pos": Vector2(0.90, 0.27), "unlock": "",
 		"scene": "res://scenes/fishing/fishing.tscn", "desc": "빨간 등대가 있는 입문 낚시터",
 	},
 	"market": {
-		"name": "물빛 수산시장", "pos": Vector2(0.20, 0.56), "unlock": "",
+		"name": "물빛 수산시장", "pos": Vector2(0.56, 0.47), "unlock": "",
 		"scene": "", "desc": "반쯤 문을 닫은 오래된 시장",
 	},
 	"tackle": {
-		"name": "준호네 낚시방", "pos": Vector2(0.30, 0.42), "unlock": "",
+		"name": "준호네 낚시방", "pos": Vector2(0.45, 0.33), "unlock": "",
 		"scene": "res://scenes/shop/tackle_shop.tscn", "desc": "장비, 미끼, 수리",
 	},
 	"diner": {
-		"name": "복자네 밥집", "pos": Vector2(0.56, 0.33), "unlock": "",
+		"name": "복자네 밥집", "pos": Vector2(0.20, 0.47), "unlock": "",
 		"scene": "", "desc": "마을에 하나 남은 밥집",
 	},
 	"store": {
-		"name": "경자상회", "pos": Vector2(0.68, 0.17), "unlock": "",
+		"name": "경자상회", "pos": Vector2(0.15, 0.56), "unlock": "",
 		"scene": "", "desc": "50년 된 구멍가게",
 	},
 	"hall": {
-		"name": "마을회관", "pos": Vector2(0.48, 0.10), "unlock": "chapter2_done",
+		"name": "마을회관", "pos": Vector2(0.19, 0.15), "unlock": "chapter2_done",
 		"scene": "", "desc": "게시판과 마을 의뢰",
 	},
 	"school": {
-		"name": "물빛분교", "pos": Vector2(0.22, 0.13), "unlock": "chapter2_done",
+		"name": "물빛분교", "pos": Vector2(0.40, 0.14), "unlock": "chapter2_done",
 		"scene": "", "desc": "학생이 한 명뿐인 분교",
 	},
 	"guesthouse": {
-		"name": "등대민박", "pos": Vector2(0.88, 0.27), "unlock": "chapter2_done",
+		"name": "등대민박", "pos": Vector2(0.57, 0.25), "unlock": "chapter2_done",
 		"scene": "", "desc": "방 다섯 개짜리 민박",
 	},
 	"rocks": {
-		"name": "검은여 갯바위", "pos": Vector2(0.94, 0.50), "unlock": "learned_tide",
+		"name": "검은여 갯바위", "pos": Vector2(0.86, 0.66), "unlock": "learned_tide",
 		"scene": "", "desc": "물때를 알아야 들어갈 수 있는 중급 낚시터",
 	},
 	"lab": {
-		"name": "해양생태 연구소", "pos": Vector2(0.10, 0.36), "unlock": "chapter3_start",
+		"name": "해양생태 연구소", "pos": Vector2(0.56, 0.72), "unlock": "chapter3_start",
 		"scene": "", "desc": "서윤이 일하는 연구소",
 	},
 	"beach": {
-		"name": "야광충 해변", "pos": Vector2(0.08, 0.72), "unlock": "found_glow_beach",
+		"name": "야광충 해변", "pos": Vector2(0.07, 0.85), "unlock": "found_glow_beach",
 		"scene": "", "desc": "여름밤에만 빛나는 작은 만",
 	},
 	"island": {
-		"name": "동백섬", "pos": Vector2(0.74, 0.11), "unlock": "has_boat",
+		"name": "동백섬", "pos": Vector2(0.85, 0.12), "unlock": "has_boat",
 		"scene": "", "desc": "배로만 갈 수 있는 무인도",
 	},
 }

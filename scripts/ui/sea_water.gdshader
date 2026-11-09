@@ -9,6 +9,12 @@ uniform float water_top = 0.345;
 uniform float water_bottom = 0.70;
 uniform float strength = 1.0;
 
+varying vec4 v_modulate; // 그리기 색(투명도). fragment의 COLOR에는 그림 색이 이미 곱해져 있어서 따로 받는다
+
+void vertex() {
+	v_modulate = COLOR;
+}
+
 float water_mask(vec4 c) {
 	return smoothstep(0.06, 0.18, c.b - c.r);
 }
@@ -36,5 +42,5 @@ void fragment() {
 	float cell = hash(floor(uv * vec2(90.0, 260.0)));
 	float tw = 0.5 + 0.5 * sin(TIME * (1.5 + cell * 2.5) + cell * 6.28);
 	col.rgb += hi * (tw - 0.45) * 0.35 * strength;
-	COLOR = col * COLOR;
+	COLOR = col * v_modulate;
 }

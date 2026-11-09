@@ -75,6 +75,29 @@
 | `DialogueBox` | 남색 대사창 + 산호 이름표 |
 | `ArtSlot` | 그림 자리. `cover = true`면 꽉 채운다. 그림이 없으면 옅은 칸에 이름 |
 
+## 공통 헤더와 메뉴 (2026-11-10)
+모든 장면 맨 위에 같은 헤더를 둔다. 코드: `scripts/ui/game_header.gd` (GameHeader), `scripts/ui/game_menu.gd` (GameMenu), 글자 만들기는 `scripts/ui/hud_text.gd` (HudText, 헤드리스 테스트용 순수 함수).
+
+| 부분 | 내용 |
+|---|---|
+| 헤더 판 | 크림 chunky 판. 위 여백 `TOP_PAD 26`(휴대폰 노치), 높이 `BAR_H 70`, 아래 끝 `GameHeader.BOTTOM`. 헤더 밑에 놓는 것은 이 값 + 12~14 |
+| 왼쪽 | 1줄: `3일차`(CORAL_DEEP) + 시각 `오전 06:40`(주아 25, 가장 큰 글자) / 2줄: `맑음 · 9물 물때 좋음`(Pretendard 16, INK_SOFT) |
+| 오른쪽 | 배지(`set_badge("4마리")`, 민트 바탕 남색 글자), 돈(주아 23), 메뉴 버튼(sun 알약, 84x48) |
+| 메뉴 시트 | 아래에서 올라오는 크림 시트(CanvasLayer 20). 탭: 가방, 도감, 장비, 설정. 높이는 내용에 맞춰 520~940px |
+| 가방 | 아이스박스를 어종별로 묶어 마리 수, 가장 큰 것, 값 |
+| 도감 | 2열 카드. 못 잡은 어종은 그림을 `UiKit.SILHOUETTE`로 덮고 이름 `???` |
+| 장비 | 가진 낚싯대, 릴, 미끼 중 고르기. 바꾸면 `gear_changed` 신호 (낚시 화면은 주인공 그림과 능력치에 바로 반영) |
+| 설정 | 배경음악, 효과음 켜고 끄기(`Sound.set_bgm_on`, `set_sfx_on`), 타이틀로(한 번 더 눌러 확인) |
+
+- 장면에서: `var h := GameHeader.new(); add_child(h)`. 시간을 직접 굴리는 장면은 매 프레임 `set_minutes(분)`, 돈이 바뀌면 `refresh()`
+- 메뉴가 열려 있는 동안(`is_menu_open()`) 낚시는 시간과 입력을 멈춘다. 줄다리기 중에는 `show_bar(false)`로 헤더를 숨긴다
+- 탭은 `UiKit.tab_track()` + `UiKit.tab_button(글자)` (낚시방 탭과 같은 컴포넌트)
+
+### 접근성 기준 (2026-11-10 점검)
+- 터치 영역은 48px 이상 (`BUTTON_H_SM 48`, 탭 48)
+- 크림 바탕 글자: INK(13.9:1), INK_SOFT(5.7:1)만 쓴다. INK_MUTED(2.5:1)와 CORAL(2.2:1), SEA(2.1:1)는 글자색으로 쓰지 않는다. 산호 글자가 필요하면 CORAL_DEEP(3.4:1, 큰 글자만)
+- 민트, 하늘, 산호 바탕 위 글자는 흰색 대신 INK (흰색은 2.2~2.7:1). `action("mint")`의 글자도 INK
+
 ## 화면 배치 원칙
 - 위: 남색 칩과 상단바 (장소, 시각, 잔고). 위에서 20~24px
 - 가운데: 그림

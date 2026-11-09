@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://juow0g3bs4xa"
-path="res://.godot/imported/map_village.jpg-dbf96ed6d5a28f12e1c2242627192065.ctex"
+uid="uid://1xjf0rxpy4v8"
+path="res://.godot/imported/map_village.png-eeeba903e51899d031382d85a4dee428.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/art/map_village.jpg"
-dest_files=["res://.godot/imported/map_village.jpg-dbf96ed6d5a28f12e1c2242627192065.ctex"]
+source_file="res://assets/art/map_village.png"
+dest_files=["res://.godot/imported/map_village.png-eeeba903e51899d031382d85a4dee428.ctex"]
 
 [params]
 

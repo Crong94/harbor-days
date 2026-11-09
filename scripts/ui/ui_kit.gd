@@ -38,6 +38,8 @@ const LEAF := Color("8fcf7a")
 const DANGER := Color("f0585a")
 const SCRIM := Color(0.1, 0.07, 0.18, 0.5) # 모달 뒤 어둡게
 const SHADOW := Color(0.14, 0.1, 0.2, 0.3)
+## 아직 못 본 것(도감의 못 잡은 물고기)을 그림자처럼 덮는 색. modulate로 쓴다
+const SILHOUETTE := Color(0.16, 0.13, 0.26, 0.55)
 
 ## 예전 이름 (기존 코드 호환). 새 코드에서는 위 이름을 쓴다
 const CREAM := FOAM
@@ -103,7 +105,7 @@ const MOTION_BASE := 0.24
 const MOTION_SLOW := 0.45
 
 const BUTTON_H := 60
-const BUTTON_H_SM := 46
+const BUTTON_H_SM := 48 # 휴대폰 터치 최소 높이
 
 static var _font_cache := {}
 
@@ -301,7 +303,7 @@ static func action(t: String, kind := "primary", small := false) -> Button:
 			fg = FOAM
 		"mint":
 			bg = SEA
-			fg = Color.WHITE
+			fg = INK # 민트 위 흰 글자는 대비가 2.2:1이라 남색 글자로
 		"sun":
 			bg = SUN
 			fg = INK
@@ -397,6 +399,38 @@ static func set_chip(c: PanelContainer, value: String) -> void:
 	var v := c.find_child("Value", true, false) as Label
 	if v:
 		v.text = value
+
+
+## 탭 줄 (알약 모양 분할 버튼을 담는 판). 안에 tab_button들을 넣는다
+static func tab_track() -> PanelContainer:
+	var track := PanelContainer.new()
+	track.add_theme_stylebox_override("panel", box(PAPER_DEEP, RADIUS_PILL, PAPER_LINE, 2, 5))
+	return track
+
+
+## 탭 버튼 하나. 고른 탭은 햇살 노랑 통통한 알약, 나머지는 글자만. set_pressed_no_signal로 고른 상태를 바꾼다
+static func tab_button(t: String) -> Button:
+	var b := Button.new()
+	b.text = t
+	b.toggle_mode = true
+	b.focus_mode = Control.FOCUS_ALL
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.custom_minimum_size.y = BUTTON_H_SM
+	b.add_theme_font_override("font", font("cute"))
+	b.add_theme_font_size_override("font_size", 21)
+	var off := box(Color(0, 0, 0, 0), RADIUS_PILL, Color.TRANSPARENT, 0, 0)
+	var on := chunky(SUN, RADIUS_PILL, 0, 3)
+	b.add_theme_stylebox_override("normal", off)
+	b.add_theme_stylebox_override("hover", off)
+	b.add_theme_stylebox_override("pressed", on)
+	b.add_theme_stylebox_override("hover_pressed", on)
+	b.add_theme_stylebox_override("focus", box(Color.TRANSPARENT, RADIUS_PILL, SUN, 2, 0))
+	b.add_theme_color_override("font_color", INK_SOFT)
+	b.add_theme_color_override("font_hover_color", INK)
+	b.add_theme_color_override("font_pressed_color", INK)
+	b.add_theme_color_override("font_hover_pressed_color", INK)
+	return b
 
 
 ## 작은 배지 (NEW, 사용 중 같은 표시)

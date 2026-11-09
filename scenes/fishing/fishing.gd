@@ -69,14 +69,11 @@ var _layer: Control
 var _fx: Control # 판정 글자 (PERFECT 등)
 var _hud_draw: Control # 게이지 그리기
 
-var _clock: PanelContainer
-var _count: PanelContainer
-var _sea_pill: PanelContainer
+var _header: GameHeader # 맨 위 공통 헤더 (날짜, 시각, 날씨, 돈, 메뉴)
 var _quit_btn: Button
 var _order_card: PanelContainer
 var _order_text: Label
 var _order_prog: Label
-var _top_bar: HBoxContainer
 var _calm_row: HBoxContainer
 var _hint_pill: PanelContainer
 var _hint: Label
@@ -166,6 +163,7 @@ func _ready() -> void:
 	_bg.art_blend = BG_ART_BLEND
 	_bg.art_view = ART_VIEW
 	_bg.sun_art = "sun"
+	_bg.art_schedule = SeaBackdrop.FISHING_SCHEDULE # 밤, 새벽, 아침, 저녁 그림을 시각에 따라 이어 붙인다
 	_bg.water_band = Vector2(WATER_TOP_Y, WATER_BOTTOM_Y)
 	_bg.minutes = minutes
 	_world.add_child(_bg)
@@ -232,7 +230,7 @@ func _ready() -> void:
 # ─── 입력 ───────────────────────────────────────────
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _in_story or _summary.visible or _bait_sheet.visible:
+	if _in_story or _summary.visible or _bait_sheet.visible or _header.is_menu_open():
 		return
 	# 견제: 오른쪽 클릭 또는 Shift
 	if (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT) \
@@ -292,7 +290,7 @@ func _steer() -> float:
 
 func _process(delta: float) -> void:
 	_t += delta
-	var playing := not _in_story and not _summary.visible and logic.state != FishingLogic.State.CAUGHT
+	var playing := not _in_story and not _summary.visible and logic.state != FishingLogic.State.CAUGHT and not _header.is_menu_open()
 	if _hitstop > 0.0:
 		_hitstop -= delta
 		playing = false
@@ -316,19 +314,26 @@ func _process(delta: float) -> void:
 		_on_state_changed()
 		_last_state = logic.state
 
-	UiKit.set_chip(_clock, _clock_text())
-	UiKit.set_chip(_count, "%d마리" % GameState.caught_today.size())
+	_header.set_minutes(minutes)
+	var n := GameState.caught_today.size()
+	_header.set_badge("%d마리" % n if n > 0 else "")
 	# 화면은 지금 할 일만 보여 준다: 조용할 때는 주문과 오늘의 바다, 싸울 때는 줄다리기 카드 하나
 	var calm := logic.state in [FishingLogic.State.READY, FishingLogic.State.FAILED] and not _in_story and not _ending
 	var fighting := logic.state == FishingLogic.State.REELING
-	_top_bar.visible = not fighting
+	_header.show_bar(not fighting)
 	_calm_row.visible = calm
 	_quit_btn.visible = not tutorial
 	_order_card.visible = calm and not order.is_empty()
 	_bait_btn.visible = calm
 	_mend_btn.visible = not _in_story and logic.state == FishingLogic.State.WAITING
 	_fight_panel.visible = fighting
-	_hint_row.offset_top = (_fight_panel.position.y + _fight_panel.size.y + 14.0) if fighting else (214.0 if _order_card.visible else 150.0)
+	# 안내 말풍선: 줄다리기 카드 아래, 조용할 때는 주문 쪽지와 그만하기 줄 아래, 나머지는 헤더 바로 아래
+	var below := GameHeader.BOTTOM + 12.0
+	if fighting:
+		below = _fight_panel.position.y + _fight_panel.size.y + 14.0
+	elif _calm_row.visible and (_order_card.visible or _quit_btn.visible):
+		below = maxf(_order_card.position.y + _order_card.size.y if _order_card.visible else 0.0, _calm_row.position.y + _calm_row.size.y) + 12.0
+	_hint_row.offset_top = below
 	_hint_pill.visible = not _hint.text.is_empty() and not _in_story
 	_update_order_card()
 	if _fight_panel.visible:
@@ -359,12 +364,6 @@ func _process(delta: float) -> void:
 			_start_ending()
 		elif not tutorial and minutes >= LATE_MIN:
 			_start_ending()
-
-
-func _clock_text() -> String:
-	var h := int(minutes) / 60
-	var period := "새벽" if h < 6 else ("오전" if h < 12 else ("오후" if h < 18 else ("저녁" if h < 21 else "밤")))
-	return "%s %02d:%02d" % [period, h, int(minutes) % 60]
 
 
 ## 찌 톡톡, 릴 감는 소리처럼 상태 안에서 반복되는 소리
@@ -516,30 +515,19 @@ func _start_ending() -> void:
 # ─── 화면 구성 ──────────────────────────────────────
 
 func _build_hud() -> void:
-	# 위: 시계와 잡은 수 (크림 알약). 줄다리기 중에는 줄다리기 카드가 이 자리를 쓴다
-	_top_bar = UiKit.hbox(UiKit.SPACE_SM)
-	_top_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_top_bar.offset_left = 20
-	_top_bar.offset_right = -20
-	_top_bar.offset_top = 24
-	_top_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_top_bar)
-	_clock = UiKit.chip("", "", "icon_clock", false)
-	_top_bar.add_child(_clock)
-	_top_bar.add_child(UiKit.spacer())
-	_count = UiKit.chip("", "", "icon_fish", false)
-	_top_bar.add_child(_count)
+	# 맨 위 공통 헤더: 날짜와 시각, 오늘의 바다(날씨, 물때), 돈, 메뉴. 줄다리기 중에는 숨긴다
+	_header = GameHeader.new()
+	add_child(_header)
+	_header.gear_changed.connect(_on_gear_changed)
 
-	# 둘째 줄 (조용할 때만): 오늘의 바다와 그만하기
+	# 헤더 아래 (조용할 때만): 오른쪽에 그만하기
 	_calm_row = UiKit.hbox(UiKit.SPACE_SM)
 	_calm_row.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	_calm_row.offset_left = 20
 	_calm_row.offset_right = -20
-	_calm_row.offset_top = 84
+	_calm_row.offset_top = GameHeader.BOTTOM + 14.0
 	_calm_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_calm_row)
-	_sea_pill = UiKit.chip("", SeaDay.summary(sea), "", false)
-	_calm_row.add_child(_sea_pill)
 	_calm_row.add_child(UiKit.spacer())
 	_quit_btn = UiKit.action("그만하기", "secondary", true)
 	_quit_btn.pressed.connect(_start_ending)
@@ -549,7 +537,7 @@ func _build_hud() -> void:
 	_order_card = PanelContainer.new()
 	_order_card.add_theme_stylebox_override("panel", UiKit.chunky(UiKit.PAPER, UiKit.RADIUS_MD, 12, 4))
 	_order_card.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	_order_card.position = Vector2(20, 146)
+	_order_card.position = Vector2(20, GameHeader.BOTTOM + 14.0)
 	_order_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_order_card)
 	var oh := UiKit.hbox(UiKit.SPACE_SM)
@@ -610,7 +598,7 @@ func _build_hud() -> void:
 	# 안내 말풍선 (위쪽. 아래는 주인공 자리). 튜토리얼이나 실패했을 때만 뜬다
 	_hint_row = CenterContainer.new()
 	_hint_row.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_hint_row.offset_top = 150
+	_hint_row.offset_top = GameHeader.BOTTOM + 12.0
 	_hint_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_hint_row)
 	_hint_pill = PanelContainer.new()
@@ -672,6 +660,17 @@ func _build_hud() -> void:
 	_mend_btn.button_up.connect(func(): _mend_held = false)
 	_mend_btn.hide()
 	add_child(_mend_btn)
+
+
+## 메뉴에서 낚싯대, 릴, 미끼를 바꾸면 주인공 그림과 낚시 능력치에 바로 반영한다
+func _on_gear_changed() -> void:
+	GearDB.apply(logic, GameState.equipped_rod, GameState.equipped_reel)
+	_player.set_gear(GameState.equipped_rod, GameState.equipped_reel)
+	var fa := GearDB.float_art(GameState.equipped_rod)
+	_float_tex = load(ArtSlot.art_path(fa)) if ArtSlot.has_art(fa) else null
+	if logic.state in [FishingLogic.State.READY, FishingLogic.State.FAILED]:
+		logic.new_point()
+	_refresh_bait()
 
 
 func _set_hint(t: String, color: Color) -> void:

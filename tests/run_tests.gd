@@ -14,6 +14,7 @@ func _init() -> void:
 	_test_fishing()
 	_test_fun()
 	_test_sea_day()
+	_test_header()
 	_test_locations()
 	_test_gear()
 	_test_realism()
@@ -381,7 +382,8 @@ func _test_locations() -> void:
 		if not scene.is_empty():
 			_eq(ResourceLoader.exists(scene), true, "%s 장면 파일 존재" % id)
 	_eq(Locations.travel_minutes("shop", "shop"), 0, "같은 장소 이동 0분")
-	_eq(Locations.travel_minutes("shop", "diner"), 5, "옆 가게는 최소 5분")
+	_eq(Locations.travel_minutes("shop", "tackle"), 5, "바로 옆 가게는 최소 5분")
+	_eq(Locations.travel_minutes("shop", "breakwater") > Locations.travel_minutes("shop", "market"), true, "방파제 끝은 시장보다 멀다")
 	_eq(Locations.travel_minutes("shop", "breakwater"), Locations.travel_minutes("breakwater", "shop"), "이동 시간 대칭")
 	_eq(Locations.travel_minutes("shop", "breakwater") % 5, 0, "5분 단위")
 	_eq(Locations.travel_minutes("shop", "island") > Locations.travel_minutes("shop", "rocks"), true, "섬은 배 시간 추가")
@@ -484,6 +486,14 @@ func _test_brightness() -> void:
 	_eq(SeaBackdrop.sun_path(10 * 60).x > SeaBackdrop.sun_path(6 * 60).x, true, "동쪽을 보니 해는 오른쪽(남쪽)으로 감")
 	_eq(SeaBackdrop.sun_path(15 * 60).z, 0.0, "오후에는 해가 등 뒤(서쪽)로 넘어가 안 보임")
 	_eq(SeaBackdrop.sun_path(21 * 60).z, 0.0, "밤에는 해 없음")
+	var sch := SeaBackdrop.FISHING_SCHEDULE
+	_eq(SeaBackdrop.schedule_mix(sch, 2 * 60)[2], 0.0, "새벽 2시는 밤 그림 그대로")
+	_eq(sch[SeaBackdrop.schedule_mix(sch, 12 * 60)[0]][1], "bg_fishing_morning_v", "낮 12시는 아침 그림")
+	var mx: Array = SeaBackdrop.schedule_mix(sch, 6 * 60 + 30)
+	_eq(mx[2] > 0.0 and mx[2] < 1.0, true, "6시 반은 새벽과 아침 사이")
+	_eq(sch[SeaBackdrop.schedule_mix(sch, 23 * 60)[0]][1], "bg_fishing_night_v", "밤 11시는 밤 그림")
+	for e in sch:
+		_eq(ArtSlot.has_art(e[1]), true, "%s 그림" % e[1])
 	var z := SeaBackdrop.sun_path(5 * 60 + 30).z
 	_eq(z > 0.0 and z < 1.0, true, "해는 서서히 나타남 (%.2f)" % z)
 	var prev := SeaBackdrop.sun_path(5 * 60)
@@ -603,3 +613,21 @@ func _test_sound() -> void:
 		_eq(SoundScript.has_sfx(id), true, "효과음 %s" % id)
 	_eq(SoundScript.has_sfx("없는소리"), false, "없는 효과음")
 
+
+## 공통 헤더와 메뉴의 글자, 가방 묶기
+func _test_header() -> void:
+	_eq(HudText.date_text(3), "3일차", "날짜")
+	_eq(HudText.clock_text(5 * 60 + 7), "새벽 05:07", "새벽 시각")
+	_eq(HudText.clock_text(9 * 60 + 30), "오전 09:30", "오전 시각")
+	_eq(HudText.clock_text(13 * 60 + 5), "오후 13:05", "오후 시각")
+	_eq(HudText.clock_text(19 * 60), "저녁 19:00", "저녁 시각")
+	_eq(HudText.clock_text(22 * 60 + 40), "밤 22:40", "밤 시각")
+	_eq(HudText.clock_text(24 * 60 + 10), "새벽 00:10", "자정 넘김")
+	var info := SeaDay.of(1)
+	_eq(HudText.sea_text(info), "맑음 · 7물 물때 좋음", "날씨와 물때")
+	var g: Dictionary = HudText.group_inventory([{"id": "bolak", "size": 18.0}, {"id": "bolak", "size": 22.5}, {"id": "ureok", "size": 30.0}])
+	_eq(g.size(), 2, "가방은 어종별로 묶음")
+	_eq(g.bolak.count, 2, "볼락 두 마리")
+	_eq(g.bolak.best, 22.5, "가장 큰 볼락")
+	_eq(g.bolak.value, FishDB.value_of("bolak", 18.0) + FishDB.value_of("bolak", 22.5), "볼락 값 합")
+	_eq(HudText.group_inventory([]), {}, "빈 가방")

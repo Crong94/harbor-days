@@ -2,15 +2,14 @@ extends Control
 ## 물빛울포 마을 지도 (세로). 장소 핀을 골라 이동하면 거리만큼 시간이 흐른다.
 ## 지도 그림: assets/art/map_village (지금은 바다 한 접시의 임시 그림). 핀 위치는 scripts/data/locations.gd
 ##
-## 구성: 위 유리 상단바(마을 이름, 날짜와 시각, 잔고, 장비) / 지도와 핀 / 아래 종이 시트(장소 정보와 이동)
+## 구성: 맨 위 공통 헤더(날짜와 시각, 날씨, 돈, 메뉴: 가방, 도감, 장비, 설정) / 마을 이름 / 지도와 핀 / 아래 종이 시트(장소 정보와 이동)
 
 const PIN_DOT := 14.0 # 잠긴 장소 점 크기
 
 var _map: ArtSlot
 var _pins_root: Control
 var _pins := {} # id → Control
-var _clock: Label
-var _money: PanelContainer
+var _header: GameHeader
 var _sheet: PanelContainer
 var _sheet_title: Label
 var _sheet_desc: Label
@@ -116,44 +115,20 @@ func _layout_pins() -> void:
 			c.position = at - c.size / 2.0
 
 
-# ─── 상단바 ─────────────────────────────────────────
+# ─── 상단 ───────────────────────────────────────────
 
 func _build_top_bar() -> void:
-	var bar := UiKit.glass_panel(0, UiKit.RADIUS_LG, true)
-	var s: StyleBoxFlat = bar.get_theme_stylebox("panel")
-	s.content_margin_left = 22
-	s.content_margin_right = 14
-	s.content_margin_top = 12
-	s.content_margin_bottom = 12
-	bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	bar.offset_left = 16
-	bar.offset_right = -16
-	bar.offset_top = 20
-	add_child(bar)
-	var h := UiKit.hbox(UiKit.SPACE_MD)
-	h.alignment = BoxContainer.ALIGNMENT_CENTER
-	bar.add_child(h)
-	var name_col := UiKit.vbox(0)
+	_header = GameHeader.new()
+	add_child(_header)
+	# 헤더 아래 마을 이름 (지도 위 스티커 글자)
 	var town := UiKit.text("물빛울포", "h2", UiKit.FOAM)
-	town.add_theme_font_override("font", UiKit.font("cute"))
-	town.add_theme_font_size_override("font_size", 26)
-	name_col.add_child(town)
-	_clock = UiKit.text("", "caption", UiKit.FOAM_SOFT)
-	name_col.add_child(_clock)
-	h.add_child(name_col)
-	h.add_child(UiKit.spacer())
-	_money = UiKit.chip("", "", "icon_coin")
-	h.add_child(_money)
-	var gear_btn := UiKit.action("장비", "glass", true)
-	gear_btn.custom_minimum_size.x = 84
-	gear_btn.pressed.connect(_open_gear)
-	h.add_child(gear_btn)
-	_refresh_hud()
+	UiKit.outlined(town, 10)
+	town.position = Vector2(26, GameHeader.BOTTOM + 8.0)
+	add_child(town)
 
 
 func _refresh_hud() -> void:
-	_clock.text = GameState.clock_text()
-	UiKit.set_chip(_money, GameState.format_won(GameState.money))
+	_header.refresh()
 
 
 # ─── 아래 시트 ──────────────────────────────────────
@@ -241,8 +216,8 @@ func _travel() -> void:
 func _build_toast() -> void:
 	var holder := CenterContainer.new()
 	holder.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	holder.offset_top = 124
-	holder.offset_bottom = 180
+	holder.offset_top = GameHeader.BOTTOM + 56.0
+	holder.offset_bottom = GameHeader.BOTTOM + 112.0
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(holder)
 	_toast = UiKit.glass_panel(0, UiKit.RADIUS_PILL, true)
@@ -264,90 +239,3 @@ func _show_toast(t: String) -> void:
 	tw.tween_property(_toast, "modulate:a", 1.0, UiKit.MOTION_BASE)
 	tw.tween_interval(2.2)
 	tw.tween_property(_toast, "modulate:a", 0.0, UiKit.MOTION_SLOW)
-
-
-# ─── 장비 ───────────────────────────────────────────
-# 가진 낚싯대와 릴 중에서 고른다. 고른 장비는 낚시 화면의 SD 주인공과 낚시 능력치에 바로 반영된다.
-
-var _gear_modal: Control
-
-
-func _open_gear() -> void:
-	if _gear_modal:
-		_gear_modal.queue_free()
-	_gear_modal = Control.new()
-	_gear_modal.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(_gear_modal)
-	var dim := UiKit.scrim()
-	dim.gui_input.connect(func(e): if e is InputEventMouseButton and e.pressed: _close_gear())
-	_gear_modal.add_child(dim)
-
-	var panel := UiKit.paper_panel(28)
-	UiKit.elevate(panel.get_theme_stylebox("panel"), 3)
-	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	panel.custom_minimum_size = Vector2(640, 0)
-	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
-	_gear_modal.add_child(panel)
-	var v := UiKit.vbox(UiKit.SPACE_MD)
-	panel.add_child(v)
-	var head := UiKit.hbox()
-	head.add_child(UiKit.text("낚시 장비", "h2", UiKit.INK))
-	head.add_child(UiKit.spacer())
-	var close := UiKit.action("닫기", "ghost", true)
-	close.custom_minimum_size.x = 80
-	close.pressed.connect(_close_gear)
-	head.add_child(close)
-	v.add_child(head)
-
-	v.add_child(UiKit.text("낚싯대", "label", UiKit.SEA))
-	for id in GameState.owned_rods:
-		var r := GearDB.rod(id)
-		v.add_child(_gear_row(GearDB.icon_art(r), r.name, "던지기 %d%% · 버티기 +%d%%" % [int(r.cast * 100), int(r.strength * 100)], id == GameState.equipped_rod, func():
-			GameState.equipped_rod = id
-			Sound.play_sfx("tap")
-			_open_gear()))
-	v.add_child(UiKit.gap(4))
-	v.add_child(UiKit.text("릴", "label", UiKit.SEA))
-	for id in GameState.owned_reels:
-		var l := GearDB.reel(id)
-		v.add_child(_gear_row(GearDB.icon_art(l), l.name, "감기 %d%% · 드랙 +%d%%" % [int(l.speed * 100), int(l.drag * 100)], id == GameState.equipped_reel, func():
-			GameState.equipped_reel = id
-			Sound.play_sfx("tap")
-			_open_gear()))
-	v.add_child(UiKit.gap(4))
-	v.add_child(UiKit.text("새 장비는 준호네 낚시방에서 살 수 있어요.", "caption", UiKit.INK_MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-
-
-func _close_gear() -> void:
-	if _gear_modal:
-		_gear_modal.queue_free()
-		_gear_modal = null
-
-
-func _gear_row(icon: String, title: String, stats: String, equipped: bool, on_pick: Callable) -> PanelContainer:
-	var row := PanelContainer.new()
-	var s := UiKit.inset_box(UiKit.SPACE_MD, UiKit.RADIUS_MD)
-	if equipped:
-		s.border_color = UiKit.CORAL
-		s.set_border_width_all(2)
-	row.add_theme_stylebox_override("panel", s)
-	var h := UiKit.hbox(UiKit.SPACE_MD)
-	h.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_child(h)
-	var ic := UiKit.icon_rect(icon, 56)
-	if ic:
-		h.add_child(ic)
-	var info := UiKit.vbox(2)
-	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.add_child(UiKit.text(title, "title", UiKit.INK))
-	info.add_child(UiKit.text(stats, "caption", UiKit.INK_SOFT))
-	h.add_child(info)
-	if equipped:
-		h.add_child(UiKit.badge("사용 중", UiKit.CORAL, Color.WHITE))
-	else:
-		var b := UiKit.action("장착", "secondary", true)
-		b.custom_minimum_size.x = 92
-		b.pressed.connect(on_pick)
-		h.add_child(b)
-	return row

@@ -47,6 +47,36 @@ var _base_tex: Texture2D
 var art_view := Rect2(0, 0, 1, 1)
 var _blend_tex: Texture2D
 
+## 시간표: [시각(분), 그림 id]를 시각 순서로. 있으면 art_base, art_blend 대신 쓴다.
+## 이웃한 두 그림 사이를 시각에 따라 서서히 겹쳐 바꾼다 (자정을 넘어 이어진다).
+var art_schedule: Array = []
+var _sched_tex: Array = [] # [시각, Texture2D]
+
+## 낚시 화면 시간표 (북쪽 방파제, 동쪽 바다). 같은 시각이 두 번 나오면 그 사이는 한 그림으로 머문다
+const FISHING_SCHEDULE := [
+	[0, "bg_fishing_night_v"], [4 * 60, "bg_fishing_night_v"],
+	[5 * 60, "bg_fishing_dawn_v"], [5 * 60 + 45, "bg_fishing_dawn_v"],
+	[7 * 60 + 15, "bg_fishing_morning_v"], [16 * 60 + 30, "bg_fishing_morning_v"],
+	[18 * 60, "bg_fishing_evening_v"], [19 * 60, "bg_fishing_evening_v"],
+	[20 * 60, "bg_fishing_night_v"],
+]
+
+
+## 시각에 따른 두 그림과 섞는 정도: [앞 그림 번호, 뒤 그림 번호, 0~1]
+static func schedule_mix(sched: Array, m: float) -> Array:
+	m = fposmod(m, 24.0 * 60.0)
+	var n := sched.size()
+	for i in n:
+		var a: Array = sched[i]
+		var b: Array = sched[(i + 1) % n]
+		var t0: float = a[0]
+		var t1: float = b[0] if i + 1 < n else b[0] + 24.0 * 60.0
+		if m >= t0 and m < t1:
+			var k := 0.0 if t1 <= t0 else (m - t0) / (t1 - t0)
+			return [i, (i + 1) % n, k if a[1] != b[1] else 0.0]
+	return [0, 0, 0.0]
+
+
 ## 해: 배경과 따로 받은 해 그림(sun.png)을 시각(minutes)에 따라 움직인다.
 ## 새벽에는 산 바로 위에서 서서히 나타나며(투명도) 떠오르고, 저녁에는 서서히 사라지며 진다. 잘린 해는 보이지 않는다.
 ## 좌표는 배경 그림 크기 대비 비율. sun_art가 비어 있으면 해를 그리지 않는다.
@@ -71,6 +101,11 @@ func _ready() -> void:
 		_base_tex = load(ArtSlot.art_path(art_base))
 	if not art_blend.is_empty() and ArtSlot.has_art(art_blend):
 		_blend_tex = load(ArtSlot.art_path(art_blend))
+	for e in art_schedule:
+		if ArtSlot.has_art(e[1]):
+			_sched_tex.append([e[0], load(ArtSlot.art_path(e[1]))])
+	if not _sched_tex.is_empty() and _base_tex == null:
+		_base_tex = _sched_tex[0][1] # 크기 계산(art_point)과 물결 셰이더 켜기에 쓴다
 	if not sun_art.is_empty() and ArtSlot.has_art(sun_art):
 		_sun_tex = load(ArtSlot.art_path(sun_art))
 		_sun_node = Control.new()
@@ -162,6 +197,14 @@ func _palette() -> Dictionary:
 
 
 func _draw() -> void:
+	if not _sched_tex.is_empty() and minutes >= 0.0:
+		var mix := schedule_mix(_sched_tex, minutes)
+		var ta: Texture2D = _sched_tex[mix[0]][1]
+		var tb: Texture2D = _sched_tex[mix[1]][1]
+		draw_texture_rect(ta, _cover_rect(ta), false)
+		if mix[2] > 0.0 and tb != ta:
+			draw_texture_rect(tb, _cover_rect(tb), false, Color(1, 1, 1, mix[2]))
+		return
 	if _base_tex:
 		draw_texture_rect(_base_tex, _cover_rect(_base_tex), false)
 		if _blend_tex and brightness > 0.0:

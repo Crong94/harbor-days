@@ -14,7 +14,7 @@ const GREETINGS := [
 	"요즘 새벽 볼락 잘 붙는대요. 장비 하나 바꿔 보실래요?",
 ]
 
-var _money: PanelContainer
+var _header: GameHeader
 var _talk: Label
 var _list: VBoxContainer
 var _tab := "rod"
@@ -39,34 +39,26 @@ func _ready() -> void:
 	UiKit.fade_in(self)
 
 
+## 맨 위 공통 헤더 + 그 아래 가게 이름과 나가기
 func _build_top_bar() -> void:
-	var bar := UiKit.glass_panel(0, UiKit.RADIUS_LG, true)
-	var s: StyleBoxFlat = bar.get_theme_stylebox("panel")
-	s.content_margin_left = 22
-	s.content_margin_right = 14
-	s.content_margin_top = 12
-	s.content_margin_bottom = 12
-	bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	bar.offset_left = 16
-	bar.offset_right = -16
-	bar.offset_top = 20
-	add_child(bar)
-	var h := UiKit.hbox(UiKit.SPACE_MD)
-	h.alignment = BoxContainer.ALIGNMENT_CENTER
-	bar.add_child(h)
-	var col := UiKit.vbox(0)
+	_header = GameHeader.new()
+	add_child(_header)
+	_header.gear_changed.connect(_refresh)
+	var row := UiKit.hbox(UiKit.SPACE_MD)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	row.offset_left = 22
+	row.offset_right = -20
+	row.offset_top = GameHeader.BOTTOM + 12.0
+	add_child(row)
 	var title := UiKit.text("준호네 낚시방", "h2", UiKit.FOAM)
-	title.add_theme_font_size_override("font_size", 28)
-	col.add_child(title)
-	col.add_child(UiKit.text("장비 · 미끼 · 수리", "caption", UiKit.FOAM_SOFT))
-	h.add_child(col)
-	h.add_child(UiKit.spacer())
-	_money = UiKit.chip("", "", "icon_coin")
-	h.add_child(_money)
-	var out := UiKit.action("나가기", "glass", true)
-	out.custom_minimum_size.x = 92
+	UiKit.outlined(title, 10)
+	row.add_child(title)
+	row.add_child(UiKit.spacer())
+	var out := UiKit.action("나가기", "secondary", true)
+	out.custom_minimum_size.x = 104
 	out.pressed.connect(func(): UiKit.go_to(self, MAP_SCENE))
-	h.add_child(out)
+	row.add_child(out)
 
 
 ## 준호 초상화와 말풍선
@@ -75,10 +67,10 @@ func _build_junho() -> void:
 	row.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	row.offset_left = 20
 	row.offset_right = -20
-	row.offset_top = 124
-	row.offset_bottom = 404
+	row.offset_top = GameHeader.BOTTOM + 76.0
+	row.offset_bottom = GameHeader.BOTTOM + 330.0
 	add_child(row)
-	var junho := ArtSlot.make("npc_junho", "이준호", Vector2(210, 280))
+	var junho := ArtSlot.make("npc_junho", "이준호", Vector2(190, 250))
 	row.add_child(junho)
 	var bubble_holder := UiKit.vbox()
 	bubble_holder.alignment = BoxContainer.ALIGNMENT_END
@@ -104,7 +96,7 @@ func _build_sheet() -> void:
 	sheet.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	sheet.offset_left = 12
 	sheet.offset_right = -12
-	sheet.offset_top = 420
+	sheet.offset_top = GameHeader.BOTTOM + 344.0
 	sheet.offset_bottom = -16
 	add_child(sheet)
 	var v := UiKit.vbox(UiKit.SPACE_MD)
@@ -122,32 +114,11 @@ func _build_sheet() -> void:
 
 ## 낚싯대 / 릴 탭 (알약 모양 분할 버튼)
 func _make_tabs() -> PanelContainer:
-	var track := PanelContainer.new()
-	var ts := UiKit.box(UiKit.PAPER_DEEP, UiKit.RADIUS_PILL, Color.TRANSPARENT, 0, 5)
-	track.add_theme_stylebox_override("panel", ts)
+	var track := UiKit.tab_track()
 	var h := UiKit.hbox(UiKit.SPACE_XS)
 	track.add_child(h)
 	for kind in [["rod", "낚싯대"], ["reel", "릴"], ["bait", "미끼"]]:
-		var b := Button.new()
-		b.text = kind[1]
-		b.toggle_mode = true
-		b.focus_mode = Control.FOCUS_ALL
-		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.custom_minimum_size.y = 44
-		b.add_theme_font_override("font", UiKit.font("cute"))
-		b.add_theme_font_size_override("font_size", 21)
-		var off := UiKit.box(Color(0, 0, 0, 0), UiKit.RADIUS_PILL, Color.TRANSPARENT, 0, 0)
-		var on := UiKit.chunky(UiKit.SUN, UiKit.RADIUS_PILL, 0, 3)
-		b.add_theme_stylebox_override("normal", off)
-		b.add_theme_stylebox_override("hover", off)
-		b.add_theme_stylebox_override("pressed", on)
-		b.add_theme_stylebox_override("hover_pressed", on)
-		b.add_theme_stylebox_override("focus", UiKit.box(Color.TRANSPARENT, UiKit.RADIUS_PILL, UiKit.SUN, 2, 0))
-		b.add_theme_color_override("font_color", UiKit.INK_MUTED)
-		b.add_theme_color_override("font_hover_color", UiKit.INK_SOFT)
-		b.add_theme_color_override("font_pressed_color", UiKit.INK)
-		b.add_theme_color_override("font_hover_pressed_color", UiKit.INK)
+		var b := UiKit.tab_button(kind[1])
 		b.pressed.connect(func():
 			_tab = kind[0]
 			Sound.play_sfx("tap", 0.05, -8.0)
@@ -158,7 +129,7 @@ func _make_tabs() -> PanelContainer:
 
 
 func _refresh() -> void:
-	UiKit.set_chip(_money, GameState.format_won(GameState.money))
+	_header.refresh()
 	for k in _tab_buttons:
 		_tab_buttons[k].set_pressed_no_signal(k == _tab)
 	for c in _list.get_children():
