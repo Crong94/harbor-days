@@ -164,10 +164,18 @@ func _special_arrives() -> void:
 	_list_panel.hide()
 	Sound.play_sfx("door")
 	var fname: String = FishDB.get_fish(special_fish.id).name
+	var want_name: String = FishDB.get_fish(special.fish).name
 	var wanted: bool = special_fish.id == special.fish
+	var ask := ""
+	if GameState.order_done:
+		ask = "아까 보내 준 %s 잘 받았어. 오늘 저녁은 여기서 먹고 갈게." % want_name
+	elif wanted:
+		ask = "%s 있나? 오늘은 그게 땡기네." % want_name
+	else:
+		ask = "%s 없나 보네. 그럼 있는 걸로 줘." % Josa.attach(want_name, "은/는")
 	_dialogue.play([
-		{"speaker": "", "text": "문에 단 종이 딸랑 울렸다. %s 씨다." % special.name},
-		{"speaker": special.name, "text": "%s 있나? 오늘은 그게 땡기네." % FishDB.get_fish(special.fish).name if wanted else "%s는 없나 보네. 그럼 있는 걸로 줘." % FishDB.get_fish(special.fish).name},
+		{"speaker": "", "text": "문에 단 종이 딸랑 울렸다. %s다." % Orders.call_name(special.name)},
+		{"speaker": special.name, "text": ask},
 		{"speaker": "{player}", "text": "%s 좋은 걸로 하나 남겨 뒀어요. 바로 구워 드릴게요." % fname},
 	])
 
@@ -216,14 +224,10 @@ func _special_served() -> void:
 	GameState.earn(special_price)
 	rep_change += st
 	_header.refresh()
-	var react := {
-		3: "이야, 이거 제대로네. 또 올게.",
-		2: "먹을 만하네. 다음엔 더 잘하겄지.",
-		1: "음... 그래도 따뜻한 밥은 고맙네.",
-	}
+	var react: Array = Orders.customer(special.name).get("react", ["잘 먹었어요.", "잘 먹었어요.", "잘 먹었어요."])
 	_dialogue.play([
-		{"speaker": special.name, "text": react.get(st, "")},
-		{"speaker": "", "text": "%s 씨가 %s을 내고 갔다." % [special.name, GameState.format_won(special_price)]},
+		{"speaker": special.name, "text": react[clampi(3 - st, 0, 2)]},
+		{"speaker": "", "text": "%s %s을 내고 갔다." % [Josa.attach(Orders.call_name(special.name), "이/가"), GameState.format_won(special_price)]},
 	])
 
 
@@ -287,7 +291,11 @@ func _show_ledger() -> void:
 	_ledger_rows.add_child(_row("순이익", "", GameState.format_won(GameState.sales_today - GameState.spent_today), UiKit.INK, true))
 	_ledger_rows.add_child(_row("평판", "", ("+%d" % rep_change) if rep_change >= 0 else str(rep_change), UiKit.CORAL if rep_change >= 0 else UiKit.DANGER))
 	if not GameState.inventory.is_empty():
-		_ledger_rows.add_child(UiKit.text("남은 생선 %d마리는 내일 팔아요" % GameState.inventory.size(), "caption", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
+		var old := GameState.spoiling_tonight().size()
+		var note := "남은 생선 %d마리는 내일 팔아요" % GameState.inventory.size()
+		if old > 0:
+			note = "남은 생선 %d마리 중 %d마리는 오늘 밤 상해요" % [GameState.inventory.size(), old]
+		_ledger_rows.add_child(UiKit.text(note, "caption", UiKit.CORAL_DEEP if old > 0 else UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
 	_ledger.show()
 	UiKit.fade_in(_ledger, 0.4)
 	_night_btn.grab_focus()
@@ -398,7 +406,7 @@ func _build_ledger() -> void:
 	center.add_child(panel)
 	var v := UiKit.vbox(UiKit.SPACE_LG)
 	panel.add_child(v)
-	v.add_child(UiKit.badge("%d일차 저녁" % GameState.day, UiKit.NAVY_DEEP, UiKit.FOAM))
+	v.add_child(UiKit.badge(Calendar.text(GameState.day) + " 저녁",UiKit.NAVY_DEEP, UiKit.FOAM))
 	v.add_child(UiKit.text("오늘 장부", "h1", UiKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	_ledger_rows = UiKit.vbox(UiKit.SPACE_SM)
 	v.add_child(_ledger_rows)

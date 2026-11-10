@@ -6,20 +6,46 @@ extends RefCounted
 ##
 ## 대사는 템플릿({player}, {shop}). 화면에 띄울 때 GameState.line()으로 바꾼다.
 
+## call: 이야기 글에서 부르는 이름. react: 저녁에 직접 구운 접시를 먹고 하는 말 [별 3, 2, 1]
 const CUSTOMERS := [
-	{"name": "최순덕", "lines": [
+	{"name": "최순덕", "call": "순덕 할머니", "lines": [
 		"{player|이/가} 굽는 %s 한번 더 먹고 싶네.",
 		"우리 영감이 %s 좋아했지. 몇 마리만 부탁해.",
+	], "react": [
+		"아이고, 이거 제대로네. 또 올게.",
+		"먹을 만하네. 다음엔 더 잘하겄지.",
+		"음... 그래도 따뜻한 밥은 고맙네.",
 	]},
-	{"name": "박만수", "lines": [
+	{"name": "박만수", "call": "만수 할아버지", "lines": [
 		"%s 잡아 와 봐라. 실력 좀 보자.",
 		"오늘 물때면 %s 나온다. 놓치지 말고.",
+	], "react": [
+		"...잘 구웠네. 손이 좀 늘었구먼.",
+		"먹을 만하다. 불 앞에서 조금 더 참아 봐라.",
+		"고기는 좋은데 굽는 게 아직이네.",
 	]},
-	{"name": "이준호", "lines": [
+	{"name": "이준호", "call": "준호", "lines": [
 		"형 %s 잡으면 사진 좀 찍어 줘요. 가게에 붙이게.",
 		"손님들이 %s 어디서 잡냐고 물어봐서요. 몇 마리만요.",
+	], "react": [
+		"형 이거 진짜 맛있어요. 가게에 소문낼게요!",
+		"오, 괜찮은데요? 다음엔 더 기대할게요.",
+		"음... 형, 그래도 잘 먹었어요.",
 	]},
 ]
+
+
+## 손님 한 명의 정보 (이름으로 찾는다). 없으면 빈 Dictionary
+static func customer(name: String) -> Dictionary:
+	for c in CUSTOMERS:
+		if c.name == name:
+			return c
+	return {}
+
+
+## 이야기 글에서 부르는 이름. 예: "순덕 할머니"
+static func call_name(name: String) -> String:
+	return customer(name).get("call", name)
 
 ## 주문에 나올 수 있는 어종과 몇 마리
 const POOL := [

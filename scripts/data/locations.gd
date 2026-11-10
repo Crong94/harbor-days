@@ -36,7 +36,7 @@ const LIST := {
 	},
 	"market": {
 		"name": "물빛 수산시장", "pos": Vector2(0.674, 0.286), "unlock": "",
-		"scene": "", "desc": "반쯤 문을 닫은 오래된 시장",
+		"scene": "res://scenes/market/market.tscn", "desc": "반쯤 문을 닫은 오래된 시장. 잡은 생선을 판다",
 	},
 	"tackle": {
 		"name": "준호네 낚시방", "pos": Vector2(0.514, 0.366), "unlock": "",

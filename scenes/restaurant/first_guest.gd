@@ -323,7 +323,7 @@ func _build_ledger() -> void:
 	center.add_child(panel)
 	var v := UiKit.vbox(UiKit.SPACE_LG)
 	panel.add_child(v)
-	v.add_child(UiKit.badge("1일차 밤", UiKit.NAVY_DEEP, UiKit.FOAM))
+	v.add_child(UiKit.badge(Calendar.text(1) + " 밤",UiKit.NAVY_DEEP, UiKit.FOAM))
 	v.add_child(UiKit.text("장부 첫 줄", "h1", UiKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	_ledger_rows = UiKit.vbox(UiKit.SPACE_SM)
 	v.add_child(_ledger_rows)

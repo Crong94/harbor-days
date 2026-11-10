@@ -124,6 +124,8 @@ var _card_lock := 0.0 # 카드가 튀어나오는 동안은 눌러도 닫히지 
 var _card_order: PanelContainer
 var _card_new := false
 var _card_record := false
+var _card_released := {} # 아이스박스가 꽉 차서 놓아준 고기
+var _card_box: Label
 var _summary: Control
 var _summary_title: Label
 var _summary_list: VBoxContainer
@@ -638,9 +640,9 @@ func _play_state_sound(s: int) -> void:
 
 
 func _record_catch() -> void:
-	var entry := {"id": logic.fish_id, "size": logic.fish_size, "perfect": logic.hook_grade == "perfect"}
+	var entry := {"id": logic.fish_id, "size": logic.fish_size, "perfect": logic.hook_grade == "perfect", "day": GameState.day}
 	GameState.caught_today.append(entry)
-	GameState.inventory.append(entry)
+	_card_released = GameState.store_catch(entry) # 아이스박스가 꽉 차면 가장 싼 고기를 놓아준다
 	var best: float = GameState.dex.get(logic.fish_id, 0.0)
 	_card_new = best == 0.0
 	_card_record = best > 0.0 and logic.fish_size > best
@@ -1098,6 +1100,8 @@ func _build_card() -> void:
 	v.add_child(_card_value)
 	_card_order = UiKit.badge("", UiKit.SEA, Color.WHITE)
 	v.add_child(_card_order)
+	_card_box = UiKit.text("", "caption", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(_card_box)
 	_card_continue = UiKit.text("눌러서 계속", "label", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(_card_continue)
 	_card_root.hide()
@@ -1140,6 +1144,15 @@ func _show_card() -> void:
 			else:
 				lbl.text = "주문 %d/%d" % [GameState.order_filled, order.count]
 			_card_order.show()
+	# 아이스박스 자리
+	var cap := GameState.icebox_size
+	if not _card_released.is_empty():
+		var rf: String = FishDB.get_fish(_card_released.id).name
+		_card_box.text = ("아이스박스가 꽉 차서 방금 잡은 %s 놓아줬어요" % Josa.attach(rf, "을/를")) if _card_released.size == logic.fish_size and _card_released.id == id else ("아이스박스가 꽉 차서 %s 한 마리를 놓아줬어요" % rf)
+		_card_box.add_theme_color_override("font_color", UiKit.CORAL_DEEP)
+	else:
+		_card_box.text = "아이스박스 %d / %d" % [GameState.inventory.size(), cap]
+		_card_box.add_theme_color_override("font_color", UiKit.CORAL_DEEP if GameState.icebox_free() == 0 else UiKit.INK_SOFT)
 	var rare := rar != FishDB.RARITY.common
 	Sound.play_sfx("newfish" if (_card_new or rare) else "catch")
 	_card_root.show()

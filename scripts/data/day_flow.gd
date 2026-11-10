@@ -26,6 +26,11 @@ const GUESTS_MAX := 5
 ## 구이 한 접시 값 = 생선 값 × 이 배수 (밥, 반찬 포함)
 const DISH_MARKUP := 1.6
 const DISH_MIN := 6000
+## 보통 손님이 한 끼에 내는 돈의 끝. 이보다 비싼 생선(감성돔 같은)은 보통 손님에게 내지 않는다.
+## 그런 고기는 특별 손님에게 내거나 수산시장에 판다
+const REGULAR_MAX := 20000
+## 특별 손님 한 접시 값의 끝
+const SPECIAL_MAX := 45000
 ## 생선 없이 온 손님이 그냥 돌아갈 때 깎이는 평판
 const REP_MISS := -2
 const REP_SERVED := 1
@@ -94,7 +99,8 @@ static func guest_count(day: int) -> int:
 static func serve_regulars(day: int, inventory: Array) -> Dictionary:
 	var order := []
 	for i in inventory.size():
-		order.append(i)
+		if dish_price(inventory[i].id, inventory[i].size) <= REGULAR_MAX:
+			order.append(i)
 	order.sort_custom(func(a, b): return FishDB.value_of(inventory[a].id, inventory[a].size) > FishDB.value_of(inventory[b].id, inventory[b].size))
 	var n := guest_count(day)
 	var served := []
@@ -129,4 +135,9 @@ static func special_guest(day: int) -> Dictionary:
 ## 특별 손님 요리값: 별 하나당 더 받는다
 static func special_price(fish_id: String, size_cm: float, stars: int) -> int:
 	var base := dish_price(fish_id, size_cm)
-	return int(roundf(base * (0.8 + 0.3 * clampi(stars, 1, 3)) / 500.0) * 500.0)
+	return mini(SPECIAL_MAX, int(roundf(base * (0.8 + 0.3 * clampi(stars, 1, 3)) / 500.0) * 500.0))
+
+
+## 보통 손님에게 내기엔 너무 비싼 생선인지 (시장에 파는 게 낫다)
+static func too_pricey(fish_id: String, size_cm: float) -> bool:
+	return dish_price(fish_id, size_cm) > REGULAR_MAX

@@ -112,6 +112,10 @@ func set_badge(t: String) -> void:
 func refresh() -> void:
 	_date.text = HudText.date_text(GameState.day)
 	_sea.text = HudText.sea_text(SeaDay.of(GameState.day))
+	# 상환일이 가까우면 작게 알린다
+	var loan := Loan.header_text(GameState.day, GameState.monthly_repayment, GameState.arrears, GameState.debt)
+	if not loan.is_empty():
+		_sea.text += "  ·  " + loan
 	_money.text = GameState.format_won(GameState.money)
 
 

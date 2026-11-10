@@ -27,6 +27,9 @@ func _init() -> void:
 	_test_day_flow()
 	_test_garden()
 	_test_save()
+	_test_month()
+	_test_icebox()
+	_test_market()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -702,7 +705,7 @@ func _test_sound() -> void:
 
 ## 공통 헤더와 메뉴의 글자, 가방 묶기
 func _test_header() -> void:
-	_eq(HudText.date_text(3), "3일차", "날짜")
+	_eq(HudText.date_text(3), "3월 3일", "날짜")
 	_eq(HudText.clock_text(5 * 60 + 7), "새벽 05:07", "새벽 시각")
 	_eq(HudText.clock_text(9 * 60 + 30), "오전 09:30", "오전 시각")
 	_eq(HudText.clock_text(13 * 60 + 5), "오후 13:05", "오후 시각")
@@ -899,3 +902,123 @@ func _test_save() -> void:
 	gs2.free()
 	gs3.free()
 
+
+
+## 달력과 대출 상환
+func _test_month() -> void:
+	_eq(Calendar.text(1), "3월 1일 (월)", "1일차는 2027년 3월 1일 월요일")
+	_eq(Calendar.short_text(31), "3월 31일", "3월은 31일까지")
+	_eq(Calendar.short_text(32), "4월 1일", "32일차는 4월 1일")
+	_eq(Calendar.short_text(62), "5월 1일", "4월은 30일까지")
+	_eq(Calendar.season(1), "봄", "3월은 봄")
+	_eq(Calendar.season(93), "여름", "6월은 여름")
+	_eq(Calendar.is_month_start(32), true, "4월 1일은 달 첫날")
+	_eq(Calendar.next_month_start(1), 32, "다음 상환일은 32일차")
+	_eq(Loan.days_left(25), 7, "상환까지 이레")
+	_eq(Loan.settle(1, 0, 100, 10, 0), {}, "첫날은 상환 없음")
+	_eq(Loan.settle(20, 999999, 100, 10, 0), {}, "달 중간엔 상환 없음")
+	var ok := Loan.settle(32, 600000, 30000000, 550000, 0)
+	_eq(ok.paid, 550000, "통장이 넉넉하면 갚음")
+	_eq(ok.debt, 30000000 - 550000, "갚은 만큼 대출이 줄어듦")
+	var bad := Loan.settle(32, 100000, 30000000, 550000, 0)
+	_eq(bad.paid, 0, "모자라면 못 갚음")
+	_eq(bad.arrears, 550000, "못 갚은 돈은 밀림")
+	var catch_up := Loan.settle(62, 2000000, 30000000, 550000, 550000)
+	_eq(catch_up.paid, 1100000, "다음 달엔 밀린 돈까지 냄")
+	_eq(catch_up.arrears, 0, "밀린 돈 정리")
+	_eq(Loan.settle(32, 999999, 300000, 550000, 0).paid, 300000, "남은 대출보다 더 내지 않음")
+	_eq(Loan.header_text(10, 550000, 0, 30000000), "", "상환일이 멀면 헤더에 안 보임")
+	_eq(Loan.header_text(29, 550000, 0, 30000000), "상환 D-3 · 55만", "상환일이 가까우면 보임")
+	_eq(Loan.notice(ok).contains("갚았어요"), true, "상환 알림")
+	_eq(Loan.notice(bad).contains("못 갚았어요"), true, "연체 알림")
+
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.day = 31
+	gs.money = 700000
+	gs.end_day()
+	_eq(gs.day, 32, "4월 1일 아침")
+	_eq(gs.money, 150000, "상환금이 빠짐")
+	_eq(gs.debt, 30000000 - 550000, "대출 잔액")
+	_eq(gs.notices.size(), 1, "상환 알림이 쌓임")
+	_eq(gs.pop_notices().size(), 1, "알림 꺼내기")
+	_eq(gs.notices.size(), 0, "꺼내면 비움")
+	gs.day = 61
+	gs.money = 100000
+	gs.end_day()
+	_eq(gs.money, 100000, "모자라면 그대로")
+	_eq(gs.arrears, 550000, "연체")
+	_eq(gs.missed_payments, 1, "연체한 달 수")
+	gs.free()
+
+
+## 아이스박스 칸 수, 신선도, 주문 생선 보내기, 보통 손님 값 끝
+func _test_icebox() -> void:
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.day = 4
+	gs.icebox_size = 3
+	_eq(gs.store_catch({"id": "bolak", "size": 20.0}), {}, "자리가 있으면 들어감")
+	_eq(gs.inventory[0].day, 4, "잡은 날을 적음")
+	gs.store_catch({"id": "noraemi", "size": 25.0})
+	gs.store_catch({"id": "ureok", "size": 30.0})
+	_eq(gs.icebox_free(), 0, "꽉 참")
+	var out: Dictionary = gs.store_catch({"id": "mangsang", "size": 13.0})
+	_eq(out.id, "mangsang", "방금 잡은 게 제일 싸면 그걸 놓아줌")
+	out = gs.store_catch({"id": "gamseongdom", "size": 40.0})
+	_eq(out.id, "bolak", "비싼 걸 잡으면 제일 싼 걸 놓아줌")
+	_eq(gs.inventory.size(), 3, "칸 수를 넘지 않음")
+	# 신선도: 잡은 날 밤은 괜찮고, 다음 날 밤에 상한다
+	gs.inventory = [{"id": "bolak", "size": 20.0, "day": 3}, {"id": "bolak", "size": 18.0, "day": 4}]
+	_eq(gs.spoiling_tonight().size(), 1, "어제 잡은 건 오늘 밤 상함")
+	gs.end_day()
+	_eq(gs.inventory.size(), 1, "상한 생선은 버림")
+	_eq(gs.inventory[0].day, 4, "오늘 잡은 건 남음")
+	_eq(gs.notices.size(), 1, "상한 생선 알림")
+	gs.free()
+
+	# 주문을 다 채우면 그 생선을 보낸다 (저녁에 또 팔지 않게)
+	var o := Orders.of(3)
+	var g2 = load("res://scripts/autoload/game_state.gd").new()
+	g2.day = 3
+	for i in o.count:
+		g2.store_catch({"id": o.fish, "size": o.min_cm + 1.0 + i})
+	g2.store_catch({"id": o.fish, "size": o.min_cm - 2.0})
+	for i in o.count:
+		g2.offer_to_order(o.fish, o.min_cm + 1.0 + i)
+	_eq(g2.order_done, true, "주문 완료")
+	_eq(g2.inventory.size(), 1, "주문한 생선은 아이스박스에서 빠짐")
+	_eq(g2.inventory[0].size, o.min_cm - 2.0, "조건에 안 맞는 건 남음")
+	g2.free()
+
+	# 보통 손님은 비싼 고기를 안 산다
+	_eq(DayFlow.too_pricey("gamseongdom", 40.0), true, "감성돔은 보통 손님에게 비쌈")
+	_eq(DayFlow.too_pricey("bolak", 20.0), false, "볼락은 괜찮음")
+	var r := DayFlow.serve_regulars(5, [{"id": "gamseongdom", "size": 40.0}, {"id": "bolak", "size": 20.0}])
+	_eq(r.served.size(), 1, "볼락만 팔림")
+	_eq(r.served[0].fish, "bolak", "감성돔은 남김")
+	_eq(r.used, [1], "쓴 생선 자리")
+	_eq(DayFlow.special_price("gamseongdom", 52.0, 3), DayFlow.SPECIAL_MAX, "특별 손님 값에도 끝이 있음")
+	_eq(Orders.call_name("최순덕"), "순덕 할머니", "부르는 이름")
+	for c in Orders.CUSTOMERS:
+		_eq(c.react.size(), 3, "%s 반응 세 가지" % c.name)
+
+
+func _test_market() -> void:
+	_eq(Market.is_open(5 * 60), true, "새벽 5시 엶")
+	_eq(Market.is_open(16 * 60 + 59), true, "오후 5시 전까지")
+	_eq(Market.is_open(17 * 60), false, "오후 5시 닫음")
+	_eq(Market.is_open(22 * 60), false, "밤엔 닫음")
+	_eq(Market.price("bolak", 20.0) < DayFlow.dish_price("bolak", 20.0), true, "흔한 고기는 식당이 더 남음")
+	_eq(Market.price("gamseongdom", 45.0) > DayFlow.special_price("gamseongdom", 45.0, 3), true, "감성돔은 시장이 더 남음")
+	_eq(Market.better_here("gamseongdom", 45.0), true, "시장이 나은 고기 표시")
+	_eq(Locations.get_loc("market").scene.is_empty(), false, "지도에서 시장으로 감")
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.money = 0
+	var e := {"id": "ureok", "size": 30.0, "day": 1}
+	gs.inventory = [e, {"id": "bolak", "size": 15.0, "day": 1}]
+	var got: int = gs.sell_fish(gs.inventory[0])
+	_eq(got, Market.price("ureok", 30.0), "판 값")
+	_eq(gs.money, got, "돈이 들어옴")
+	_eq(gs.sales_today, got, "장부 매출")
+	_eq(gs.inventory.size(), 1, "판 생선은 빠짐")
+	_eq(gs.sell_fish({"id": "ureok", "size": 99.0}), 0, "없는 생선은 못 팜")
+	gs.free()

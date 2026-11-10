@@ -75,6 +75,7 @@ func _ready() -> void:
 		_show_toast.call_deferred("지도를 끌어서 마을을 둘러봐요")
 	else:
 		_show_toast.call_deferred(DayFlow.next_hint(GameState.time_minutes, GameState.opened_today))
+	_show_notices.call_deferred(2.6)
 
 
 ## 지도에 올 때마다 진행을 저장한다. 화면 찍기용 장면(_shot) 안에 끼워 넣은 지도는 저장하지 않는다
@@ -341,6 +342,11 @@ func _select(id: String) -> void:
 				_go_btn.text = "지금은 낚시 시간이 아니에요"
 				_sheet_desc.text = GameState.line(loc.desc) + "
 새벽 5시~11시, 밤 9시~11시 반에 낚시할 수 있어요."
+		"market":
+			if not Market.is_open(arrive):
+				_action = ""
+				_go_btn.text = "지금은 문을 닫았어요"
+				_sheet_desc.text = GameState.line(loc.desc) + "\n새벽 5시부터 오후 5시까지 열어요."
 		"shop":
 			if GameState.has_flag("first_guest_done"):
 				if GameState.opened_today:
@@ -384,7 +390,8 @@ func _travel() -> void:
 		Sound.play_sfx("step")
 		_refresh_hud()
 		_rebuild_pins()
-		_show_toast("푹 잤다. %d일차가 밝았어요" % GameState.day)
+		_show_toast("푹 잤다. %s 아침이 밝았어요" % Calendar.text(GameState.day))
+		_show_notices.call_deferred(2.6)
 		return
 	var scene: String = loc.get("scene", "")
 	if not scene.is_empty():
@@ -415,8 +422,20 @@ func _build_toast() -> void:
 	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	holder.add_child(_toast)
 	_toast_label = UiKit.text("", "label", UiKit.FOAM, HORIZONTAL_ALIGNMENT_CENTER)
+	_toast_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_toast_label.custom_minimum_size.x = 560 # 긴 알림(상환, 상한 생선)은 두 줄로
 	_toast.add_child(_toast_label)
 	_toast.modulate.a = 0.0
+
+
+## 쌓인 알림(상환, 상한 생선)을 앞 안내가 사라진 뒤 하나씩 띄운다
+func _show_notices(delay: float) -> void:
+	for t in GameState.pop_notices():
+		await get_tree().create_timer(delay).timeout
+		if not is_inside_tree():
+			return
+		_show_toast(t)
+		delay = 3.2
 
 
 func _show_toast(t: String) -> void:

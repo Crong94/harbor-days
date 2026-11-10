@@ -54,7 +54,7 @@ func _ready() -> void:
 			GameState.load_game()
 			UiKit.go_to(self, MAP_SCENE))
 		bottom.add_child(cont)
-		bottom.add_child(UiKit.text("%d일차 · %s" % [int(saved.get("day", 1)), str(saved.get("shop_name", ""))], "caption", UiKit.FOAM_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
+		bottom.add_child(UiKit.text("%s · %s" % [Calendar.text(int(saved.get("day", 1))), str(saved.get("shop_name", ""))], "caption", UiKit.FOAM_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
 		first = cont
 	var start := UiKit.action("새로 시작", "primary" if saved.is_empty() else "glass")
 	start.custom_minimum_size = Vector2(420, 64)

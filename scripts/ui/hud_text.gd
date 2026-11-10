@@ -3,8 +3,9 @@ extends RefCounted
 ## 헤더와 메뉴에 쓰는 글자 만들기 (순수 함수). 오토로드(GameState, Sound)를 쓰지 않아서 헤드리스 테스트에서 부를 수 있다.
 
 
+## 예: "3월 2일" (1일차는 2027년 3월 1일, Calendar)
 static func date_text(day: int) -> String:
-	return "%d일차" % day
+	return Calendar.short_text(day)
 
 
 ## 예: "새벽 05:12", "오전 09:30", "오후 13:05", "저녁 19:00", "밤 22:40"

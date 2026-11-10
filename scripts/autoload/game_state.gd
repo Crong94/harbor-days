@@ -19,11 +19,21 @@ var pet_name := "고등어"
 var money := 180_000
 var debt := 30_000_000
 var monthly_repayment := 550_000
+## 못 갚고 밀린 상환금 (Loan). 다음 상환일에 같이 빠진다
+var arrears := 0
+## 연체한 달 수 (지금까지 합)
+var missed_payments := 0
 var day := 1
+## 다음에 지도에 오면 보여 줄 알림 (상환, 상한 생선 등). 보여 주면 비운다
+var notices: Array = []
 
-## 낚시 기록. 항목 형식: {"id": "bolak", "size": 18.3}
+## 낚시 기록. 항목 형식: {"id": "bolak", "size": 18.3, "day": 잡은 날}
 var caught_today: Array = []
 var inventory: Array = []
+## 아이스박스에 넣을 수 있는 마리 수. 꽉 차면 가장 싼 고기를 놓아준다
+var icebox_size := 10
+## 잡은 날을 포함해 생선이 버티는 날 수. 잡은 다음 날 저녁 장사까지 쓸 수 있다
+const FRESH_DAYS := 2
 ## 어종 도감: 어종 id → 가장 큰 기록(cm)
 var dex := {}
 
@@ -217,6 +227,7 @@ func today_order() -> Dictionary:
 
 
 ## 잡은 물고기를 주문에 넣어 본다. 주문을 막 다 채웠으면 보상 금액, 아니면 0
+## 다 채우면 주문한 생선을 아이스박스에서 꺼내 주문한 사람에게 보낸다 (보상만 받고 같은 생선을 저녁에 또 파는 일이 없게)
 func offer_to_order(fish_id: String, size_cm: float) -> int:
 	var o := today_order()
 	if order_done or not Orders.matches(o, fish_id, size_cm):
@@ -224,9 +235,62 @@ func offer_to_order(fish_id: String, size_cm: float) -> int:
 	order_filled += 1
 	if order_filled >= o.count:
 		order_done = true
+		_deliver_order(o)
 		earn(o.reward)
 		return o.reward
 	return 0
+
+
+## 주문 조건에 맞는 생선을 작은 것부터 count마리 꺼낸다
+func _deliver_order(o: Dictionary) -> void:
+	for n in o.count:
+		var best := -1
+		for i in inventory.size():
+			var e: Dictionary = inventory[i]
+			if Orders.matches(o, e.id, e.size) and (best < 0 or e.size < inventory[best].size):
+				best = i
+		if best < 0:
+			return
+		inventory.remove_at(best)
+
+
+## 잡은 생선을 아이스박스에 넣는다. 꽉 차 있으면 가장 싼 한 마리(방금 잡은 것일 수도 있다)를 놓아준다.
+## 놓아준 생선을 돌려준다. 다 들어갔으면 빈 Dictionary
+func store_catch(entry: Dictionary) -> Dictionary:
+	var e := entry.duplicate()
+	if not e.has("day"):
+		e["day"] = day
+	inventory.append(e)
+	if inventory.size() <= icebox_size:
+		return {}
+	var low := 0
+	for i in inventory.size():
+		if FishDB.value_of(inventory[i].id, inventory[i].size) < FishDB.value_of(inventory[low].id, inventory[low].size):
+			low = i
+	var out: Dictionary = inventory[low]
+	inventory.remove_at(low)
+	return out
+
+
+## 아이스박스의 그 생선(entry)을 수산시장에 판다. 받은 돈, 없으면 0
+func sell_fish(entry: Dictionary) -> int:
+	var i := inventory.find(entry)
+	if i < 0:
+		return 0
+	inventory.remove_at(i)
+	var got := Market.price(entry.id, entry.size)
+	earn(got)
+	return got
+
+
+## 아이스박스에 자리가 남았는지
+func icebox_free() -> int:
+	return maxi(0, icebox_size - inventory.size())
+
+
+## 오늘 밤을 넘기면 상하는 생선 (잡은 날을 포함해 FRESH_DAYS일째인 것)
+func spoiling_tonight() -> Array:
+	return inventory.filter(func(e): return day - int(e.get("day", day)) + 1 >= FRESH_DAYS)
 
 
 ## 아이스박스에서 그 어종 한 마리를 꺼낸다. 없으면 빈 Dictionary
@@ -242,7 +306,22 @@ func take_fish(id: String) -> Dictionary:
 ## 하루를 마치고 다음 날 아침으로 넘어간다.
 ## wake_minutes를 주지 않으면 DayFlow 규칙대로 (밤 낚시를 했으면 늦잠)
 func end_day(wake_minutes := -1) -> void:
+	# 오래된 생선은 밤새 상해서 버린다
+	var spoiled := spoiling_tonight()
+	if not spoiled.is_empty():
+		inventory = inventory.filter(func(e): return not spoiled.has(e))
+		notices.append("아이스박스에서 생선 %d마리가 상해서 버렸어요. 잡은 다음 날 저녁까지 팔아요" % spoiled.size())
 	day += 1
+	# 매달 1일은 대출 상환일
+	var r := Loan.settle(day, money, debt, monthly_repayment, arrears)
+	if not r.is_empty():
+		if r.paid > 0:
+			money -= r.paid
+		else:
+			missed_payments += 1
+		arrears = r.arrears
+		debt = r.debt
+		notices.append(Loan.notice(r))
 	time_minutes = wake_minutes if wake_minutes >= 0 else DayFlow.wake_time(night_fished)
 	opened_today = false
 	night_fished = false
@@ -257,7 +336,14 @@ func clock_text() -> String:
 	var m := time_minutes % (24 * 60)
 	var h := m / 60
 	var period := "새벽" if h < 6 else ("오전" if h < 12 else ("오후" if h < 18 else "저녁" if h < 21 else "밤"))
-	return "%d일차 %s %02d:%02d" % [day, period, h, m % 60]
+	return "%s %s %02d:%02d" % [Calendar.short_text(day), period, h, m % 60]
+
+
+## 쌓인 알림을 꺼내고 비운다
+func pop_notices() -> Array:
+	var out := notices.duplicate()
+	notices.clear()
+	return out
 
 var _player_regex := RegEx.create_from_string("^[가-힣a-zA-Z0-9]+$")
 var _shop_regex := RegEx.create_from_string("^[가-힣a-zA-Z0-9 ]+$")
