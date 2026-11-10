@@ -296,7 +296,7 @@ func _build_settings() -> void:
 		else:
 			get_tree().change_scene_to_file(TITLE_SCENE))
 	_list.add_child(title_btn)
-	_list.add_child(UiKit.text("타이틀로 가면 지금 하루 진행은 저장되지 않아요", "caption", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
+	_list.add_child(UiKit.text("마을 지도에 올 때마다 저절로 저장돼요. 낚시나 장사 도중은 저장되지 않아요", "caption", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
 
 
 func _toggle_row(label: String, on: bool, setter: Callable) -> PanelContainer:

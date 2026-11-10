@@ -26,6 +26,7 @@ func _init() -> void:
 	_test_sound()
 	_test_day_flow()
 	_test_garden()
+	_test_save()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -812,4 +813,89 @@ func _test_garden() -> void:
 	_eq(Locations.is_unlocked("garden", {}), true, "텃밭은 처음부터 열림")
 	_eq(Locations.is_unlocked("coop", {}), false, "닭장은 처음엔 잠김")
 	_eq(Locations.is_unlocked("coop", {"coop_open": true}), true, "이야기가 진행되면 닭장 열림")
+
+
+func _test_save() -> void:
+	var path := "user://test_save.dat"
+	DirAccess.remove_absolute(path)
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	_eq(gs.has_save(path), false, "저장이 없으면 없다고")
+	_eq(gs.load_game(path), false, "저장이 없으면 불러오기 실패")
+	var names := SaveGame.fields(gs)
+	_eq("money" in names and "garden" in names and "flags" in names, true, "돈, 텃밭, 진행 표시를 저장")
+	_eq("vibration_on" in names or "_player_regex" in names, false, "설정과 안쪽 변수는 저장 안 함")
+	gs.player_name = "하늘"
+	gs.shop_name = "갯내음"
+	gs.money = 123456
+	gs.day = 7
+	gs.time_minutes = 11 * 60 + 5
+	gs.current_location = "breakwater"
+	gs.inventory.append({"id": "ureok", "size": 31.4, "perfect": true})
+	gs.dex["ureok"] = 31.4
+	gs.owned_rods.append("rod_2")
+	gs.equipped_rod = "rod_2"
+	gs.baits["worm"] = 7
+	gs.flags["first_guest_done"] = true
+	gs.opened_today = true
+	gs.reputation = 12
+	gs.garden[1] = {"crop": "mu", "day": 6}
+	gs.produce["daepa"] = 4
+	gs.vibration_on = false
+	_eq(gs.save_game(path), true, "저장")
+	_eq(gs.has_save(path), true, "저장이 생김")
+
+	var gs2 = load("res://scripts/autoload/game_state.gd").new()
+	_eq(gs2.load_game(path), true, "불러오기")
+	_eq(gs2.player_name, "하늘", "이름")
+	_eq(gs2.shop_name, "갯내음", "가게 이름")
+	_eq(gs2.money, 123456, "돈")
+	_eq(typeof(gs2.money), TYPE_INT, "돈은 정수 그대로")
+	_eq(gs2.day, 7, "날짜")
+	_eq(gs2.time_minutes, 11 * 60 + 5, "시각")
+	_eq(gs2.current_location, "breakwater", "있던 곳")
+	_eq(gs2.inventory.size(), 1, "아이스박스")
+	_eq(gs2.inventory[0].size, 31.4, "생선 크기")
+	_eq(gs2.dex.get("ureok", 0.0), 31.4, "도감 기록")
+	_eq(gs2.equipped_rod, "rod_2", "쓰던 낚싯대")
+	_eq("rod_2" in gs2.owned_rods, true, "가진 낚싯대")
+	_eq(gs2.bait_count("worm"), 7, "미끼 수")
+	_eq(gs2.bait_count("krill"), -1, "크릴은 그대로 무제한")
+	_eq(gs2.has_flag("first_guest_done"), true, "진행 표시")
+	_eq(gs2.opened_today, true, "오늘 가게를 열었는지")
+	_eq(gs2.reputation, 12, "평판")
+	_eq(CropDB.stage(gs2.garden[1], gs2.day), CropDB.GROWING, "텃밭에 심은 무")
+	_eq(int(gs2.produce.get("daepa", 0)), 4, "거둔 채소")
+	_eq(gs2.vibration_on, true, "설정은 진행 저장에 안 들어감")
+	# 불러온 것은 복사본이라 저장한 쪽을 바꿔도 영향이 없다
+	gs.inventory.clear()
+	_eq(gs2.inventory.size(), 1, "불러온 값은 따로")
+
+	# 새로 시작: 진행만 처음으로, 설정은 그대로
+	gs2.vibration_on = false
+	gs2.reset_game()
+	_eq(gs2.money, 180000, "새로 시작하면 처음 돈")
+	_eq(gs2.day, 1, "새로 시작하면 1일차")
+	_eq(gs2.player_name, gs2.DEFAULT_PLAYER_NAME, "이름도 처음으로")
+	_eq(gs2.inventory.is_empty() and gs2.flags.is_empty() and gs2.dex.is_empty(), true, "가방, 진행, 도감 비움")
+	_eq(gs2.owned_rods, [GearDB.DEFAULT_ROD], "장비도 처음으로")
+	_eq(CropDB.kinds(gs2.garden).size(), 0, "텃밭도 비움")
+	_eq(gs2.vibration_on, false, "설정은 남음")
+
+	# 형이 다른 값이나 모르는 항목이 섞여도 멀쩡한 것만 받는다
+	var gs3 = load("res://scripts/autoload/game_state.gd").new()
+	SaveGame.restore(gs3, {"money": "많음", "day": 4, "inventory": 3, "없는것": 1})
+	_eq(gs3.money, 180000, "형이 다른 돈은 무시")
+	_eq(gs3.day, 4, "멀쩡한 날짜는 받음")
+	_eq(gs3.inventory.size(), 0, "형이 다른 가방은 무시")
+
+	# 망가진 파일은 저장이 없는 것으로 본다
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string("망가진 파일")
+	f.close()
+	_eq(gs3.has_save(path), false, "망가진 파일은 없는 셈")
+	_eq(gs3.load_game(path), false, "망가진 파일은 불러오지 않음")
+	DirAccess.remove_absolute(path)
+	gs.free()
+	gs2.free()
+	gs3.free()
 

@@ -69,11 +69,18 @@ func _ready() -> void:
 	_layout_world.call_deferred()
 	Sound.play_bgm("town")
 	UiKit.fade_in(self)
+	_autosave.call_deferred()
 	if not GameState.flags.get("map_drag_hint", false):
 		GameState.flags["map_drag_hint"] = true
 		_show_toast.call_deferred("지도를 끌어서 마을을 둘러봐요")
 	else:
 		_show_toast.call_deferred(DayFlow.next_hint(GameState.time_minutes, GameState.opened_today))
+
+
+## 지도에 올 때마다 진행을 저장한다. 화면 찍기용 장면(_shot) 안에 끼워 넣은 지도는 저장하지 않는다
+func _autosave() -> void:
+	if get_tree().current_scene == self:
+		GameState.save_game()
 
 
 # ─── 지도 크기와 위치 ───────────────────────────────

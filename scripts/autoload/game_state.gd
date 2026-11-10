@@ -104,6 +104,25 @@ func load_settings(path := SETTINGS_PATH) -> void:
 	screen_shake_on = bool(c.get_value("feel", "screen_shake", screen_shake_on))
 
 
+## 진행 저장 (SaveGame). 마을 지도에 올 때마다 자동으로 부른다
+func save_game(path := SaveGame.PATH) -> bool:
+	return SaveGame.write(self, path)
+
+
+## 저장된 진행을 불러온다. 저장이 없으면 false
+func load_game(path := SaveGame.PATH) -> bool:
+	return SaveGame.load_into(self, path)
+
+
+func has_save(path := SaveGame.PATH) -> bool:
+	return SaveGame.exists(path)
+
+
+## 새로 시작: 진행을 처음 상태로 되돌린다 (설정은 그대로)
+func reset_game() -> void:
+	SaveGame.reset(self)
+
+
 func _exit_tree() -> void:
 	UiKit.clear_fonts()
 
