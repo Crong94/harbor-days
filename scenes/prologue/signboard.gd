@@ -77,9 +77,26 @@ func _ready() -> void:
 
 	resized.connect(_layout_board)
 	_layout_board.call_deferred()
-	_shop_edit.grab_focus()
 	UiKit.fade_in(self)
-	UiKit.rise_in(_form, 0.2)
+	# 간판을 쓰기 전: 대출 승인, 싼 매물, 물빛울포 도착 (기획서 5장 끝, 챕터 1 처음)
+	_form.hide()
+	_board.hide()
+	_lead.hide()
+	_dialogue.play(INTRO)
+
+
+const INTRO := [
+	{"speaker": "", "text": "통장 잔고는 생각보다 적었다."},
+	{"speaker": "은행 직원", "text": "{player} 고객님 귀농귀촌 창업 대출 승인되셨습니다. 상환은 다음 달부터 시작이에요."},
+	{"speaker": "", "text": "부동산 앱을 뒤지다 터무니없이 싼 매물을 찾았다. 경남 물빛울포. 식당 겸 주택. 월세 협의 가능."},
+	{"speaker": "", "text": "사진 속 바다에 빨간 등대가 보였다. 그게 무슨 뜻인지는 아직 몰랐다."},
+	{"speaker": "", "text": "버스를 세 번 갈아타고 도착한 물빛울포. 정류장엔 아무도 없고 갈매기 소리만 들린다."},
+	{"speaker": "{player}", "text": "여기가 내 가게구나. 사진보다 더 낡았네."},
+	{"speaker": "", "text": "의자는 다리가 흔들리고 환풍기는 돌지 않는다. 창고 구석에서 먼지 쌓인 낚싯대 하나를 찾았다."},
+	{"speaker": "", "text": "청소를 마치고 나오니 간판 자리가 텅 비어 있다."},
+]
+
+var _intro_done := false
 
 
 ## 아래 입력 카드 (크림 종이)
@@ -242,6 +259,15 @@ func _hang_sign() -> void:
 
 
 func _on_dialogue_finished() -> void:
+	if not _intro_done:
+		# 도착 이야기가 끝나면 간판 쓰기
+		_intro_done = true
+		_lead.show()
+		_board.show()
+		_form.show()
+		UiKit.rise_in(_form, 0.1)
+		_shop_edit.grab_focus()
+		return
 	_lead.text = GameState.line("{player}의 작은 식당, {shop}")
 	_next_btn.show()
 	UiKit.rise_in(_next_btn)

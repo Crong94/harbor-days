@@ -31,6 +31,7 @@ func _init() -> void:
 	_test_icebox()
 	_test_market()
 	_test_brief()
+	_test_story()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -1075,3 +1076,33 @@ func _test_brief() -> void:
 	gs.free()
 	_eq(FishLine.stage({"day": 5}, 5).name, "오늘 잡음", "오늘 잡은 생선")
 	_eq(FishLine.stage({"day": 4}, 5).name, "오늘 밤 상함", "어제 잡은 생선")
+
+
+## 봄 첫 주 이야기 사건과 잡담
+func _test_story() -> void:
+	var f := {"first_guest_done": true}
+	_eq(Story.pending("breakwater", 1, 6 * 60, f).is_empty(), true, "첫날엔 만수 사건 없음")
+	_eq(Story.pending("breakwater", 2, 6 * 60, f).get("id", ""), "mansu_mend", "둘째 날 아침 방파제에서 만수")
+	_eq(Story.pending("breakwater", 2, 22 * 60, f).is_empty(), true, "밤엔 만수가 없음")
+	_eq(Story.pending("breakwater", 5, 6 * 60, f).get("id", ""), "mansu_mend", "앞 사건을 먼저 봄")
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.flags = f.duplicate()
+	Story.finish(Story.pending("breakwater", 2, 6 * 60, gs.flags), gs)
+	_eq(gs.has_flag("met_mansu"), true, "만수를 만남")
+	_eq(gs.has_flag("ev_mansu_mend"), true, "본 사건 표시")
+	_eq(Story.pending("breakwater", 3, 6 * 60, gs.flags).is_empty(), true, "같은 사건은 한 번만")
+	_eq(Story.pending("breakwater", 5, 6 * 60, gs.flags).get("id", ""), "mansu_tide", "닷새째 물때 이야기")
+	_eq(Story.pending("market", 2, 9 * 60, {}).get("id", ""), "yongpal_first", "시장 첫 방문에 용팔")
+	gs.free()
+	var ids := {}
+	for ev in Story.EVENTS:
+		_eq(ids.has(ev.id), false, "사건 이름 겹침 없음 %s" % ev.id)
+		ids[ev.id] = true
+		_eq(Locations.LIST.has(ev.place), true, "%s 장소가 있음" % ev.id)
+		_eq(ev.lines.size() >= 3, true, "%s 대사" % ev.id)
+		for l in ev.lines:
+			_eq(l.text.contains("—") or l.text.contains("ㅡ"), false, "줄표 없음 %s" % ev.id)
+	for place in Story.SMALL_TALK:
+		_eq(Locations.LIST.has(place), true, "잡담 장소 %s" % place)
+		_eq(Story.small_talk(place, 3).is_empty(), false, "%s 잡담" % place)
+	_eq(Story.small_talk("없는곳", 1), [], "잡담 없는 곳")

@@ -37,6 +37,7 @@ var _moved := false # 이번 누름이 끌기였으면 핀 탭을 무시한다
 var _velocity := Vector2.ZERO
 var _focus_tween: Tween
 var _drawer: DayDrawer
+var _dialogue: DialogueBox # 이야기 사건과 잡담 (처음 쓸 때 만든다)
 
 
 func _ready() -> void:
@@ -184,7 +185,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _can_drag_from(p: Vector2) -> bool:
-	if _header.is_menu_open() or (_drawer and _drawer.is_open()):
+	if _header.is_menu_open() or (_drawer and _drawer.is_open()) or (_dialogue and _dialogue.visible):
 		return false
 	if p.y < GameHeader.BOTTOM:
 		return false
@@ -298,6 +299,8 @@ func _layout_pins() -> void:
 func _on_pin_pressed(id: String) -> void:
 	if _moved:
 		return # 끌다가 손을 뗀 것
+	if _dialogue and _dialogue.visible:
+		return # 대사 중에는 다른 장소를 고르지 않는다
 	_select(id)
 
 
@@ -427,15 +430,44 @@ func _travel() -> void:
 		_drawer.refresh_dot()
 		_show_notices.call_deferred(2.6)
 		return
+	# 이야기 사건이 있으면 지도 위 대사창으로 먼저 보여 주고 이어서 들어간다 (Story)
+	var ev := Story.pending(id, GameState.day, GameState.time_minutes, GameState.flags)
+	if not ev.is_empty():
+		_refresh_hud()
+		_play_story(ev.lines, func():
+			Story.finish(ev, GameState)
+			_enter(id))
+		return
+	_enter(id)
+
+
+## 장소에 들어간다: 화면이 있으면 그 화면으로, 없으면 지도에 머물며 잡담
+func _enter(id: String) -> void:
+	var loc := Locations.get_loc(id)
 	var scene: String = loc.get("scene", "")
 	if not scene.is_empty():
 		UiKit.go_to(self, scene)
 		return
-	# 장소 화면이 아직 없으면 지도에 머문다
 	Sound.play_sfx("step")
 	_refresh_hud()
 	_rebuild_pins()
-	_show_toast(GameState.line("%s에 왔어요. 장소 화면은 준비 중이에요." % loc.name))
+	var talk := Story.small_talk(id, GameState.day)
+	if not talk.is_empty():
+		_play_story(talk, Callable())
+	else:
+		_show_toast(GameState.line("%s에 왔어요." % loc.name))
+
+
+## 지도 위 대사창 (이야기 사건, 잡담). 끝나면 then을 부른다
+func _play_story(lines: Array, then: Callable) -> void:
+	if _dialogue == null:
+		_dialogue = DialogueBox.new()
+		add_child(_dialogue)
+	for c in _dialogue.finished.get_connections():
+		_dialogue.finished.disconnect(c.callable)
+	if then.is_valid():
+		_dialogue.finished.connect(then, CONNECT_ONE_SHOT)
+	_dialogue.play(lines)
 
 
 # ─── 토스트 ─────────────────────────────────────────

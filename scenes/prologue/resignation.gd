@@ -101,9 +101,38 @@ func _ready() -> void:
 	buttons.add_child(sign_btn)
 	root.add_child(buttons)
 
-	_name_edit.grab_focus()
 	UiKit.fade_in(self)
-	UiKit.rise_in(paper, 0.15)
+	# 사직서를 꺼내기 전: 새벽 두 시 사무실, 아버지 기일 알림, 빨간 등대 사진 (기획서 5장)
+	_root = root
+	_paper = paper
+	root.hide()
+	var d := DialogueBox.new()
+	add_child(d)
+	d.finished.connect(_show_paper, CONNECT_ONE_SHOT)
+	d.play(INTRO)
+
+
+## 사직서 장면 앞 이야기. 이름을 아직 안 정해서 주인공은 "나"
+const INTRO := [
+	{"speaker": "", "text": "새벽 두 시. 판교의 사무실."},
+	{"speaker": "", "text": "장애 대응이 끝났다. 다들 퇴근하고 빈 모니터에 커서만 깜빡인다."},
+	{"speaker": "", "text": "휴대폰이 울린다. 캘린더 알림. 아버지 기일."},
+	{"speaker": "나", "text": "올해도 못 갔네."},
+	{"speaker": "", "text": "책상 서랍 깊은 곳에서 오래된 사진 한 장을 꺼낸다."},
+	{"speaker": "", "text": "작은 물고기를 들고 웃는 아이. 그 뒤에서 쑥스럽게 웃는 아버지. 멀리 빨간 등대가 서 있다."},
+	{"speaker": "나", "text": "그때 그 생선 진짜 맛있었는데."},
+	{"speaker": "", "text": "다음 날 아침. 사직서를 꺼냈다."},
+]
+
+var _root: Control
+var _paper: Control
+
+
+func _show_paper() -> void:
+	_root.show()
+	UiKit.rise_in(_root, 0.0, 18.0)
+	UiKit.rise_in(_paper, 0.15)
+	_name_edit.grab_focus()
 
 
 func _sign() -> void:
