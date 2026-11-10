@@ -15,29 +15,20 @@
 ## 2. 코드 받기
 
 1. 작업 폴더를 만든다. 예: `D:\games` (Mac: `~/games`)
-2. 아래 둘 중 하나를 받아 작업 폴더에 둔다
-   - **전체 백업 하나**: `oneului-bada-full-<날짜>.bundle` (Claude 대화에서 받은 파일)
-   - 또는 드라이브 `오늘의바다_백업`의 `oneului-bada-20261109-0615.bundle` + 가장 최근 `oneului-bada-inc-...bundle`
-3. Git Bash(Mac은 터미널)를 열고
+2. Git Bash(Mac은 터미널)에서
 
 ```bash
 cd /d/games
 ```
 
-전체 백업 하나를 받았다면
-
 ```bash
-git clone oneului-bada-full-20261109.bundle oneului-bada
+git clone https://github.com/crong94/oneului-bada.git
 ```
 
-기본 + 추가분 두 개를 받았다면
+3. 이 저장소에서만 개인 메일로 커밋하도록 설정한다 (회사 PC는 전역 설정이 회사 메일이라 꼭 한다)
 
 ```bash
-git clone oneului-bada-20261109-0615.bundle oneului-bada
-```
-
-```bash
-cd oneului-bada && git pull ../oneului-bada-inc-8586b84-to-HEAD.bundle main
+cd oneului-bada && git config user.name "Songok Kim" && git config user.email "thddhr14@gmail.com"
 ```
 
 4. 확인
@@ -45,6 +36,8 @@ cd oneului-bada && git pull ../oneului-bada-inc-8586b84-to-HEAD.bundle main
 ```bash
 git log --oneline -3
 ```
+
+처음 push할 때 GitHub 로그인 창이 뜨면 crong94 계정으로 로그인한다.
 
 ## 3. 참조 그림 넣기 (git에 넣지 않는 원본)
 
@@ -69,16 +62,13 @@ git log --oneline -3
 1. Claude 데스크톱 앱 → Code 탭 → 폴더 선택에서 `oneului-bada` 폴더를 연다
 2. `docs/HANDOFF.md`의 코드 블록을 복사해 첫 메시지로 붙여 넣는다
 
-## 6. 백업 (GitHub 없이)
+## 6. 매일 작업 흐름 (로컬과 GitHub)
 
-- git은 로컬 커밋만 한다 (`git remote add`, `git push` 금지, GitHub 계정 문제가 풀릴 때까지)
-- 주 1회 이상 Git Bash에서
-
-```bash
-./tools/backup.sh
-```
-
-`build/backup/`에 bundle과 zip이 생긴다. 이 파일을 드라이브 `오늘의바다_백업`에 올린다. Google Drive 데스크톱을 쓰면 그 폴더에 복사만 하면 된다.
+- 시작할 때 `git pull`, 끝나면 커밋하고 `git push`
+- 회사 PC에는 Godot를 깔지 않는다. 회사에서 고친 것은 push하면 GitHub Actions가 테스트를 돌린다. 결과는 github.com/crong94/oneului-bada → Actions 탭
+- 웹 빌드가 필요하면 Actions 탭 → CI → Run workflow → "웹 빌드도 만들기" 체크. 결과 zip은 7일 보관
+- 저장소가 공개라서 개인 정보, 비밀번호, 토큰은 넣지 않는다
+- `./tools/backup.sh`(bundle, zip)는 GitHub가 안 될 때만 쓰는 예비 백업이다
 
 ## 7. APK (이전 게임 바다 한 접시)
 

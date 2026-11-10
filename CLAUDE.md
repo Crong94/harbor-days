@@ -7,15 +7,19 @@
 - 해상도: 1280x720, stretch mode canvas_items
 - 폰트: `assets/fonts/NotoSansKR-Regular.ttf` (한글 11,172자 전체 포함, OFL)
 
-## GitHub 사용 금지 (중요)
-- 계정 문제 해결 전까지 **원격 저장소를 연결하거나 push하지 않는다.** `git remote add`, `git push`, GitHub Actions 설정 모두 금지.
-- Git은 로컬 커밋만 한다.
-- 작업이 끝나면 `tools/backup.sh`로 bundle과 zip을 만들고 사용자의 개인 구글 드라이브 `오늘의바다_백업` 폴더에 올린다.
+## Git과 GitHub (중요)
+- 원격 저장소: GitHub `crong94/oneului-bada` (**공개**). 기준 브랜치는 `main`.
+- 로컬에서 커밋하고 GitHub에 push한다. 작업을 시작할 때 `git pull`, 끝나면 `git push`.
+- 공개 저장소라서 비밀번호, 토큰, 개인 메일, 집 위치 같은 개인 정보는 파일과 커밋 메시지에 넣지 않는다.
+- 커밋 작성자는 이 저장소 로컬 설정 `Songok Kim <thddhr14@gmail.com>`만 쓴다. 회사 메일로 찍히면 push 전에 고친다 (`git config user.email`로 확인).
+- 회사 PC에는 Godot를 설치하지 않는다. 회사 PC에서는 코드와 문서만 고치고, 테스트는 GitHub Actions(`.github/workflows/ci.yml`)나 집 노트북에서 돌린다.
+- Actions는 아껴 쓴다. 게임 코드가 바뀐 push/PR에서만 테스트가 돌고, 웹 빌드는 Actions 탭에서 손으로 실행할 때만 만든다. 워크플로를 늘리거나 트리거를 넓히려면 먼저 사용자에게 묻는다.
+- 큰 파일(참조 그림 원본, APK)은 계속 git 밖, 구글 드라이브 `오늘의바다_백업`에 둔다.
 
 ## 다음 세션에서 이어 받는 법 (자세한 내용은 docs/HANDOFF.md)
-1. 구글 드라이브 `오늘의바다_백업` 폴더에서 가장 최근 `oneului-bada-*.bundle`을 받는다.
-2. `git clone oneului-bada-YYYYMMDD-HHMM.bundle oneului-bada`
-3. Godot가 없으면 `tools/setup_godot.sh` 실행.
+1. 처음이면 `git clone https://github.com/crong94/oneului-bada.git`, 이미 있으면 `git pull`
+2. 참조 그림이 필요하면 드라이브 `오늘의바다_백업/ref`를 `docs/ref/`에 받는다.
+3. Godot가 없으면 `tools/setup_godot.sh` 실행 (클라우드 세션). 회사 PC는 설치하지 않는다.
 
 ## 명령
 로컬 Windows에서는 `godot` 대신 Godot 콘솔 실행 파일 경로를 쓴다 (`docs/LOCAL_SETUP.md`). 백업 스크립트는 Git Bash에서 실행.
@@ -72,4 +76,5 @@ scripts/ui        UiKit, SeaBackdrop(임시 배경), DialogueBox, ArtSlot(그림
 scripts/util      Josa (조사 처리)
 tests             헤드리스 테스트
 tools             설치, 백업 스크립트
+.github/workflows GitHub Actions (테스트, 손으로 돌리는 웹 빌드)
 ```

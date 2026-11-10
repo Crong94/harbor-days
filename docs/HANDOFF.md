@@ -1,4 +1,4 @@
-# 이어가기 (2026-11-10, 브랜치 main, 원격 없음)
+# 이어가기 (2026-11-10, 브랜치 main, 원격 GitHub crong94/oneului-bada 공개)
 
 환경: **코드** (사용자 PC에서 도는 Claude Code). 회사 PC에서 마을 지도 작업을 하다가 집 PC로 옮겨 이어 간다. 설치와 복원 방법은 `docs/LOCAL_SETUP.md`.
 
@@ -11,8 +11,8 @@
 - 애매하거나 모호한 부분이 있다면 질문을 통해 해결하고 넘어간다.
 
 ## 코드 받기
-- 드라이브 `오늘의바다_백업/bundle`에서 가장 최근 `oneului-bada-YYYYMMDD-HHMM.bundle`(전체 이력)을 받아 `git clone <bundle> oneului-bada`
-- 이미 예전 폴더가 있으면 그 폴더에서 `git pull <bundle> main`
+- 처음이면 `git clone https://github.com/crong94/oneului-bada.git`, 이미 폴더가 있으면 `git pull`
+- 회사 PC에는 Godot를 설치하지 않는다. 테스트는 GitHub Actions나 집 노트북에서 돌린다
 - 참조 그림은 드라이브 `오늘의바다_백업/ref`를 `docs/ref/`에 받는다 (git에 없음)
 - Godot 4.4.1 Standard 위치는 사용자에게 한 번 물어본다
 
@@ -34,10 +34,10 @@
 
 ## 확정된 결정 (이전부터)
 - 제목 〈오늘의 바다〉, 주인공 1994년 2월생, 7년 차 퇴사
-- 엔진 Godot 4. GitHub 쓰지 않는다 (remote, push, Actions 금지). 로컬 커밋만
+- 엔진 Godot 4. 코드는 GitHub `crong94/oneului-bada`(공개)에 push한다. Actions는 테스트와 손으로 돌리는 웹 빌드만
 - 화풍: 깔끔한 2D 셀 채색 코지 게임 스타일. 물고기는 세밀화풍
 - 그림은 절대 직접 만들지 않는다. 코드 장식 그림도 만들지 않는다. 판정 표시만 선으로
-- 백업: `./tools/backup.sh`(Git Bash)로 bundle과 zip을 만들어 드라이브 `오늘의바다_백업`에 올린다
+- 백업: GitHub가 기본. 큰 파일(참조 그림, APK)만 드라이브 `오늘의바다_백업`에 둔다
 
 ## 사용자 선호
 - 그림은 Claude가 크롬으로 ChatGPT 프로젝트(https://chatgpt.com/g/g-p-6af07332652c8191b12367fde94e54ec/project)에 직접 요청해서 받고, 결과를 보여 주고 검토받은 뒤 드라이브 ref에 올린다. 여러 시안을 받아 비교하게 하는 걸 좋아한다
@@ -55,5 +55,5 @@
    - APK 분석: 사용자가 직접 만든 이전 게임 `hanjeopsi-269.apk`(드라이브 `오늘의바다_백업/bundle`). 레포 바깥에 풀어서 무엇을 가져올지 정한다
    - 그림: `rod_starter_float.png`, `rod_carbon_rock.png`, 릴 3종, `bg_fishing_morning.jpg`, 망상어와 노래미 세밀화, 식당 내부와 외관, 항구 (`docs/그림_요청_목록.md`)
    - 코드: 〈첫 번째 손님〉 식당 장면, 아무 시간대 방파제 낚시 (지도와 연결), 준호네 낚시방 장비 구매, 버스(요금과 배차 시간 안내)
-마지막: 테스트 통과, 실행 확인, 로컬 커밋, `./tools/backup.sh`로 백업 만들어 드라이브에 올리기
+마지막: 테스트 통과(Actions 초록불), 실행 확인, 커밋하고 `git push`
 ```
