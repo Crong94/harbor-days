@@ -31,7 +31,7 @@ const HINTS := {
 	FishingLogic.State.READY: "꾹 눌러 힘을 모으고, 오른쪽 게이지가 포인트에 오면 손을 떼요",
 	FishingLogic.State.CHARGING: "반짝이는 포인트에 맞춰 손을 떼요",
 	FishingLogic.State.CASTING: "",
-	FishingLogic.State.WAITING: "찌를 지켜봐요. 톡톡 떨릴 땐 참고, 쭉 잠길 때 채요",
+	FishingLogic.State.WAITING: "찌를 지켜봐요. 톡톡 떨릴 땐 참고, 쭉 잠길 때 채요. 조용할 때 누르면 줄을 거둬요",
 	FishingLogic.State.BITE: "지금! 고리가 찌에 딱 맞을 때 눌러요",
 	FishingLogic.State.REELING: "누르고 있으면 감겨요. 물고기가 옆으로 가면 누른 채 반대로 끌어요",
 }
@@ -155,6 +155,7 @@ var _shake := 0.0
 var _hitstop := 0.0
 var _was_exhausted := false
 var _last_run := 0
+var _last_jumps := 0
 var _tutor_fight_shown := false
 var _bite_dip := 0.0 # 입질 순간 찌가 쏙 들어갔다 올라오는 연출 (1에서 0으로)
 var _ripples: Array = [] # 찌 둘레 물결 {t, p(바다 좌표), r}
@@ -455,11 +456,26 @@ func _watch_fight_events(delta: float) -> void:
 		_last_run = 0
 		_last_tension_level = 0
 		return
+	# 어종 버릇: 바늘털이 (학공치), 첫 파고들기 (우럭)
+	if logic.jumps != _last_jumps:
+		_last_jumps = logic.jumps
+		if logic.jumps > 0:
+			Sound.play_sfx("pop", 0.1)
+			Haptics.play("surge")
+			_kick(0.3)
+			for i in 6:
+				_splashes.append({"t": 0.0, "off": Vector2(randf_range(-30, 30), randf_range(-14, 4))})
+			_pop_text("바늘털이! 계속 감아요", UiKit.SUN, _to_screen(_fish_point()) + Vector2(0, -90), 34, true)
 	if logic.run_dir != 0 and _last_run == 0:
 		Sound.play_sfx("surge", 0.1, -4.0)
 		Haptics.play("surge")
 		_kick(0.35)
 		_haptic_pull = 0.25
+		if logic.run_count == 1 and logic.habit() == "dive":
+			_kick(0.6)
+			_pop_text("바위로 파고들어요!", UiKit.CORAL, _to_screen(_fish_point()) + Vector2(0, -90), 34, true)
+		elif logic.run_count == 1 and logic.habit() == "long":
+			_pop_text("길게 차고 나가요!", UiKit.CORAL, _to_screen(_fish_point()) + Vector2(0, -90), 32, true)
 		if tutorial and not _tutor_fight_shown:
 			_tutor_fight_shown = true
 			_set_hint("물고기가 %s으로 가요! 누른 채로 %s으로 끌어요" % ["왼쪽" if logic.run_dir < 0 else "오른쪽", "오른쪽" if logic.run_dir < 0 else "왼쪽"], UiKit.CORAL_DEEP)
@@ -512,7 +528,7 @@ func _on_state_changed() -> void:
 		_hint.text = ""
 		return
 	if s == FishingLogic.State.FAILED:
-		_set_hint(FishingLogic.fail_message(logic.fail_reason), UiKit.CORAL_DEEP)
+		_set_hint(FishingLogic.fail_message(logic.fail_reason), UiKit.INK if logic.fail_reason == "retrieved" else UiKit.CORAL_DEEP)
 	elif tutorial:
 		_set_hint(HINTS.get(s, ""), UiKit.CORAL_DEEP if s == FishingLogic.State.BITE else UiKit.INK)
 	else:
@@ -550,6 +566,8 @@ func _on_state_changed() -> void:
 				_kick(0.8)
 				Haptics.play("broke")
 				_flash_screen(UiKit.DANGER, 0.22)
+			elif logic.fail_reason == "retrieved":
+				Haptics.play("tap") # 줄을 거둔 건 실패가 아니라 가볍게
 			elif logic.fail_reason != "":
 				Haptics.play("lost")
 			var short := FishingLogic.fail_short(logic.fail_reason)
@@ -633,8 +651,10 @@ func _play_state_sound(s: int) -> void:
 			match logic.fail_reason:
 				"broke":
 					Sound.play_sfx("snap")
-				"slack", "escaped":
+				"slack", "escaped", "jumped":
 					Sound.play_sfx("slip")
+				"retrieved":
+					Sound.play_sfx("reel", 0.05, -4.0)
 				_:
 					Sound.play_sfx("bad", 0.0, -6.0)
 
@@ -900,7 +920,15 @@ func _update_prompt() -> void:
 				t = "지금 떼요!" if _in_nice_zone else "포인트에서 손 떼기"
 				hot = _in_nice_zone
 			FishingLogic.State.WAITING:
-				t = "톡톡은 참아요" if logic.nibble > 0.0 else "찌가 쭉 잠기면 탭!"
+				if logic.nibble > 0.0:
+					t = "톡톡은 참아요"
+				elif logic.over_mend:
+					t = "너무 당겨요! 견제를 잠깐 떼요"
+					hot = true
+				elif logic.slipped() and not logic.mending:
+					t = "찌가 흘러가요. 견제!"
+				else:
+					t = "찌가 쭉 잠기면 탭!"
 			FishingLogic.State.BITE:
 				t = "지금 탭!"
 				hot = true
@@ -1452,6 +1480,8 @@ func _draw_layer() -> void:
 	# 캐스팅 포인트: 물고기가 모인 자리의 물결
 	if s in [FishingLogic.State.READY, FishingLogic.State.CHARGING] and not _in_story:
 		_draw_point()
+	elif s == FishingLogic.State.WAITING and logic.landed_grade != "":
+		_draw_point(0.35, false) # 기다리는 동안은 옅게: 찌가 포인트에서 흘러가는 게 보이게
 	# 찌 둘레 물결 (착수, 톡톡, 입질)
 	var rsc := _depth_scale(logic.cast_power)
 	for rp in _ripples:
@@ -1473,12 +1503,14 @@ func _draw_layer() -> void:
 			_draw_ellipse_arc(fp + sp.off * ssc * 0.5, (6.0 + sp.t * 26.0) * ssc, Color(1, 1, 1, a * 0.6), 2.0)
 
 
-func _draw_point() -> void:
+func _draw_point(alpha := 1.0, show_label := true) -> void:
 	var p := _water_point(logic.point_depth)
 	var sc := _depth_scale(logic.point_depth)
 	for i in 3:
 		var k := fmod(_t * 0.6 + i / 3.0, 1.0)
-		_draw_ellipse_arc(p, (14.0 + k * 46.0) * sc, Color(1, 1, 0.85, (1.0 - k) * 0.85), 3.0)
+		_draw_ellipse_arc(p, (14.0 + k * 46.0) * sc, Color(1, 1, 0.85, (1.0 - k) * 0.85 * alpha), 3.0)
+	if not show_label:
+		return
 	# 반짝임
 	var tw := 0.5 + 0.5 * sin(_t * 6.0)
 	var r := (6.0 + tw * 5.0) * sc
@@ -1729,6 +1761,37 @@ func _draw_cast_gauge() -> void:
 	var font := UiKit.font("cute")
 	_hud_draw.draw_string_outline(font, Vector2(r.position.x - 6, r.position.y - 14), "거리", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, 8, UiKit.OUTLINE)
 	_hud_draw.draw_string(font, Vector2(r.position.x - 6, r.position.y - 14), "거리", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, UiKit.FOAM)
+	# 거리별로 지금 잘 나오는 고기 (발밑, 중간, 먼 물). 시각, 날씨, 미끼에 따라 바뀐다
+	var ctx := {"brightness": logic.brightness, "bait": logic.bait, "weather": logic.weather}
+	for z in ZONES:
+		var d: float = z[0]
+		if d > logic.cast_mult + 0.02:
+			continue
+		var zy: float = y_of.call(d)
+		var id := FishDB.top_at(ctx, d)
+		var tex := _zone_fish_tex(id)
+		var lx := r.position.x - 16.0
+		_hud_draw.draw_string_outline(font, Vector2(lx - 96.0, zy - 6.0), z[1], HORIZONTAL_ALIGNMENT_RIGHT, 96, 16, 6, UiKit.OUTLINE)
+		_hud_draw.draw_string(font, Vector2(lx - 96.0, zy - 6.0), z[1], HORIZONTAL_ALIGNMENT_RIGHT, 96, 16, UiKit.FOAM_SOFT)
+		if tex:
+			var ts := tex.get_size()
+			var fw := 40.0 * ts.x / ts.y
+			_hud_draw.draw_texture_rect(tex, Rect2(lx - fw, zy - 2.0, fw, 40.0), false)
+		else:
+			var n: String = FishDB.get_fish(id).get("name", "")
+			_hud_draw.draw_string(font, Vector2(lx - 96.0, zy + 18.0), n, HORIZONTAL_ALIGNMENT_RIGHT, 96, 16, UiKit.FOAM)
+
+
+## 거리 게이지 옆 표시 자리: [거리, 이름]
+const ZONES := [[0.15, "발밑"], [0.5, "중간"], [0.85, "먼 물"]]
+var _zone_tex := {}
+
+
+func _zone_fish_tex(id: String) -> Texture2D:
+	if not _zone_tex.has(id):
+		var art := "fish_" + id
+		_zone_tex[id] = load(ArtSlot.art_path(art)) if ArtSlot.has_art(art) else null
+	return _zone_tex[id]
 
 
 ## 줄다리기 게이지: 아래 판 안에 남은 거리 길과 크게 줄 장력, 물고기 높이 화면 가장자리에 끌 방향

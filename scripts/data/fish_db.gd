@@ -9,6 +9,7 @@ extends RefCounted
 ## zone: 던진 거리별 출현 배율 [발밑, 중간, 먼 물] (바다 한 접시 species.json zone)
 ## weather: 날씨별 배율 (SeaDay.WEATHER id)
 ## catalog: Catalog(바다 한 접시 데이터) 어종 id, grill: 생선구이 레시피 id
+## habit: 줄다리기 버릇 (FishingLogic). dive 처음에 바위로 세게 파고듦, shake 짧고 잦게 처박음, long 길게 차고 나감, jump 바늘털이
 
 const RARITY := {
 	"common": {"name": "일반", "color": Color("7fb59a"), "price": 1.0},
@@ -38,7 +39,7 @@ const FISH := {
 		"min_cm": 15.0, "max_cm": 32.0, "strength": 0.55, "price": 5000,
 		"weight": 3.0, "night": 0.1, "zone": [1.4, 1.0, 0.6],
 		"weather": {"windy": 1.2},
-		"catalog": "noraemi", "grill": "noraemi-gui",
+		"habit": "shake", "catalog": "noraemi", "grill": "noraemi-gui",
 		"desc": "바위틈에 숨어 사는 얼룩무늬 물고기. 작아도 끌어올릴 때 힘이 좋다.",
 	},
 	"ssombaengi": {
@@ -54,7 +55,7 @@ const FISH := {
 		"min_cm": 18.0, "max_cm": 45.0, "strength": 0.7, "price": 9000,
 		"weight": 1.3, "night": 0.6, "zone": [1.0, 1.2, 0.8],
 		"weather": {"cloudy": 1.3, "rain": 1.4},
-		"catalog": "ureok", "grill": "ureok-gui",
+		"habit": "dive", "catalog": "ureok", "grill": "ureok-gui",
 		"desc": "바위틈의 듬직한 대장. 한번 물면 바위로 파고들어서 처음 힘싸움이 세다.",
 	},
 	"hakgongchi": {
@@ -62,7 +63,7 @@ const FISH := {
 		"min_cm": 25.0, "max_cm": 40.0, "strength": 0.3, "price": 7000,
 		"weight": 1.2, "night": -0.7, "zone": [0.2, 0.9, 1.8],
 		"weather": {"sunny": 1.4},
-		"catalog": "hakgongchi", "grill": "hakgongchi-gui",
+		"habit": "jump", "catalog": "hakgongchi", "grill": "hakgongchi-gui",
 		"desc": "바늘처럼 뾰족한 아래턱을 가진 은빛 물고기. 맑은 낮에 먼 물 수면에서 떼 지어 다닌다.",
 	},
 	"gamseongdom": {
@@ -70,7 +71,7 @@ const FISH := {
 		"min_cm": 25.0, "max_cm": 52.0, "strength": 0.95, "price": 28000,
 		"weight": 0.22, "night": 0.3, "zone": [0.2, 0.8, 1.8],
 		"weather": {"cloudy": 1.4, "windy": 1.5},
-		"catalog": "gamseongdom", "grill": "gamseongdom-gui",
+		"habit": "long", "catalog": "gamseongdom", "grill": "gamseongdom-gui",
 		"desc": "방파제 꾼들의 꿈. 먼 물에서 드물게 모습을 보인다. 힘이 엄청나서 장비가 약하면 버티기 어렵다.",
 	},
 }
@@ -124,6 +125,30 @@ static func pick_ctx(rng: RandomNumberGenerator, ctx: Dictionary) -> String:
 		if r <= 0.0:
 			return id
 	return "bolak"
+
+
+## 이 거리(0 발밑 ~ 1 먼 물)에서 지금 가장 잘 나오는 어종 (거리 게이지 옆 표시)
+static func top_at(ctx: Dictionary, depth: float) -> String:
+	var c := ctx.duplicate()
+	c["depth"] = depth
+	var best := ""
+	var best_w := -1.0
+	for id in FISH:
+		var w := weight_of(id, c)
+		if w > best_w:
+			best_w = w
+			best = id
+	return best
+
+
+## 버릇 한 줄 설명 (도감, 잡은 카드)
+static func habit_text(id: String) -> String:
+	return {
+		"dive": "물자마자 바위로 세게 파고들어요. 첫 번째 차고 나갈 때를 버텨요",
+		"shake": "짧게 자주 처박아요. 좌우를 부지런히 맞춰요",
+		"long": "한 번 차고 나가면 길게 가요. 장력을 식히며 버텨요",
+		"jump": "물 위로 뛰어올라 바늘을 털어요. 뛰는 동안 손을 떼지 마요",
+	}.get(get_fish(id).get("habit", ""), "")
 
 
 ## 예전 방식 (밝기만 본다)

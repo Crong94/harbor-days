@@ -33,6 +33,7 @@ func _init() -> void:
 	_test_market()
 	_test_brief()
 	_test_story()
+	_test_fishing_depth()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -231,8 +232,8 @@ func _test_fishing() -> void:
 	_eq(l.state, S.WAITING, "던진 뒤 기다리기")
 
 	l.press()
-	_eq(l.state, S.FAILED, "기다리는 중 누르면 실패")
-	_eq(l.fail_reason in ["early", "nibble"], true, "일찍 챈 이유")
+	_eq(l.state, S.FAILED, "기다리는 중 누르면 끝남")
+	_eq(l.fail_reason in ["retrieved", "nibble"], true, "조용할 땐 회수, 톡톡일 땐 헛챔질")
 	_run_until(l, [S.READY], never, 3.0)
 	_eq(l.state, S.READY, "실패 후 다시 준비")
 
@@ -1156,3 +1157,88 @@ func _test_story() -> void:
 		_eq(Locations.LIST.has(place), true, "잡담 장소 %s" % place)
 		_eq(Story.small_talk(place, 3).is_empty(), false, "%s 잡담" % place)
 	_eq(Story.small_talk("없는곳", 1), [], "잡담 없는 곳")
+
+
+## 견제의 이득과 손해, 회수, 거리별 어종, 어종 버릇
+func _test_fishing_depth() -> void:
+	var S := FishingLogic.State
+	# 흘러가면 포인트에서 벗어나 판정이 내려간다
+	var a := _new_logic(41)
+	a.forgiving = false
+	a.catch_count = 1
+	a.point_depth = 0.5
+	a.state = S.CHARGING
+	a.power = 0.5 / a.cast_mult
+	a.release()
+	_eq(a.cast_grade, "nice", "포인트에 떨어짐")
+	_run_until(a, [S.WAITING], func(_x): return false, 2.0)
+	a._timer = 999.0
+	for i in 60 * 8:
+		a.update(1.0 / 60.0, false, false)
+	_eq(a.cast_grade != "nice", true, "흘러가면 NICE가 사라짐 (%s)" % a.cast_grade)
+	_eq(a.slipped(), true, "벗어났다고 알림")
+	# 견제를 짧게 끊어 잡으면 그대로, 오래 잡으면 찌가 끌려온다
+	var b := _new_logic(42)
+	b.point_depth = 0.5
+	b.state = S.CHARGING
+	b.power = 0.5 / b.cast_mult
+	b.release()
+	_run_until(b, [S.WAITING], func(_x): return false, 2.0)
+	b._timer = 999.0
+	var p0 := b.cast_power
+	for i in 60:
+		b.update(1.0 / 60.0, false, true)
+	_eq(is_equal_approx(b.cast_power, p0), true, "1초 견제는 괜찮음")
+	_eq(b.over_mend, false, "아직 안 당김")
+	for i in 60 * 2:
+		b.update(1.0 / 60.0, false, true)
+	_eq(b.over_mend, true, "오래 잡으면 너무 당김")
+	_eq(b.cast_power < p0, true, "찌가 발밑 쪽으로 끌려옴")
+	# 조용할 때 누르면 회수: 연속 PERFECT를 깨지 않는다
+	var c := _new_logic(43)
+	c.perfect_streak = 2
+	_cast(c)
+	c.nibble = 0.0
+	c.press()
+	_eq(c.fail_reason, "retrieved", "회수")
+	_eq(c.perfect_streak, 2, "회수는 실패로 치지 않음")
+	_eq(FishingLogic.fail_message("retrieved").is_empty(), false, "회수 안내")
+	# 거리별 대표 어종
+	var night := {"brightness": 0.0, "bait": "krill", "weather": "sunny"}
+	var day := {"brightness": 1.0, "bait": "krill", "weather": "sunny"}
+	_eq(FishDB.top_at(night, 0.1), "bolak", "어두운 발밑은 볼락")
+	_eq(FishDB.top_at(day, 0.95) != "bolak", true, "밝은 먼 물은 볼락이 아님 (%s)" % FishDB.top_at(day, 0.95))
+	# 어종 버릇
+	for id in ["noraemi", "ureok", "hakgongchi", "gamseongdom"]:
+		_eq(FishDB.habit_text(id).is_empty(), false, "%s 버릇 설명" % id)
+	_eq(FishDB.habit_text("bolak"), "", "볼락은 버릇 없음")
+	# 우럭은 물자마자 파고든다
+	var u := _new_logic(44)
+	u.forgiving = false
+	u.force_first_fish = "ureok"
+	_cast(u)
+	_run_until(u, [S.BITE], func(_x): return false, 20.0)
+	u.press()
+	_eq(u.fish_id, "ureok", "우럭")
+	for i in 30:
+		u.update(1.0 / 60.0, true)
+	_eq(u.run_count >= 1, true, "우럭은 물자마자 차고 나감")
+	# 학공치는 바늘털이를 한다. 손을 떼고 있으면 빠진다
+	var jumped := 0
+	var lost_by_jump := 0
+	for sd in 12:
+		var h := _new_logic(60 + sd)
+		h.forgiving = false
+		h.force_first_fish = "hakgongchi"
+		_cast(h)
+		_run_until(h, [S.BITE], func(_x): return false, 20.0)
+		h.press()
+		var t := 0.0
+		while h.state == S.REELING and t < 20.0:
+			h.update(1.0 / 60.0, h.jump_t <= 0.0 and h.tension < 0.6)
+			t += 1.0 / 60.0
+		jumped += h.jumps
+		if h.fail_reason == "jumped":
+			lost_by_jump += 1
+	_eq(jumped > 0, true, "학공치 바늘털이 (%d번)" % jumped)
+	_eq(lost_by_jump > 0, true, "바늘털이 때 손을 떼면 놓침 (%d번)" % lost_by_jump)
