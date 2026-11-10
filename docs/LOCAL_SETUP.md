@@ -73,3 +73,33 @@ git log --oneline -3
 ## 7. APK (이전 게임 바다 한 접시)
 
 드라이브 `오늘의바다_백업/hanjeopsi-269.apk`를 브라우저로 내려받아 **레포 바깥** 폴더에 둔다. 예: `D:\games\hanjeopsi-269.apk`. 직접 만든 게임이라 안의 그림, 데이터, 코드를 가져와도 된다. 284MB라 git에는 절대 넣지 않는다.
+
+## 8. 집 노트북을 원격으로 쓰기 (Remote Control)
+
+회사 PC에는 Godot를 깔지 않는다. 대신 집 노트북에서 Claude를 돌리고, 회사 PC나 폰에서 그 세션에 붙어 지시한다. 실제 작업, Godot 실행, 테스트는 전부 집 노트북에서 일어난다.
+
+### 처음 한 번 (집 노트북에서)
+
+1. 1번 표대로 Git, Godot 4.4.1, Claude 데스크톱 앱을 설치한다
+2. 2번대로 GitHub에서 clone하고 개인 메일을 설정한다. 처음 push할 때 GitHub 로그인 창이 뜨면 Crong94로 로그인한다
+3. Claude 데스크톱 앱 → Code 탭에서 `oneului-bada` 폴더를 열고, Godot 콘솔 실행 파일 위치를 한 번 알려 준다
+4. Claude 설정 → Claude Code에서 **Connect new sessions to Remote Control**을 켠다. 이제 노트북에서 여는 세션은 다른 기기에서 이어 쓸 수 있다
+5. 같은 곳에서 **Keep computer awake while Claude works**도 켜 둔다 (작업 중에는 절전에 안 들어간다)
+6. Windows 설정 → 시스템 → 전원에서 "전원 연결 시 절전 모드" 시간을 "안 함"으로 바꾸고, "덮개를 닫을 때"도 "아무것도 안 함"으로 바꾼다. Claude 설정만으로는 덮개를 닫으면 잠든다
+
+### 매번 (집 노트북이 켜져 있을 때)
+
+1. 집 노트북: Claude 앱을 켜고 `oneului-bada` 폴더로 Code 세션을 하나 연다 (나가기 전에)
+2. 회사 PC나 폰: 브라우저에서 claude.ai/code에 들어가면 집 노트북 세션이 목록에 보인다. 그 세션을 열어 지시한다
+3. 끝날 때 Claude에게 "테스트 돌리고 커밋하고 push해 줘"라고 한다. 회사 PC에서는 `git pull`만 하면 같은 코드가 된다
+
+### 집 노트북이 꺼져 있을 때
+
+- claude.ai/code에서 **클라우드 세션**으로 GitHub `Crong94/oneului-bada`를 연다. Godot가 없으면 Claude에게 `tools/setup_godot.sh`를 실행하라고 한다
+- 클라우드 세션은 작업을 브랜치에 push한다. 집 노트북이나 회사 PC에서 `git pull`로 받는다 (main이 아닌 브랜치면 GitHub에서 PR로 합친다)
+- 게임 화면을 직접 보는 확인은 클라우드에서 안 된다. 테스트까지만 하고, 실행 확인은 집 노트북에서 한다
+
+### 주의
+
+- 같은 파일을 두 곳에서 동시에 고치지 않는다. 다른 곳에서 시작하기 전에 꼭 `git pull`
+- 회사 PC에서 Claude가 직접 코드를 고칠 때도 테스트는 push 후 GitHub Actions 결과로 확인한다
