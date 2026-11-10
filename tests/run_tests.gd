@@ -26,6 +26,7 @@ func _init() -> void:
 	_test_sound()
 	_test_day_flow()
 	_test_garden()
+	_test_coop()
 	_test_save()
 	_test_month()
 	_test_icebox()
@@ -1076,6 +1077,55 @@ func _test_brief() -> void:
 	gs.free()
 	_eq(FishLine.stage({"day": 5}, 5).name, "오늘 잡음", "오늘 잡은 생선")
 	_eq(FishLine.stage({"day": 4}, 5).name, "오늘 밤 상함", "어제 잡은 생선")
+
+
+func _test_coop() -> void:
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.day = 4
+	gs.money = 10000
+	_eq(Locations.is_unlocked("coop", gs.flags), false, "닭장은 처음엔 잠김")
+	_eq(Coop.current_quest(gs), 0, "첫 부탁")
+	_eq(Coop.give(gs), "아직 모자라요.", "생선이 없으면 못 드림")
+	gs.inventory.append({"id": "mangsang", "size": 20.0, "day": 4})
+	_eq(Coop.have_count(gs, Coop.QUESTS[0].need), 1, "아무 생선 한 마리")
+	_eq(Coop.give(gs), "", "첫 부탁 들어줌")
+	_eq(gs.inventory.size(), 0, "생선을 드림")
+	_eq(Coop.current_quest(gs), -1, "하루에 하나만")
+	gs.end_day()
+	_eq(Coop.current_quest(gs), 1, "다음 날 둘째 부탁")
+	gs.produce["daepa"] = 3
+	_eq(Coop.give(gs), "", "대파 드림")
+	_eq(int(gs.produce["daepa"]), 1, "대파 두 단 빠짐")
+	gs.end_day()
+	gs.inventory.append({"id": "bolak", "size": 18.0, "day": gs.day})
+	gs.inventory.append({"id": "noraemi", "size": 25.0, "day": gs.day})
+	_eq(Coop.give(gs), "아직 모자라요.", "볼락 한 마리로는 모자람")
+	gs.inventory.append({"id": "bolak", "size": 16.0, "day": gs.day})
+	_eq(Coop.give(gs), "", "볼락 두 마리 드림")
+	_eq(gs.inventory.size(), 1, "볼락만 빠지고 노래미는 남음")
+	_eq(Locations.is_unlocked("coop", gs.flags), true, "부탁 셋을 들어주면 닭장 열림")
+	_eq(gs.hens, 2, "병아리 두 마리")
+	_eq(Coop.current_quest(gs), -1, "부탁 끝")
+	_eq(Coop.collect(gs), 0, "처음엔 달걀 없음")
+	_eq(Coop.feed(gs), "", "모이 주기")
+	_eq(Coop.feed(gs), "오늘은 벌써 모이를 줬어요.", "하루 한 번")
+	gs.end_day()
+	_eq(gs.coop_eggs, 2, "모이 먹은 닭은 알을 하나씩")
+	gs.end_day()
+	_eq(gs.coop_eggs, 2, "모이를 안 준 날은 알이 없음")
+	_eq(Coop.collect(gs), 2, "달걀 두 개 줍기")
+	_eq(int(gs.produce["egg"]), 2, "주운 달걀은 모아 둠")
+	for i in 5:
+		Coop.feed(gs)
+		gs.end_day()
+	_eq(gs.coop_eggs, Coop.EGG_MAX, "안 주우면 여섯 개까지만")
+	gs.chicken_feed = 0
+	_eq(Coop.feed(gs), "모이가 다 떨어졌어요.", "모이 없음")
+	gs.money = 10000
+	_eq(Coop.buy_feed(gs), "", "모이 한 포대 사기")
+	_eq(gs.chicken_feed, Coop.FEED_PACK, "열 번 분")
+	gs.free()
+
 
 
 ## 봄 첫 주 이야기 사건과 잡담

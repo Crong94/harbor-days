@@ -24,11 +24,11 @@ const LIST := {
 	},
 	"coop": {
 		"name": "닭장", "pos": Vector2(0.658, 0.508), "unlock": "coop_open", "pin": "below",
-		"scene": "", "desc": "병아리를 얻으면 쓸 수 있는 작은 닭장",
+		"scene": "res://scenes/coop/coop.tscn", "desc": "순덕 할머니가 준 닭들이 사는 작은 닭장",
 	},
 	"grandma": {
 		"name": "순덕 할머니 집", "pos": Vector2(0.374, 0.564), "unlock": "met_sundeok",
-		"scene": "", "desc": "바로 옆집 기와집",
+		"scene": "res://scenes/village/sundeok_house.tscn", "desc": "바로 옆집 기와집. 할머니가 가끔 부탁을 한다",
 	},
 	"breakwater": {
 		"name": "북쪽 방파제", "pos": Vector2(0.605, 0.227), "unlock": "",

@@ -81,6 +81,14 @@ var garden: Array = CropDB.new_garden()
 ## 수확해 둔 채소. 작물 id → 개수
 var produce := {}
 
+## 닭장과 순덕 할머니 부탁 (Coop)
+var hens := 0
+var chicken_feed := 0 # 모이를 줄 수 있는 남은 횟수
+var hens_fed_today := false
+var coop_eggs := 0 # 닭장에 쌓여 아직 줍지 않은 달걀
+var sundeok_quest := 0 # 들어준 부탁 수
+var sundeok_quest_day := 0 # 마지막으로 부탁을 들어준 날
+
 ## 설정 (메뉴 설정 탭). 바꾸면 SETTINGS_PATH에 저장하고 다음에 켤 때 불러온다
 const SETTINGS_PATH := "user://settings.cfg"
 ## 진동 (Haptics가 본다)
@@ -321,6 +329,7 @@ func end_day(wake_minutes := -1) -> void:
 	if not spoiled.is_empty():
 		inventory = inventory.filter(func(e): return not spoiled.has(e))
 		_news("아이스박스에서 생선 %d마리가 상해서 버렸어요. 잡은 다음 날 저녁까지 팔아요" % spoiled.size())
+	Coop.next_day(self)
 	day += 1
 	# 매달 1일은 대출 상환일
 	var r := Loan.settle(day, money, debt, monthly_repayment, arrears)

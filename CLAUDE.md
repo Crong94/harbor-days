@@ -87,6 +87,8 @@ scenes/fishing    방파제 찌낚시. 첫날은 새벽 튜토리얼(첫 물고�
 scenes/restaurant 〈첫 번째 손님〉 식당 장면 (볼락구이, 최순덕)
 scenes/shop       준호네 낚시방 (장비 구매, 장착)
 scenes/garden     우리 텃밭. 이랑 네 줄에 심고 거두기 (CropDB)
+scenes/village    순덕 할머니 집 (부탁 세 가지, 다 들어주면 닭장 열림)
+scenes/coop       닭장 (모이 주기, 달걀 줍기, 모이 사기). 규칙은 scripts/data/coop.gd
 scenes/map        마을 지도. 장소 선택, 이동 시간, 해금 (scripts/data/locations.gd)
 scripts/fishing   FishingLogic (낚시 규칙, 헤드리스 테스트 가능)
 scripts/cooking   CookingLogic (간 맞추기, 굽기 규칙)
