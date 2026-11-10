@@ -13,3 +13,6 @@ Thumbs.db
 # 참조 그림 원본은 용량이 커서 저장소에 넣지 않는다. 구글 드라이브 오늘의바다_백업/ref 폴더에 따로 보관
 docs/ref/*
 !docs/ref/.gdignore
+
+# 임시 화면 찍기 장면
+_shot/

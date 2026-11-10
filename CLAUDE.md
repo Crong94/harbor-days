@@ -8,15 +8,23 @@
 - 글꼴: 주아(제목, 버튼, 숫자) + Pretendard 5굵기(본문) + 고운바탕 2굵기(사직서처럼 편지 느낌일 때만). 모두 `assets/fonts`, OFL
 - UI: `docs/UI_디자인_시스템.md` (둥글고 귀여운 코지: 굵은 외곽선 + 입체 턱, SD 그림 팔레트). 토큰과 컴포넌트는 `scripts/ui/ui_kit.gd`
 
-## GitHub 사용 금지 (중요)
-- 계정 문제 해결 전까지 **원격 저장소를 연결하거나 push하지 않는다.** `git remote add`, `git push`, GitHub Actions 설정 모두 금지.
-- Git은 로컬 커밋만 한다.
-- 작업이 끝나면 `tools/backup.sh`로 bundle과 zip을 만들고 사용자의 개인 구글 드라이브 `오늘의바다_백업` 폴더에 올린다.
+## 작업 환경 세 곳과 동기화 (중요, 2026-11-10 확정)
+어디서든 같은 레포(같은 이력)로 작업한다. 기준은 집 노트북에서 이어 온 세로 버전이다.
 
-## 다음 세션에서 이어 받는 법 (자세한 내용은 docs/HANDOFF.md)
-1. 구글 드라이브 `오늘의바다_백업` 폴더에서 가장 최근 `oneului-bada-*.bundle`을 받는다.
-2. `git clone oneului-bada-YYYYMMDD-HHMM.bundle oneului-bada`
-3. Godot가 없으면 `tools/setup_godot.sh` 실행.
+| 곳 | 하는 일 |
+|---|---|
+| 집 노트북 | Godot가 있다. 코드, 테스트, 화면 찍어 확인까지 전부 |
+| 회사 PC | Godot를 설치하지 않는다. 그림 뽑기와 문서 위주. 코드를 고쳤다면 테스트는 노트북에서 한다 |
+| GitHub `Crong94/harbor-days` (공개) | 가끔 올리는 백업. 사용자가 올리자고 할 때나 큰 단락이 끝났을 때만 push |
+| 구글 드라이브 `오늘의바다_백업` | **기기 사이를 잇는 주된 통로.** 세션이 끝날 때마다 bundle을 올린다 |
+
+- 세션 시작: 드라이브의 가장 최근 `oneului-bada-*.bundle`을 받아 `git pull <bundle 경로> main`. 레포가 없으면 `git clone <bundle> oneului-bada`
+- 세션 끝: 커밋 → `tools/backup.sh` → `build/backup/`의 새 bundle을 드라이브 `오늘의바다_백업`에 올린다 (80MB쯤이라 커넥터로는 못 올린다. 사용자가 직접 올리거나 Google Drive 데스크톱 폴더에 복사)
+- 두 기기에서 동시에 작업하지 않는다. 한쪽에서 bundle을 올린 뒤 다른 쪽에서 받는다
+- 커밋 작성자는 레포 로컬 설정 `Songok Kim <thddhr14@gmail.com>`만 쓴다
+- 공개 레포라서 비밀번호, 토큰, 개인 메일, 집 위치, PC 사용자 폴더 경로 같은 개인 정보는 파일과 커밋 메시지에 넣지 않는다
+- push할 때 로그인 창이 뜨면 사용자가 Crong94로 직접 로그인한다. GitHub Actions는 두지 않는다 (넣으려면 먼저 묻는다)
+- GitHub의 `old-landscape` 브랜치는 회사 PC에서 잠깐 갈라졌던 가로 1280x720 버전이다. 합치지 않는다. 거기서 가져온 것은 확장 지도 시안(`docs/ref/map_village_확장_v3.jpg`)뿐이다
 
 ## 명령
 로컬 Windows에서는 `godot` 대신 Godot 콘솔 실행 파일 경로를 쓴다 (`docs/LOCAL_SETUP.md`). 백업 스크립트는 Git Bash에서 실행.
@@ -27,7 +35,8 @@ godot --headless --path . --export-release "Web" build/web/index.html  # 웹 빌
 ```
 
 ## 그림 규칙 (중요)
-- **이미지는 절대 직접 만들지 않는다.** 코드로 그리는 장식 그림도 새로 만들지 않는다. 사용자가 ChatGPT로 뽑아서 준다 (사용자 평가: 코드로 그린 임시 배경은 촌스럽다)
+- **이미지는 절대 직접 만들지 않는다.** 코드로 그리는 장식 그림도 새로 만들지 않는다. 모든 그림은 ChatGPT로 받는다 (사용자 평가: 코드로 그린 임시 배경은 촌스럽다)
+- 그림을 뽑을 때는 **사용자에게 ChatGPT 대화 링크를 받아** 그 대화에서 Chrome으로 진행한다. 링크를 받기 전에 아무 대화나 열어 요청하지 않는다. 받은 결과는 보여 주고 검토받은 뒤 게임과 드라이브 ref에 넣는다
 - 배경 그림이 들어오면 SeaBackdrop의 코드 그림 대신 그림(art_base, art_blend)을 쓴다
 - 물고기 그림은 사용자가 준 시트(드라이브 ref/sheets)를 `tools/slice_sheet.py`로 잘라 쓴다. 볼락도 시트 조각으로 통일했다(세밀화는 이질적이라 접음). 어떤 조각이 어떤 어종인지는 `docs/물고기_그림_목록.md`
 - 그림, 일러스트, 캐릭터, 배경 이미지는 **직접 만들지 않는다.** 필요한 그림은 `docs/그림_요청_목록.md`에 적고 사용자에게 요청한다.
@@ -54,7 +63,7 @@ godot --headless --path . --export-release "Web" build/web/index.html  # 웹 빌
 
 ## 바다 한 접시 (이전 게임) 자료
 - 사용자가 직접 만든 이전 게임이라 그림, 소리, 데이터를 가져와 써도 된다. Godot 4 + C# 게임이었다
-- APK와 푼 파일은 레포 바깥 `C:\Users\<USER>\Desktop\오늘의바다_작업\`에 있다 (`hanjeopsi_풀린파일/`에 art, audio, data. `미리보기/`에 묶음 jpg). git에 넣지 않는다
+- APK와 푼 파일은 레포 바깥, 레포와 나란히 있는 `오늘의바다_작업\` 폴더에 있다 (`hanjeopsi_풀린파일/`에 art, audio, data. `미리보기/`에 묶음 jpg). git에 넣지 않는다
 - 프로젝트 폴더 안 `작업폴더/`, `Yeoul/`은 사용자가 둔 원본이다. `.git/info/exclude`와 `.gdignore`로 git과 Godot 모두에서 빠져 있다
 - 물고기 아이콘(아이콘풍)과 세로 모바일 배경은 화풍과 화면 비율이 달라 가져오지 않았다
 - 장면 실행 검사: `<Godot>_console.exe --headless --path . res://scenes/<장면>.tscn --quit-after 120` (테스트 스크립트 모드에서는 오토로드가 없어서 장면을 불러올 수 없다)

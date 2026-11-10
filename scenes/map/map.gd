@@ -1,6 +1,6 @@
 extends Control
 ## 물빛울포 마을 지도. 화면보다 큰 가로 지도를 손가락(마우스)으로 끌어 둘러보고, 장소 핀을 골라 이동한다.
-## 지도 그림: assets/art/map_village.png (가로 3:2, 위가 북쪽, 오른쪽이 동쪽 바다). 핀 위치는 scripts/data/locations.gd
+## 지도 그림: assets/art/map_village.png (가로 3:2 확장 지도). 핀 위치는 scripts/data/locations.gd
 ##
 ## 구성: 맨 위 공통 헤더(고정) / 끌어서 움직이는 지도와 핀 / 아래 종이 시트(장소 정보와 이동)
 ## 지도는 화면 높이의 MAP_SCREENS배 크기로 보여 준다. 처음에는 지금 있는 곳을 가운데에 둔다.
@@ -187,6 +187,8 @@ func _rebuild_pins() -> void:
 		_pins[id].queue_free()
 	_pins.clear()
 	for id in Locations.LIST:
+		if not Locations.is_visible(id, GameState.flags):
+			continue # 숨은 장소
 		var p := _make_pin(id)
 		_pins[id] = p
 		_world.add_child(p)
@@ -244,7 +246,9 @@ func _layout_pins() -> void:
 		var c: Control = _pins[id]
 		c.reset_size()
 		var at: Vector2 = Locations.get_loc(id).pos * _world.size
-		if c is Button:
+		if c is Button and Locations.get_loc(id).get("pin", "") == "below":
+			c.position = at - Vector2(c.size.x / 2.0, 0.0)
+		elif c is Button:
 			c.position = at - Vector2(c.size.x / 2.0, c.size.y)
 		else:
 			c.position = at - c.size / 2.0
