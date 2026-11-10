@@ -199,6 +199,21 @@ func _test_locations() -> void:
 	_eq(Locations.is_unlocked("shop", {}), true, "식당은 처음부터 열림")
 	_eq(Locations.is_unlocked("rocks", {}), false, "갯바위는 잠김")
 	_eq(Locations.is_unlocked("rocks", {"learned_tide": true}), true, "물때 배우면 갯바위 열림")
+	_eq(Locations.is_visible("rocks", {}), true, "잠긴 장소도 핀은 보임")
+	_eq(Locations.is_visible("hidden_rocks", {}), false, "숨은 갯바위는 찾기 전엔 안 보임")
+	_eq(Locations.is_visible("hidden_rocks", {"found_hidden_rocks": true}), true, "찾으면 숨은 갯바위가 보임")
+	_eq(Locations.travel_minutes("shop", "reef") > Locations.travel_minutes("shop", "rocks"), true, "바위섬도 배 시간 추가")
+	for id in Locations.LIST:
+		var pin: String = Locations.get_loc(id).get("pin", "")
+		_eq(pin == "" or pin == "below", true, "%s 핀 방향 값" % id)
+
+	# 3:2 지도를 1280x720에 꽉 채우기: 너비가 맞고 위는 조금, 아래는 더 많이 잘린다
+	var fit := ArtSlot.fit_rect(Vector2(1536, 1024), Vector2(1280, 720), true, Vector2(0.5, 0.15))
+	_eq(is_equal_approx(fit.size.x, 1280.0), true, "지도 너비가 화면에 꼭 맞음")
+	_eq(fit.position.y < 0.0 and fit.end.y > 720.0, true, "지도 위아래가 화면 밖으로 넘침")
+	_eq(-fit.position.y < fit.end.y - 720.0, true, "위보다 아래를 더 자름")
+	var inside := ArtSlot.fit_rect(Vector2(1536, 1024), Vector2(1280, 720))
+	_eq(inside.size.y <= 720.0 and inside.size.x <= 1280.0, true, "기본은 칸 안에 다 들어감")
 
 
 func _test_gear() -> void:

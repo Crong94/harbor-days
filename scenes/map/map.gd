@@ -1,6 +1,8 @@
 extends Control
 ## 물빛울포 마을 지도. 장소를 골라 이동하면 거리만큼 시간이 흐른다.
-## 지도 그림은 assets/art/map_village.png (사용자에게 받음). 없으면 그림 자리만 보인다.
+## 지도 그림은 assets/art/map_village.jpg (사용자에게 받음). 없으면 그림 자리만 보인다.
+
+const MAP_FOCUS := Vector2(0.5, 0.15)
 
 var _map: ArtSlot
 var _pins_root: Control
@@ -23,6 +25,9 @@ func _ready() -> void:
 	add_child(sea)
 
 	_map = ArtSlot.make("map_village", "마을 지도 일러스트", Vector2.ZERO)
+	# 3:2 지도를 16:9 화면에 꽉 채운다. 위아래가 조금 잘리는데 아래쪽 빈 바다를 더 잘라 뒷산 전망대를 살린다
+	_map.cover = true
+	_map.cover_focus = MAP_FOCUS
 	_map.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_map)
 
@@ -30,10 +35,7 @@ func _ready() -> void:
 	_pins_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_pins_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_pins_root)
-	for id in Locations.LIST:
-		var b := _make_pin(id)
-		_pins[id] = b
-		_pins_root.add_child(b)
+	_make_pins()
 
 	_build_hud()
 	_build_panel()
@@ -66,21 +68,39 @@ func _make_pin(id: String) -> Button:
 	return b
 
 
+## 지도에 보일 장소만 핀을 만든다 (숨은 장소는 찾기 전까지 없음)
+func _make_pins() -> void:
+	for id in Locations.LIST:
+		if not Locations.is_visible(id, GameState.flags):
+			continue
+		var b := _make_pin(id)
+		_pins[id] = b
+		_pins_root.add_child(b)
+
+
 ## 장소 핀을 지도 그림 위 비율 위치에 놓는다. 핀의 가운데 아래가 그 위치를 가리킨다.
+## "pin": "below"인 곳은 핀의 가운데 위가 그 위치에 붙는다.
 func _layout_pins() -> void:
 	var r := _map.content_rect()
 	for id in _pins:
 		var b: Button = _pins[id]
 		b.reset_size()
-		var p: Vector2 = Locations.get_loc(id).pos
+		var loc := Locations.get_loc(id)
+		var p: Vector2 = loc.pos
 		var at := r.position + p * r.size
-		b.position = at - Vector2(b.size.x / 2.0, b.size.y)
+		var below: bool = loc.get("pin", "") == "below"
+		b.position = at - Vector2(b.size.x / 2.0, 0.0 if below else b.size.y)
 
 
 func _build_hud() -> void:
 	var bar := PanelContainer.new()
 	bar.add_theme_stylebox_override("panel", UiKit.box(Color(UiKit.NAVY_DEEP, 0.85), 14, Color.TRANSPARENT, 0, 14))
-	bar.position = Vector2(24, 20)
+	# 왼쪽 위에는 뒷산 전망대가 있어서 오른쪽 위(하늘과 먼바다)에 둔다
+	bar.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	bar.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	bar.offset_left = -24
+	bar.offset_right = -24
+	bar.offset_top = 20
 	add_child(bar)
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 28)
@@ -171,10 +191,7 @@ func _travel() -> void:
 	for pid in _pins:
 		_pins[pid].queue_free()
 	_pins.clear()
-	for pid in Locations.LIST:
-		var b := _make_pin(pid)
-		_pins[pid] = b
-		_pins_root.add_child(b)
+	_make_pins()
 	_layout_pins.call_deferred()
 	_show_toast(GameState.line("%s에 왔다. 장소 화면은 준비 중이에요." % loc.name))
 

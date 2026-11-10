@@ -8,6 +8,10 @@ const ART_DIR := "res://assets/art/"
 var art_id := ""
 var label_text := ""
 var flip_h := false
+## true면 칸을 빈틈없이 채우고 넘치는 부분은 잘라 낸다 (지도처럼 화면을 꽉 채울 그림)
+var cover := false
+## cover일 때 어느 쪽을 남길지. (0.5, 0.5)는 가운데, y가 0이면 위쪽을 남긴다
+var cover_focus := Vector2(0.5, 0.5)
 var _tex: Texture2D
 
 
@@ -31,6 +35,7 @@ static func art_path(id: String) -> String:
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clip_contents = cover
 	if has_art(art_id):
 		_tex = load(art_path(art_id))
 	queue_redraw()
@@ -44,13 +49,18 @@ func set_art(id: String, label: String) -> void:
 
 
 ## 그림이 실제로 그려지는 영역 (비율 유지로 생기는 여백 제외). 그림이 없으면 칸 전체.
+## cover면 칸보다 클 수 있다 (잘려 나간 부분까지 포함한 그림 전체 영역).
 func content_rect() -> Rect2:
 	if not _tex:
 		return Rect2(Vector2.ZERO, size)
-	var ts := _tex.get_size()
-	var k := minf(size.x / ts.x, size.y / ts.y)
+	return fit_rect(_tex.get_size(), size, cover, cover_focus)
+
+
+## 그림 크기 ts를 칸 크기 box에 맞춘 영역. fill이면 꽉 채우고, 아니면 칸 안에 다 들어가게.
+static func fit_rect(ts: Vector2, box: Vector2, fill := false, focus := Vector2(0.5, 0.5)) -> Rect2:
+	var k := maxf(box.x / ts.x, box.y / ts.y) if fill else minf(box.x / ts.x, box.y / ts.y)
 	var ds := ts * k
-	return Rect2((size - ds) / 2.0, ds)
+	return Rect2((box - ds) * focus, ds)
 
 
 func _draw() -> void:
