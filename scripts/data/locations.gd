@@ -23,8 +23,8 @@ const LIST := {
 		"scene": "", "desc": "집 근처 작은 텃밭",
 	},
 	"coop": {
-		"name": "닭장", "pos": Vector2(0.658, 0.508), "unlock": "", "pin": "below",
-		"scene": "", "desc": "아직 비어 있는 작은 닭장",
+		"name": "닭장", "pos": Vector2(0.658, 0.508), "unlock": "coop_open", "pin": "below",
+		"scene": "", "desc": "병아리를 얻으면 쓸 수 있는 작은 닭장",
 	},
 	"grandma": {
 		"name": "순덕 할머니 집", "pos": Vector2(0.374, 0.564), "unlock": "met_sundeok",

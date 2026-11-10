@@ -89,7 +89,7 @@ scenes/shop       준호네 낚시방 (장비 구매, 장착)
 scenes/map        마을 지도. 장소 선택, 이동 시간, 해금 (scripts/data/locations.gd)
 scripts/fishing   FishingLogic (낚시 규칙, 헤드리스 테스트 가능)
 scripts/cooking   CookingLogic (간 맞추기, 굽기 규칙)
-scripts/data      FishDB (어종 7종, 희귀도), GearDB (낚싯대·릴 10단계), BaitDB (미끼), SeaDay (물때·날씨), Orders (식당 주문), Locations (장소), Catalog (바다 한 접시 어종 71종, 레시피 50개)
+scripts/data      FishDB (어종 7종, 희귀도), GearDB (낚싯대·릴 10단계), BaitDB (미끼), SeaDay (물때·날씨), Orders (식당 주문), Locations (장소), CropDB (텃밭 네 칸과 작물 6종, docs/텃밭_설계.md), Catalog (바다 한 접시 어종 71종, 레시피 50개)
 assets/art        사용자에게 받은 그림 (docs/그림_요청_목록.md). dish, cook_tool, kitchen, ingredient, gear_icon은 바다 한 접시에서 가져옴
 assets/art/sd     주인공 SD 동작 프레임 (back_01~12 낚시 뒷모습, front_01~12 앞모습)
 assets/audio      배경음악 bgm, 효과음 sfx (바다 한 접시에서 가져옴)

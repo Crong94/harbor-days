@@ -59,6 +59,11 @@ var opened_today := false
 var night_fished := false
 var reputation := 0
 
+## 우리 텃밭 (CropDB). 칸 네 개, 칸마다 {} 또는 {"crop": id, "day": 심은 날}
+var garden: Array = CropDB.new_garden()
+## 수확해 둔 채소. 작물 id → 개수
+var produce := {}
+
 ## 설정 (메뉴 설정 탭). 바꾸면 SETTINGS_PATH에 저장하고 다음에 켤 때 불러온다
 const SETTINGS_PATH := "user://settings.cfg"
 ## 진동 (Haptics가 본다)
@@ -132,6 +137,29 @@ func buy_gear(kind: String, id: String) -> String:
 	spend(price)
 	owned.append(id)
 	return ""
+
+
+## 텃밭 이랑(index 0~3)에 씨앗을 사서 심는다. 문제가 없으면 빈 문자열, 있으면 안내 문구를 돌려준다.
+func plant_crop(index: int, crop_id: String) -> String:
+	var err := CropDB.plant_error(garden, index, crop_id, money)
+	if not err.is_empty():
+		return err
+	spend(int(CropDB.crop(crop_id).price))
+	garden[index] = {"crop": crop_id, "day": day}
+	return ""
+
+
+## 다 자란 이랑을 거둔다. 거둔 작물 id를 돌려준다. 아직이면 빈 문자열
+func harvest_crop(index: int) -> String:
+	if index < 0 or index >= garden.size():
+		return ""
+	var slot: Dictionary = garden[index]
+	if CropDB.stage(slot, day) != CropDB.READY:
+		return ""
+	var id: String = slot.crop
+	produce[id] = int(produce.get(id, 0)) + int(CropDB.crop(id).amount)
+	garden[index] = {}
+	return id
 
 
 ## 미끼를 산다. 문제가 없으면 빈 문자열, 있으면 안내 문구를 돌려준다.

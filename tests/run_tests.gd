@@ -25,6 +25,7 @@ func _init() -> void:
 	_test_economy()
 	_test_sound()
 	_test_day_flow()
+	_test_garden()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -772,3 +773,43 @@ func _test_day_flow() -> void:
 	_eq(DayFlow.next_hint(5 * 60, false).contains("새벽 낚시"), true, "새벽 안내")
 	_eq(DayFlow.next_hint(13 * 60, false).contains("저녁 6시"), true, "낮 안내: 가게 여는 시각")
 	_eq(DayFlow.next_hint(21 * 60 + 30, true).contains("늦잠"), true, "밤 낚시 안내")
+
+
+func _test_garden() -> void:
+	_eq(CropDB.SLOTS, 4, "텃밭은 네 칸")
+	for id in CropDB.CROPS:
+		var c := CropDB.crop(id)
+		_eq(c.price > 0 and c.days > 0 and c.amount > 0, true, "%s 값, 날, 양" % id)
+	var g := CropDB.new_garden()
+	_eq(g.size(), 4, "빈 칸 네 개")
+	_eq(CropDB.stage(g[0], 1), CropDB.EMPTY, "처음엔 빈 칸")
+	_eq(CropDB.plant_error(g, 4, "mu", 10000), "없는 이랑이에요.", "다섯째 이랑은 없음")
+	_eq(CropDB.plant_error(g, 0, "sugar", 10000), "없는 씨앗이에요.", "없는 씨앗")
+	_eq(CropDB.plant_error(g, 0, "mu", 100), "돈이 모자라요.", "씨앗 값 모자람")
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.money = 20000
+	gs.day = 3
+	_eq(gs.plant_crop(0, "daepa"), "", "대파 심기")
+	_eq(gs.plant_crop(1, "mu"), "", "무 심기")
+	_eq(gs.plant_crop(2, "baechu"), "", "배추 심기")
+	_eq(gs.plant_crop(3, "gochu"), "", "고추 심기")
+	_eq(CropDB.kinds(gs.garden).size(), 4, "한 번에 네 종류")
+	_eq(gs.money, 20000 - 1000 - 2000 - 3000 - 2000, "씨앗 값이 나감")
+	_eq(gs.plant_crop(0, "mu"), "이미 심은 이랑이에요.", "심은 이랑에는 못 심음")
+	_eq(CropDB.stage(gs.garden[0], gs.day), CropDB.GROWING, "심은 날은 자라는 중")
+	_eq(gs.harvest_crop(0), "", "덜 자라면 못 거둠")
+	gs.end_day()
+	gs.end_day()
+	_eq(CropDB.stage(gs.garden[0], gs.day), CropDB.READY, "대파는 이틀이면 다 자람")
+	_eq(CropDB.stage(gs.garden[1], gs.day), CropDB.GROWING, "무는 사흘 걸림")
+	_eq(CropDB.days_left(gs.garden[1], gs.day), 1, "무는 하루 남음")
+	_eq(CropDB.growth(gs.garden[2], gs.day), 0.5, "배추는 절반 자람")
+	_eq(gs.harvest_crop(0), "daepa", "대파 수확")
+	_eq(int(gs.produce.get("daepa", 0)), 4, "대파 네 단")
+	_eq(CropDB.stage(gs.garden[0], gs.day), CropDB.EMPTY, "거두면 빈 칸")
+	_eq(gs.plant_crop(0, "kkaennip"), "", "빈 칸에 다시 심기")
+	gs.free()
+	_eq(Locations.is_unlocked("garden", {}), true, "텃밭은 처음부터 열림")
+	_eq(Locations.is_unlocked("coop", {}), false, "닭장은 처음엔 잠김")
+	_eq(Locations.is_unlocked("coop", {"coop_open": true}), true, "이야기가 진행되면 닭장 열림")
+

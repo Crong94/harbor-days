@@ -21,7 +21,7 @@
 - 2026-11-10에 커밋 작성자를 `Songok Kim`으로 다시 써서 해시가 바뀌었다. 그 전 bundle이나 그 전 폴더와 합치지 않는다. 회사 PC의 예전 폴더(가로 버전)는 그대로 두고 새 bundle로 다시 clone한다
 - GitHub의 `old-landscape` 브랜치는 회사 PC에서 갈라졌던 가로 버전이다. 합치지 않는다
 - 먼저 읽을 것: `CLAUDE.md`(작업 규칙), `docs/LOCAL_SETUP.md`, `docs/UI_디자인_시스템.md`, `docs/그림_요청_목록.md`, 기획서 `docs/오늘의바다_시나리오_v3.md`
-- 테스트: `<Godot>_console.exe --headless --path . --script res://tests/run_tests.gd` → `504 통과, 0 실패`
+- 테스트: `<Godot>_console.exe --headless --path . --script res://tests/run_tests.gd` → `536 통과, 0 실패`
 - 화면 찍기: 임시 `res://_shot/shot.tscn`(GameState를 정하고 장면을 instantiate)을 만들어 `<Godot>.exe --path . res://_shot/shot.tscn --write-movie <폴더>/x.png --fixed-fps 30 --quit-after 50 --resolution 720x1280 -- <인자>`. `_shot/`은 .gitignore에 있다. 노트북 화면이 낮아 프레임이 720x1061로 찍힌다
 
 ## 이번(11-10 밤)에 한 것
@@ -42,7 +42,7 @@
 - 새 지도에서는 항구가 위쪽으로 열려 있다. 낚시 배경은 "북쪽 방파제 끝에서 동쪽 바다를 본다"로 그렸다. 지도의 방위를 어떻게 읽을지(위가 동쪽인지) 사용자와 정해야 한다
 
 ## 다음에 할 일 (사용자와 순서를 정해서)
-1. 텃밭 시험: 지도에서 텃밭 부분만 잘라 ChatGPT에 작물 하나를 심은 모습으로 고치게 하고 원래 자리에 덮어 어색하지 않은지 본다. 괜찮으면 빈 밭, 자라는 중, 수확 가능 세 상태로. ChatGPT 링크를 먼저 받는다
+1. 텃밭: 시험은 성공했다 (잘라서 고치고 덮기, `docs/ref/텃밭시험`). 규칙은 만들었다 (`docs/텃밭_설계.md`: 이랑 네 줄이 네 칸, 작물 6종, 닭장은 `coop_open`으로 잠금). 남은 것은 텃밭 화면, 작물 그림 12장, 식당 곁들임 연결, 닭장 여는 장면. 그림은 ChatGPT 링크를 먼저 받는다
 2. 버스: 요금과 배차 시간 안내, 옆마을
 3. 그림: `docs/그림_요청_목록.md`에서 ✅ 없는 것 (식당 내부와 외관, 항구 등)
 4. 새 장소(텃밭, 닭장, 전망대)에 할 일 붙이기
