@@ -22,13 +22,13 @@ cd /d/games
 ```
 
 ```bash
-git clone https://github.com/Crong94/oneului-bada.git
+git clone https://github.com/Crong94/harbor-days.git
 ```
 
 3. 이 저장소에서만 개인 메일로 커밋하도록 설정한다 (회사 PC는 전역 설정이 회사 메일이라 꼭 한다)
 
 ```bash
-cd oneului-bada && git config user.name "Songok Kim" && git config user.email "thddhr14@gmail.com"
+cd harbor-days && git config user.name "Songok Kim" && git config user.email "thddhr14@gmail.com"
 ```
 
 4. 확인
@@ -41,11 +41,11 @@ git log --oneline -3
 
 ## 3. 참조 그림 넣기 (git에 넣지 않는 원본)
 
-드라이브 `오늘의바다_백업/ref` 폴더를 통째로 내려받아 `oneului-bada/docs/ref/` 안에 풀어 둔다. `ref/sheets` 폴더도 `docs/ref/sheets/`로. 게임 실행에는 필요 없고, 그림 프롬프트에 첨부할 참조 그림과 물고기 시트 자르기에 쓴다.
+드라이브 `오늘의바다_백업/ref` 폴더를 통째로 내려받아 `harbor-days/docs/ref/` 안에 풀어 둔다. `ref/sheets` 폴더도 `docs/ref/sheets/`로. 게임 실행에는 필요 없고, 그림 프롬프트에 첨부할 참조 그림과 물고기 시트 자르기에 쓴다.
 
 ## 4. 실행과 테스트
 
-- 게임 실행: `Godot_v4.4.1-stable_win64.exe` 실행 → Import → `oneului-bada/project.godot` 선택 → 열리면 F5
+- 게임 실행: `Godot_v4.4.1-stable_win64.exe` 실행 → Import → `harbor-days/project.godot` 선택 → 열리면 F5
 - 처음 열면 리소스 가져오기가 자동으로 돈다
 - 테스트 (Git Bash, Godot 폴더 경로는 자기 PC에 맞게)
 
@@ -59,13 +59,13 @@ git log --oneline -3
 
 ## 5. Claude로 이어서 작업
 
-1. Claude 데스크톱 앱 → Code 탭 → 폴더 선택에서 `oneului-bada` 폴더를 연다
+1. Claude 데스크톱 앱 → Code 탭 → 폴더 선택에서 `harbor-days` 폴더를 연다
 2. `docs/HANDOFF.md`의 코드 블록을 복사해 첫 메시지로 붙여 넣는다
 
 ## 6. 매일 작업 흐름 (로컬과 GitHub)
 
 - 시작할 때 `git pull`, 끝나면 커밋하고 `git push`
-- 회사 PC에는 Godot를 깔지 않는다. 회사에서 고친 것은 push하면 GitHub Actions가 테스트를 돌린다. 결과는 github.com/Crong94/oneului-bada → Actions 탭
+- 회사 PC에는 Godot를 깔지 않는다. 회사에서 고친 것은 push하면 GitHub Actions가 테스트를 돌린다. 결과는 github.com/Crong94/harbor-days → Actions 탭
 - 웹 빌드가 필요하면 Actions 탭 → CI → Run workflow → "웹 빌드도 만들기" 체크. 결과 zip은 7일 보관
 - 저장소가 공개라서 개인 정보, 비밀번호, 토큰은 넣지 않는다
 - `./tools/backup.sh`(bundle, zip)는 GitHub가 안 될 때만 쓰는 예비 백업이다
@@ -82,20 +82,20 @@ git log --oneline -3
 
 1. 1번 표대로 Git, Godot 4.4.1, Claude 데스크톱 앱을 설치한다
 2. 2번대로 GitHub에서 clone하고 개인 메일을 설정한다. 처음 push할 때 GitHub 로그인 창이 뜨면 Crong94로 로그인한다
-3. Claude 데스크톱 앱 → Code 탭에서 `oneului-bada` 폴더를 열고, Godot 콘솔 실행 파일 위치를 한 번 알려 준다
+3. Claude 데스크톱 앱 → Code 탭에서 `harbor-days` 폴더를 열고, Godot 콘솔 실행 파일 위치를 한 번 알려 준다
 4. Claude 설정 → Claude Code에서 **Connect new sessions to Remote Control**을 켠다. 이제 노트북에서 여는 세션은 다른 기기에서 이어 쓸 수 있다
 5. 같은 곳에서 **Keep computer awake while Claude works**도 켜 둔다 (작업 중에는 절전에 안 들어간다)
 6. Windows 설정 → 시스템 → 전원에서 "전원 연결 시 절전 모드" 시간을 "안 함"으로 바꾸고, "덮개를 닫을 때"도 "아무것도 안 함"으로 바꾼다. Claude 설정만으로는 덮개를 닫으면 잠든다
 
 ### 매번 (집 노트북이 켜져 있을 때)
 
-1. 집 노트북: Claude 앱을 켜고 `oneului-bada` 폴더로 Code 세션을 하나 연다 (나가기 전에)
+1. 집 노트북: Claude 앱을 켜고 `harbor-days` 폴더로 Code 세션을 하나 연다 (나가기 전에)
 2. 회사 PC나 폰: 브라우저에서 claude.ai/code에 들어가면 집 노트북 세션이 목록에 보인다. 그 세션을 열어 지시한다
 3. 끝날 때 Claude에게 "테스트 돌리고 커밋하고 push해 줘"라고 한다. 회사 PC에서는 `git pull`만 하면 같은 코드가 된다
 
 ### 집 노트북이 꺼져 있을 때
 
-- claude.ai/code에서 **클라우드 세션**으로 GitHub `Crong94/oneului-bada`를 연다. Godot가 없으면 Claude에게 `tools/setup_godot.sh`를 실행하라고 한다
+- claude.ai/code에서 **클라우드 세션**으로 GitHub `Crong94/harbor-days`를 연다. Godot가 없으면 Claude에게 `tools/setup_godot.sh`를 실행하라고 한다
 - 클라우드 세션은 작업을 브랜치에 push한다. 집 노트북이나 회사 PC에서 `git pull`로 받는다 (main이 아닌 브랜치면 GitHub에서 PR로 합친다)
 - 게임 화면을 직접 보는 확인은 클라우드에서 안 된다. 테스트까지만 하고, 실행 확인은 집 노트북에서 한다
 

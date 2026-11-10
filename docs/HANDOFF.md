@@ -1,4 +1,4 @@
-# 이어가기 (2026-11-10, 브랜치 main, 원격 GitHub Crong94/oneului-bada 공개)
+# 이어가기 (2026-11-10, 브랜치 main, 원격 GitHub Crong94/harbor-days 공개)
 
 환경: **코드** (사용자 PC에서 도는 Claude Code). 회사 PC에서 마을 지도 작업을 하다가 집 PC로 옮겨 이어 간다. 설치와 복원 방법은 `docs/LOCAL_SETUP.md`.
 
@@ -11,7 +11,7 @@
 - 애매하거나 모호한 부분이 있다면 질문을 통해 해결하고 넘어간다.
 
 ## 코드 받기
-- 처음이면 `git clone https://github.com/Crong94/oneului-bada.git`, 이미 폴더가 있으면 `git pull`
+- 처음이면 `git clone https://github.com/Crong94/harbor-days.git`, 이미 폴더가 있으면 `git pull`
 - 회사 PC에는 Godot를 설치하지 않는다. 테스트는 GitHub Actions나 집 노트북에서 돌린다
 - 참조 그림은 드라이브 `오늘의바다_백업/ref`를 `docs/ref/`에 받는다 (git에 없음)
 - Godot 4.4.1 Standard 위치는 사용자에게 한 번 물어본다
@@ -34,7 +34,7 @@
 
 ## 확정된 결정 (이전부터)
 - 제목 〈오늘의 바다〉, 주인공 1994년 2월생, 7년 차 퇴사
-- 엔진 Godot 4. 코드는 GitHub `Crong94/oneului-bada`(공개)에 push한다. Actions는 테스트와 손으로 돌리는 웹 빌드만
+- 엔진 Godot 4. 코드는 GitHub `Crong94/harbor-days`(공개)에 push한다. Actions는 테스트와 손으로 돌리는 웹 빌드만
 - 화풍: 깔끔한 2D 셀 채색 코지 게임 스타일. 물고기는 세밀화풍
 - 그림은 절대 직접 만들지 않는다. 코드 장식 그림도 만들지 않는다. 판정 표시만 선으로
 - 백업: GitHub가 기본. 큰 파일(참조 그림, APK)만 드라이브 `오늘의바다_백업`에 둔다
