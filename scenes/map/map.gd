@@ -501,12 +501,12 @@ func _show_notices(delay: float) -> void:
 		if not is_inside_tree():
 			return
 		_show_toast(t)
-		delay = 3.2
+		delay = 4.8
 
 
 func _show_toast(t: String) -> void:
 	_toast_label.text = t
 	var tw := create_tween()
 	tw.tween_property(_toast, "modulate:a", 1.0, UiKit.MOTION_BASE)
-	tw.tween_interval(2.2)
+	tw.tween_interval(3.8) # 2.2초는 읽기 전에 사라졌다
 	tw.tween_property(_toast, "modulate:a", 0.0, UiKit.MOTION_SLOW)

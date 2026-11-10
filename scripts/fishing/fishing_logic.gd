@@ -514,7 +514,7 @@ static func fail_message(reason: String) -> String:
 		"slack":
 			return "줄이 느슨해진 사이 바늘이 빠졌어요. 손을 너무 오래 뗐어요"
 		"escaped":
-			return "물고기가 바위틈으로 파고들었어요. 옆으로 차고 나가면 반대로 끌어요"
+			return "물고기가 바위틈으로 파고들었어요. 아래 판에 방향이 뜨면 손가락을 그쪽으로 끌어요"
 		"retrieved":
 			return "줄을 거뒀어요. 포인트에 맞춰 다시 던져요"
 		"jumped":
