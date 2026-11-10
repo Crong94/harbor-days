@@ -16,8 +16,7 @@ const HEIGHT := 230.0
 var _lines: Array = []
 var _index := -1
 var _panel: PanelContainer
-var _name_tag: PanelContainer
-var _name: Label
+var _name_tag: VBoxContainer
 var _text: Label
 var _next_mark: Label
 var _tween: Tween
@@ -53,20 +52,9 @@ func _ready() -> void:
 	_next_mark = UiKit.text("▼", "caption", UiKit.SUN, HORIZONTAL_ALIGNMENT_RIGHT)
 	v.add_child(_next_mark)
 
-	# 이름표: 패널 왼쪽 위에 걸친 산호색 알약
-	_name_tag = PanelContainer.new()
-	var ns := UiKit.box(UiKit.CORAL, UiKit.RADIUS_PILL, Color.TRANSPARENT, 0, 0)
-	ns.content_margin_left = 18
-	ns.content_margin_right = 18
-	ns.content_margin_top = 6
-	ns.content_margin_bottom = 7
-	UiKit.elevate(ns, 1)
-	_name_tag.add_theme_stylebox_override("panel", ns)
-	_name_tag.position = Vector2(22, -18)
-	_name_tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_name = UiKit.text("", "title", Color.WHITE)
-	_name.add_theme_font_size_override("font_size", 19)
-	_name_tag.add_child(_name)
+	# 이름: 패널 왼쪽 위 가장자리에 걸친 외곽선 글자와 인물 색 밑줄 (알약 상자 없이)
+	_name_tag = UiKit.name_label("", Color(0, 0, 0, 0), 33)
+	_name_tag.position = Vector2(26, -34)
 	add_child(_name_tag)
 	hide()
 
@@ -95,7 +83,8 @@ func _advance() -> void:
 		return
 	var line: Dictionary = _lines[_index]
 	var speaker := GameState.line(line.get("speaker", ""))
-	_name.text = speaker
+	UiKit.set_name_label(_name_tag, speaker)
+	_name_tag.reset_size()
 	_name_tag.visible = not speaker.is_empty()
 	_text.text = GameState.line(line.get("text", ""))
 	# 지문은 흐리게, 대사는 밝게

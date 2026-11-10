@@ -69,7 +69,7 @@ func _build_yongpal() -> void:
 	holder.add_child(bubble)
 	var bv := UiKit.vbox(UiKit.SPACE_SM)
 	bubble.add_child(bv)
-	var tag := UiKit.badge("오용팔", UiKit.CORAL, Color.WHITE)
+	var tag := UiKit.name_label("오용팔", Color(0, 0, 0, 0), 28)
 	tag.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	bv.add_child(tag)
 	_talk = UiKit.paragraph(GameState.line(GREETINGS.pick_random()), "body", UiKit.FOAM)

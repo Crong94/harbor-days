@@ -81,7 +81,7 @@ func _build_junho() -> void:
 	bubble_holder.add_child(bubble)
 	var bv := UiKit.vbox(UiKit.SPACE_SM)
 	bubble.add_child(bv)
-	var tag := UiKit.badge("이준호", UiKit.CORAL, Color.WHITE)
+	var tag := UiKit.name_label("이준호", Color(0, 0, 0, 0), 28)
 	tag.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	bv.add_child(tag)
 	_talk = UiKit.paragraph(GameState.line(GREETINGS.pick_random()), "body", UiKit.FOAM)

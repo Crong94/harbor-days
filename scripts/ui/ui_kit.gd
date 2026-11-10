@@ -462,6 +462,48 @@ static func tab_button(t: String) -> Button:
 # ─── 여울 수첩 모양 (2026-11-10 사용자 요청: 여울 레포의 수첩 화면을 그대로 따른다) ───
 # 외곽선 없이 도톰한 아래 턱으로 입체감을 낸다. 목록 오른쪽 단추와 상태 표시는 크기를 똑같이 맞춘다 (ROW_BTN)
 
+## 인물마다 이름 밑줄 색 (사용자 요청: 등장인물 이름은 알약 대신 다른 모양으로, 2026-11-10)
+const SPEAKER_COLORS := {
+	"최순덕": Color("f6a6a6"), "순덕": Color("f6a6a6"), "할머니": Color("f6a6a6"),
+	"박만수": Color("79a8f2"), "만수": Color("79a8f2"),
+	"이준호": Color("ffc845"), "준호": Color("ffc845"),
+	"오용팔": Color("8fcf7a"), "용팔": Color("8fcf7a"),
+}
+
+
+static func speaker_color(speaker: String) -> Color:
+	return SPEAKER_COLORS.get(speaker, CORAL)
+
+
+## 등장인물 이름: 상자 없이 굵은 외곽선 글자(스티커 글자)와 그 아래 인물 색 밑줄.
+## 대사창 위, 말풍선 위에 쓴다. 색을 주지 않으면 이름으로 정한다
+static func name_label(speaker: String, color := Color(0, 0, 0, 0), px := 26) -> VBoxContainer:
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", -2)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	var c := color if color.a > 0.0 else speaker_color(speaker)
+	var l := text(speaker, "title", FOAM)
+	l.add_theme_font_size_override("font_size", px)
+	outlined(l, 9)
+	l.name = "Name"
+	v.add_child(l)
+	var bar := Panel.new()
+	bar.name = "Bar"
+	bar.custom_minimum_size = Vector2(0, 9)
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_theme_stylebox_override("panel", box(c, 3, OUTLINE, 2, 0))
+	v.add_child(bar)
+	return v
+
+
+## name_label의 이름과 밑줄 색을 바꾼다
+static func set_name_label(v: VBoxContainer, speaker: String) -> void:
+	(v.get_node("Name") as Label).text = speaker
+	var bar := v.get_node("Bar") as Panel
+	bar.add_theme_stylebox_override("panel", box(speaker_color(speaker), 3, OUTLINE, 2, 0))
+
+
 ## 목록 한 줄 오른쪽 단추와 상태 표시 크기 (둘이 늘 같다)
 const ROW_BTN := Vector2(112, 52)
 const BTN_LIP := 7
