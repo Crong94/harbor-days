@@ -51,6 +51,25 @@ const WOOD := Color("8a5a3a")
 const WOOD_DARK := Color("3a2a20")
 const ERROR := DANGER
 
+## 여울 수첩 색 (여울 레포 Palette). 수첩, 목록, 단추, 하루 서랍에 쓴다
+const NIGHT_DEEP := Color("0f1a2b") # 탭 줄 판
+const NIGHT_INK := Color("2b2b2b") # 막대 바탕
+const NOTE := Color("f4ecd8") # 공책 종이
+const NOTE_DARK := Color("d9cba8") # 공책 줄, 종이 아래 턱
+const NOTE_RED := Color(0.85, 0.33, 0.31, 0.35) # 공책 왼쪽 여백 줄
+const NOTE_INK := Color("2b2b2b")
+const NOTE_INK_SOFT := Color("5b5148")
+const TEAL_BTN := Color("3f7a8a") # 기본 단추
+const GOLD := Color("f2c14e")
+const GOLD_DARK := Color("a8761a")
+const GOLD_SOFT := Color("f7e3a6") # 쓰는 중 바탕
+const GREEN_FRESH := Color("7fd17e") # 오늘 잡음
+const BLUE_FRESH := Color("8cc8ff")
+const RED_BTN := Color("d9534f")
+const PURPLE := Color("6a5a8a")
+const GRAY_TEXT := Color("a7adb5")
+const GRAY_DARK := Color("5c6269")
+
 # ─── 글자 ───────────────────────────────────────────
 
 const FONT_DIR := "res://assets/fonts/"
@@ -401,14 +420,18 @@ static func set_chip(c: PanelContainer, value: String) -> void:
 		v.text = value
 
 
-## 탭 줄 (알약 모양 분할 버튼을 담는 판). 안에 tab_button들을 넣는다
+## 탭 줄 (여울 수첩 탭): 짙은 남색 판 안에 글자 칸이 나란히 있다. 안에 tab_button들을 넣는다
 static func tab_track() -> PanelContainer:
 	var track := PanelContainer.new()
-	track.add_theme_stylebox_override("panel", box(PAPER_DEEP, RADIUS_PILL, PAPER_LINE, 2, 5))
+	var s := box(Color(NIGHT_DEEP, 0.86), 30, Color.TRANSPARENT, 0, 7)
+	s.shadow_color = Color(0, 0, 0, 0.3)
+	s.shadow_size = 9
+	s.shadow_offset = Vector2(0, 4)
+	track.add_theme_stylebox_override("panel", s)
 	return track
 
 
-## 탭 버튼 하나. 고른 탭은 햇살 노랑 통통한 알약, 나머지는 글자만. set_pressed_no_signal로 고른 상태를 바꾼다
+## 탭 버튼 하나. 고른 탭은 금색 도톰한 칸(아래 턱), 나머지는 회색 글자만. set_pressed_no_signal로 고른 상태를 바꾼다
 static func tab_button(t: String) -> Button:
 	var b := Button.new()
 	b.text = t
@@ -416,21 +439,156 @@ static func tab_button(t: String) -> Button:
 	b.focus_mode = Control.FOCUS_ALL
 	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	b.custom_minimum_size.y = BUTTON_H_SM
+	b.custom_minimum_size.y = 54
 	b.add_theme_font_override("font", font("cute"))
-	b.add_theme_font_size_override("font_size", 21)
-	var off := box(Color(0, 0, 0, 0), RADIUS_PILL, Color.TRANSPARENT, 0, 0)
-	var on := chunky(SUN, RADIUS_PILL, 0, 3)
+	b.add_theme_font_size_override("font_size", 23)
+	var off := box(Color(0, 0, 0, 0), 26, Color.TRANSPARENT, 0, 0)
+	off.content_margin_bottom = 4
+	var on := box(GOLD, 26, Color.TRANSPARENT, 0, 0)
+	on.border_color = GOLD_DARK
+	on.border_width_bottom = 4
 	b.add_theme_stylebox_override("normal", off)
 	b.add_theme_stylebox_override("hover", off)
 	b.add_theme_stylebox_override("pressed", on)
 	b.add_theme_stylebox_override("hover_pressed", on)
-	b.add_theme_stylebox_override("focus", box(Color.TRANSPARENT, RADIUS_PILL, SUN, 2, 0))
-	b.add_theme_color_override("font_color", INK_SOFT)
-	b.add_theme_color_override("font_hover_color", INK)
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	b.add_theme_color_override("font_color", GRAY_TEXT)
+	b.add_theme_color_override("font_hover_color", FOAM)
 	b.add_theme_color_override("font_pressed_color", INK)
 	b.add_theme_color_override("font_hover_pressed_color", INK)
 	return b
+
+
+# ─── 여울 수첩 모양 (2026-11-10 사용자 요청: 여울 레포의 수첩 화면을 그대로 따른다) ───
+# 외곽선 없이 도톰한 아래 턱으로 입체감을 낸다. 목록 오른쪽 단추와 상태 표시는 크기를 똑같이 맞춘다 (ROW_BTN)
+
+## 목록 한 줄 오른쪽 단추와 상태 표시 크기 (둘이 늘 같다)
+const ROW_BTN := Vector2(112, 52)
+const BTN_LIP := 7
+
+
+## 여울 단추: 색 판 + 아래 짙은 턱 + 그림자, 흰 주아체. 누르면 턱이 줄어 내려앉는다.
+## size를 주지 않으면 ROW_BTN 크기 (목록 오른쪽 단추)
+static func game_button(t: String, color := TEAL_BTN, size := ROW_BTN, font_px := 21) -> Button:
+	var b := Button.new()
+	b.text = t
+	b.focus_mode = Control.FOCUS_NONE
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	b.custom_minimum_size = size
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	b.add_theme_font_override("font", font("cute"))
+	b.add_theme_font_size_override("font_size", font_px)
+	b.add_theme_stylebox_override("normal", _btn_face(color, BTN_LIP, true))
+	b.add_theme_stylebox_override("hover", _btn_face(color.lightened(0.06), BTN_LIP, true))
+	b.add_theme_stylebox_override("pressed", _btn_face(color.darkened(0.1), 3, true))
+	b.add_theme_stylebox_override("hover_pressed", _btn_face(color.darkened(0.1), 3, true))
+	b.add_theme_stylebox_override("disabled", _btn_face(color.lerp(GRAY_DARK, 0.75), BTN_LIP, false))
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	for st in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
+		b.add_theme_color_override(st, Color.WHITE)
+	b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.6))
+	b.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.25))
+	b.add_theme_constant_override("shadow_offset_y", 2)
+	_add_press_motion(b)
+	return b
+
+
+## 여울 단추 얼굴: 아래 테두리가 그림자 겸 두께. 누르면(lip 작게) 위 여백이 늘어 내려간 것처럼 보인다
+static func _btn_face(c: Color, lip: int, shadow: bool) -> StyleBoxFlat:
+	var s := box(c, 20, Color.TRANSPARENT, 0, 10)
+	s.border_color = c.darkened(0.32)
+	s.border_width_bottom = lip
+	s.content_margin_top = BTN_LIP - lip
+	s.content_margin_bottom = 2
+	if shadow:
+		s.shadow_color = Color(0, 0, 0, 0.22)
+		s.shadow_size = 6
+		s.shadow_offset = Vector2(0, 4)
+	return s
+
+
+## 상태 표시 (쓰는 중, 사용 중 같은 것). 단추와 크기와 모양이 같고, 누를 수 없어서 그림자와 눌림이 없다.
+## 기본은 여울의 "쓰는 중"처럼 금빛 글자와 금테
+static func status_tag(t: String, bg := GOLD_SOFT, fg := GOLD_DARK, size := ROW_BTN) -> PanelContainer:
+	var p := PanelContainer.new()
+	var s := box(bg, 20, bg.darkened(0.28), 2, 6)
+	s.border_width_bottom = BTN_LIP
+	s.content_margin_top = 0
+	s.content_margin_bottom = 2
+	p.add_theme_stylebox_override("panel", s)
+	p.custom_minimum_size = size
+	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var l := text(t, "label", fg, HORIZONTAL_ALIGNMENT_CENTER)
+	l.add_theme_font_size_override("font_size", 20)
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	p.add_child(l)
+	return p
+
+
+## 작은 단계 표시 (여울의 활어, 선어). 막대(fresh_bar) 위에 얹는다
+static func stage_chip(t: String, bg: Color, fg := INK) -> PanelContainer:
+	var p := PanelContainer.new()
+	var s := box(bg, 14, Color.TRANSPARENT, 0, 0)
+	s.content_margin_left = 14
+	s.content_margin_right = 14
+	s.content_margin_top = 1
+	s.content_margin_bottom = 3
+	p.add_theme_stylebox_override("panel", s)
+	p.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var l := text(t, "caption", fg, HORIZONTAL_ALIGNMENT_CENTER)
+	l.add_theme_font_override("font", font("semibold"))
+	l.add_theme_font_size_override("font_size", 16)
+	p.add_child(l)
+	return p
+
+
+## 남은 만큼 차는 짧은 막대 (여울 신선도 막대). value 0~1
+static func fresh_bar(value: float, fill: Color, width := 86.0) -> Panel:
+	var track := Panel.new()
+	track.custom_minimum_size = Vector2(width, 17)
+	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	track.add_theme_stylebox_override("panel", box(NIGHT_INK, 9, Color.TRANSPARENT, 0, 0))
+	var f := Panel.new()
+	f.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	f.add_theme_stylebox_override("panel", box(fill, 6, Color.TRANSPARENT, 0, 0))
+	track.add_child(f)
+	track.resized.connect(func():
+		var w := (track.size.x - 6.0) * clampf(value, 0.0, 1.0)
+		f.position = Vector2(3, 3)
+		f.size = Vector2(maxf(12.0 if value > 0.0 else 0.0, w), track.size.y - 6.0))
+	return track
+
+
+## 공책 종이 판 (여울 수첩): 줄이 그어진 크림 종이와 왼쪽 빨간 여백 줄
+static func note_paper(pad_x := 26, pad_y := 22) -> PanelContainer:
+	var p := NotePaper.new()
+	var s := box(NOTE, 20, Color.TRANSPARENT, 0, 0)
+	s.border_color = NOTE_DARK
+	s.border_width_bottom = 7
+	s.content_margin_left = pad_x + 8
+	s.content_margin_right = pad_x
+	s.content_margin_top = pad_y
+	s.content_margin_bottom = pad_y
+	s.shadow_color = Color(0, 0, 0, 0.4)
+	s.shadow_size = 16
+	s.shadow_offset = Vector2(0, 8)
+	p.add_theme_stylebox_override("panel", s)
+	return p
+
+
+## 공책 종이 위 목록 한 줄 (칸 없이, 뒤의 공책 줄이 비친다). get_child(0)이 HBoxContainer
+static func note_row() -> PanelContainer:
+	var row := PanelContainer.new()
+	var s := StyleBoxEmpty.new()
+	s.content_margin_top = 4
+	s.content_margin_bottom = 4
+	row.add_theme_stylebox_override("panel", s)
+	var h := hbox(SPACE_MD)
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_child(h)
+	return row
 
 
 ## 작은 배지 (NEW, 사용 중 같은 표시)

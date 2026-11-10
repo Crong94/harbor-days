@@ -30,6 +30,7 @@ func _init() -> void:
 	_test_month()
 	_test_icebox()
 	_test_market()
+	_test_brief()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -1022,3 +1023,47 @@ func _test_market() -> void:
 	_eq(gs.inventory.size(), 1, "판 생선은 빠짐")
 	_eq(gs.sell_fish({"id": "ureok", "size": 99.0}), 0, "없는 생선은 못 팜")
 	gs.free()
+
+
+## 하루 서랍 내용
+func _test_brief() -> void:
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.flags["first_guest_done"] = true
+	gs.day = 30
+	gs.sales_today = 50000
+	gs.spent_today = 8000
+	gs.money = 700000
+	gs.inventory = [{"id": "bolak", "size": 20.0, "day": 29}, {"id": "bolak", "size": 18.0, "day": 30}]
+	gs.end_day()
+	_eq(gs.yesterday_sales - gs.yesterday_spent, 42000, "어제 번 돈")
+	_eq(gs.news_today.size(), 1, "상한 생선 소식이 서랍에 남음")
+	gs.pop_notices()
+	_eq(gs.news_today.size(), 1, "토스트를 띄워도 서랍 소식은 남음")
+	gs.time_minutes = 6 * 60
+	var b := DayBrief.build(gs)
+	_eq(b.title, "3월 31일 (수) 오늘", "서랍 제목")
+	_eq(b.stats[0].value, "42,000원", "맨 위 어제 번 돈")
+	_eq(b.stats[2].name, "상환 D-1", "다음 상환")
+	var names: Array = b.sections.map(func(s): return s.name)
+	_eq(names, ["지금 할 일", "오늘 주문", "오늘의 바다", "아침 소식"], "서랍 분류")
+	var todo: Array = b.sections[0].rows
+	_eq(todo[0].target, "breakwater", "새벽 6시엔 먼저 낚시")
+	_eq(todo[0].state, "~7:00", "낚시 끝 시각")
+	_eq(todo.any(func(r): return r.target == "market"), true, "시장 열려 있으면 팔기")
+	_eq(todo.any(func(r): return r.target == "shop"), true, "저녁 장사")
+	_eq(todo.any(func(r): return r.target == "home"), false, "아침엔 자러 가지 않음")
+	gs.time_minutes = 21 * 60 + 30
+	gs.opened_today = true
+	todo = DayBrief.build(gs).sections[0].rows
+	_eq(todo.map(func(r): return r.target), ["breakwater", "home"], "밤엔 밤 낚시나 잠")
+	# 텃밭에 다 자란 줄
+	gs.time_minutes = 13 * 60
+	gs.garden[0] = {"crop": "daepa", "day": gs.day - 5}
+	todo = DayBrief.build(gs).sections[0].rows
+	_eq(todo.any(func(r): return r.target == "garden"), true, "다 자라면 거두기")
+	# 돈이 모자란 채 상환일이 가까우면 빨강
+	gs.money = 1000
+	_eq(DayBrief.build(gs).stats[2].tone, "bad", "상환 못 할 것 같으면 빨강")
+	gs.free()
+	_eq(FishLine.stage({"day": 5}, 5).name, "오늘 잡음", "오늘 잡은 생선")
+	_eq(FishLine.stage({"day": 4}, 5).name, "오늘 밤 상함", "어제 잡은 생선")

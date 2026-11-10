@@ -41,8 +41,7 @@ func _ready() -> void:
 	UiKit.outlined(title, 10)
 	row.add_child(title)
 	row.add_child(UiKit.spacer())
-	var out := UiKit.action("나가기", "secondary", true)
-	out.custom_minimum_size.x = 104
+	var out := UiKit.game_button("나가기", UiKit.GRAY_DARK)
 	out.pressed.connect(func(): UiKit.go_to(self, MAP_SCENE))
 	row.add_child(out)
 
@@ -80,24 +79,27 @@ func _build_yongpal() -> void:
 
 
 func _build_sheet() -> void:
-	var sheet := PanelContainer.new()
-	sheet.add_theme_stylebox_override("panel", UiKit.paper_box(22, UiKit.RADIUS_LG, 3))
+	var sheet := UiKit.note_paper()
 	sheet.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	sheet.offset_left = 12
-	sheet.offset_right = -12
+	sheet.offset_left = 22
+	sheet.offset_right = -22
 	sheet.offset_top = GameHeader.BOTTOM + 314.0
-	sheet.offset_bottom = -16
+	sheet.offset_bottom = -24
 	add_child(sheet)
-	var v := UiKit.vbox(UiKit.SPACE_MD)
+	var v := UiKit.vbox(UiKit.SPACE_SM)
 	sheet.add_child(v)
 	var head := UiKit.hbox(UiKit.SPACE_MD)
 	head.alignment = BoxContainer.ALIGNMENT_CENTER
-	head.add_child(UiKit.text("생선 팔기", "h2", UiKit.INK))
+	head.add_child(UiKit.text("생선 팔기", "h2", UiKit.NOTE_INK))
 	head.add_child(UiKit.spacer())
-	_box = UiKit.text("", "label", UiKit.INK_SOFT)
+	_box = UiKit.text("", "body", UiKit.NOTE_INK_SOFT)
+	_box.add_theme_font_size_override("font_size", 18)
 	head.add_child(_box)
 	v.add_child(head)
-	v.add_child(UiKit.paragraph("흔한 고기는 저녁에 구워 파는 게 더 남아요. 비싼 고기는 보통 손님이 못 사니 여기서 팔아요", "caption", UiKit.INK_SOFT))
+	var tip := UiKit.paragraph("흔한 고기는 저녁에 구워 파는 게 더 남아요. 비싼 고기는 보통 손님이 못 사니 여기서 팔아요", "body", UiKit.NOTE_INK_SOFT)
+	tip.add_theme_font_size_override("font_size", 16)
+	v.add_child(tip)
+	v.add_child(UiKit.gap(4))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -110,54 +112,31 @@ func _build_sheet() -> void:
 
 func _refresh() -> void:
 	_header.refresh()
-	_box.text = "아이스박스 %d / %d" % [GameState.inventory.size(), GameState.icebox_size]
+	_box.text = "아이스박스 %d/%d" % [GameState.inventory.size(), GameState.icebox_size]
 	for c in _list.get_children():
 		c.queue_free()
 	if GameState.inventory.is_empty():
-		var l := UiKit.paragraph("팔 생선이 없어요. 방파제에서 낚아 와요", "body", UiKit.INK_SOFT, 0.0, HORIZONTAL_ALIGNMENT_CENTER)
+		var l := UiKit.paragraph("팔 생선이 없어요. 방파제에서 낚아 와요", "body", UiKit.NOTE_INK_SOFT, 0.0, HORIZONTAL_ALIGNMENT_CENTER)
 		l.custom_minimum_size.y = 120
 		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		_list.add_child(l)
 		return
+	# 오늘 밤 상하는 것 먼저, 그다음 비싼 순서
 	var spoiling := GameState.spoiling_tonight()
 	var order := range(GameState.inventory.size())
 	order.sort_custom(func(a, b):
 		var ea: Dictionary = GameState.inventory[a]
 		var eb: Dictionary = GameState.inventory[b]
+		var sa := spoiling.has(ea)
+		if sa != spoiling.has(eb):
+			return sa
 		return Market.price(ea.id, ea.size) > Market.price(eb.id, eb.size))
 	for i in order:
-		_list.add_child(_fish_row(GameState.inventory[i], spoiling.has(GameState.inventory[i])))
-
-
-func _fish_row(e: Dictionary, spoiling: bool) -> PanelContainer:
-	var row := PanelContainer.new()
-	row.add_theme_stylebox_override("panel", UiKit.inset_box(UiKit.SPACE_MD, UiKit.RADIUS_MD))
-	var h := UiKit.hbox(UiKit.SPACE_MD)
-	h.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_child(h)
-	var t := UiKit.icon_rect("fish_" + e.id, 44)
-	if t:
-		t.custom_minimum_size = Vector2(80, 44)
-		h.add_child(t)
-	var info := UiKit.vbox(0)
-	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var name_row := UiKit.hbox(6)
-	name_row.add_child(UiKit.text(FishDB.get_fish(e.id).name, "title", UiKit.INK))
-	name_row.add_child(UiKit.text("★".repeat(FishDB.stars(e.id, e.size)), "label", UiKit.SUN))
-	info.add_child(name_row)
-	var tags := UiKit.hbox(4)
-	tags.add_child(UiKit.text("%.1fcm" % e.size, "caption", UiKit.INK_SOFT))
-	if spoiling:
-		tags.add_child(UiKit.badge("오늘 밤 상해요", UiKit.CORAL, Color.WHITE))
-	if Market.better_here(e.id, e.size):
-		tags.add_child(UiKit.badge("시장이 나아요", UiKit.SEA, Color.WHITE))
-	info.add_child(tags)
-	h.add_child(info)
-	var sell := UiKit.action(GameState.format_won(Market.price(e.id, e.size)), "primary", true)
-	sell.custom_minimum_size.x = 128
-	sell.pressed.connect(_sell.bind(e))
-	h.add_child(sell)
-	return row
+		var e: Dictionary = GameState.inventory[i]
+		var sell := UiKit.game_button("팔기")
+		sell.pressed.connect(_sell.bind(e))
+		var note := "시장이 나아요" if Market.better_here(e.id, e.size) else ""
+		_list.add_child(FishLine.make(e, GameState.day, GameState.format_won(Market.price(e.id, e.size)), note, sell))
 
 
 func _sell(e: Dictionary) -> void:

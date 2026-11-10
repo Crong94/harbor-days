@@ -35,6 +35,7 @@ var _dragging := false
 var _moved := false # 이번 누름이 끌기였으면 핀 탭을 무시한다
 var _velocity := Vector2.ZERO
 var _focus_tween: Tween
+var _drawer: DayDrawer
 
 
 func _ready() -> void:
@@ -65,6 +66,12 @@ func _ready() -> void:
 	_build_top_bar()
 	_build_sheet()
 	_build_toast()
+	# 하루 서랍 (오른쪽 끝 탭). 줄을 누르면 그 장소를 고른다
+	_drawer = DayDrawer.new()
+	add_child(_drawer)
+	_drawer.picked.connect(func(id: String):
+		if Locations.is_unlocked(id, GameState.flags):
+			_select(id))
 	resized.connect(_layout_world)
 	_layout_world.call_deferred()
 	Sound.play_bgm("town")
@@ -169,7 +176,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _can_drag_from(p: Vector2) -> bool:
-	if _header.is_menu_open():
+	if _header.is_menu_open() or (_drawer and _drawer.is_open()):
 		return false
 	if p.y < GameHeader.BOTTOM:
 		return false
@@ -391,6 +398,7 @@ func _travel() -> void:
 		_refresh_hud()
 		_rebuild_pins()
 		_show_toast("푹 잤다. %s 아침이 밝았어요" % Calendar.text(GameState.day))
+		_drawer.refresh_dot()
 		_show_notices.call_deferred(2.6)
 		return
 	var scene: String = loc.get("scene", "")

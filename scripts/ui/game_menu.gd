@@ -38,8 +38,7 @@ func _ready() -> void:
 			close())
 	_root.add_child(dim)
 
-	_sheet = PanelContainer.new()
-	_sheet.add_theme_stylebox_override("panel", UiKit.paper_box(22, UiKit.RADIUS_LG, 3))
+	_sheet = UiKit.note_paper(22, 22)
 	_sheet.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	_sheet.offset_left = 10
 	_sheet.offset_right = -10
@@ -51,10 +50,9 @@ func _ready() -> void:
 	var head := UiKit.hbox(UiKit.SPACE_SM)
 	head.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_child(head)
-	head.add_child(UiKit.text("메뉴", "h2", UiKit.INK))
+	head.add_child(UiKit.text(GameState.line("{player}의 수첩"), "h2", UiKit.NOTE_INK))
 	head.add_child(UiKit.spacer())
-	var close_btn := UiKit.action("닫기", "secondary", true)
-	close_btn.custom_minimum_size.x = 92
+	var close_btn := UiKit.game_button("닫기", UiKit.GRAY_DARK)
 	close_btn.pressed.connect(close)
 	head.add_child(close_btn)
 	v.add_child(_make_tabs())
@@ -148,29 +146,30 @@ func _fit_height() -> void:
 # ─── 가방 ───────────────────────────────────────────
 
 func _build_bag() -> void:
-	var groups := HudText.group_inventory(GameState.inventory)
 	var total := 0
-	for id in groups:
-		total += groups[id].value
-	_list.add_child(UiKit.text("아이스박스 %d마리  ·  오늘 잡은 고기 %d마리" % [GameState.inventory.size(), GameState.caught_today.size()], "label", UiKit.INK_SOFT))
-	if groups.is_empty():
+	for e in GameState.inventory:
+		total += FishDB.value_of(e.id, e.size)
+	# 위: 아이스박스 칸 (여울 쿨러 6/15 판)
+	var box := UiKit.status_tag("아이스박스 %d/%d" % [GameState.inventory.size(), GameState.icebox_size], UiKit.TEAL_BTN, Color.WHITE, Vector2(0, 50))
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_list.add_child(box)
+	var tip := UiKit.text("잡은 다음 날 저녁까지 팔아요. 그 밤을 넘기면 상해요", "body", UiKit.NOTE_INK_SOFT, HORIZONTAL_ALIGNMENT_RIGHT)
+	tip.add_theme_font_size_override("font_size", 16)
+	_list.add_child(tip)
+	if GameState.inventory.is_empty():
 		_list.add_child(_empty_note("아이스박스가 비어 있어요. 방파제에서 낚아 와요"))
 		return
-	for id in FishDB.FISH:
-		if not groups.has(id):
-			continue
-		var g: Dictionary = groups[id]
-		var row := _row()
-		var h: HBoxContainer = row.get_child(0)
-		_add_fish_thumb(h, id, false)
-		var info := UiKit.vbox(0)
-		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		info.add_child(UiKit.text(FishDB.get_fish(id).name, "title", UiKit.INK))
-		info.add_child(UiKit.text("가장 큰 것 %.1fcm  ·  %s어치" % [g.best, GameState.format_won(g.value)], "caption", UiKit.INK_SOFT))
-		h.add_child(info)
-		h.add_child(UiKit.text("%d마리" % g.count, "number", UiKit.CORAL_DEEP))
-		_list.add_child(row)
-	_list.add_child(UiKit.text("모두 %s어치" % GameState.format_won(total), "title", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_RIGHT))
+	# 오늘 밤 상하는 것 먼저, 그다음 비싼 순서
+	var spoiling := GameState.spoiling_tonight()
+	var items := GameState.inventory.duplicate()
+	items.sort_custom(func(a, b):
+		if spoiling.has(a) != spoiling.has(b):
+			return spoiling.has(a)
+		return FishDB.value_of(a.id, a.size) > FishDB.value_of(b.id, b.size))
+	for e in items:
+		_list.add_child(FishLine.make(e, GameState.day, GameState.format_won(FishDB.value_of(e.id, e.size))))
+	var sum := UiKit.text("모두 %s어치" % GameState.format_won(total), "title", UiKit.NOTE_INK_SOFT, HORIZONTAL_ALIGNMENT_RIGHT)
+	_list.add_child(sum)
 
 
 # ─── 도감 ───────────────────────────────────────────
@@ -246,27 +245,31 @@ func _gear_picked() -> void:
 	_refresh()
 
 
+## 장비 한 줄 (여울 미끼 줄): 쓰는 것은 금테 칸에 금빛 글자, 오른쪽 "쓰는 중"은 단추와 같은 크기
 func _gear_row(icon: String, title: String, stats: String, equipped: bool, on_pick: Callable) -> PanelContainer:
-	var row := _row()
-	if equipped:
-		var s: StyleBoxFlat = row.get_theme_stylebox("panel")
-		s.border_color = UiKit.CORAL
-		s.set_border_width_all(3)
-	var h: HBoxContainer = row.get_child(0)
+	var row := PanelContainer.new()
+	var s := UiKit.box(Color(UiKit.GOLD_SOFT, 0.7) if equipped else Color(UiKit.NOTE_DARK, 0.28), 16, UiKit.GOLD_DARK if equipped else Color(UiKit.NOTE_DARK, 0.6), 2 if equipped else 1, 10)
+	s.content_margin_left = 12
+	row.add_theme_stylebox_override("panel", s)
+	var h := UiKit.hbox(UiKit.SPACE_MD)
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_child(h)
 	var ic := UiKit.icon_rect(icon, 52)
 	if ic:
 		h.add_child(ic)
-	var info := UiKit.vbox(0)
+	var info := UiKit.vbox(-2)
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.add_child(UiKit.text(title, "title", UiKit.INK))
-	var st := UiKit.paragraph(stats, "caption", UiKit.INK_SOFT)
+	var t := UiKit.text(title, "title", UiKit.GOLD_DARK if equipped else UiKit.NOTE_INK)
+	t.add_theme_font_size_override("font_size", 22)
+	info.add_child(t)
+	var st := UiKit.paragraph(stats, "body", UiKit.NOTE_INK_SOFT)
+	st.add_theme_font_size_override("font_size", 16)
 	info.add_child(st)
 	h.add_child(info)
 	if equipped:
-		h.add_child(UiKit.badge("사용 중", UiKit.SUN, UiKit.INK))
+		h.add_child(UiKit.status_tag("쓰는 중"))
 	else:
-		var b := UiKit.action("고르기", "secondary", true)
-		b.custom_minimum_size.x = 96
+		var b := UiKit.game_button("고르기")
 		b.pressed.connect(on_pick)
 		h.add_child(b)
 	return row
@@ -282,7 +285,7 @@ func _build_settings() -> void:
 		Haptics.play("hook"))) # 켰을 때 어떤 느낌인지 바로 알 수 있게 (끄면 울리지 않는다)
 	_list.add_child(_toggle_row("화면 흔들림", GameState.screen_shake_on, func(on: bool): GameState.set_screen_shake(on)))
 	_list.add_child(UiKit.gap(8))
-	var title_btn := UiKit.action("한 번 더 누르면 타이틀로 가요" if _title_armed else "타이틀로", "secondary")
+	var title_btn := UiKit.game_button("한 번 더 누르면 타이틀로 가요" if _title_armed else "타이틀로", UiKit.RED_BTN if _title_armed else UiKit.GRAY_DARK, Vector2(0, 58))
 	title_btn.pressed.connect(func():
 		if not _title_armed:
 			_title_armed = true
@@ -302,11 +305,10 @@ func _build_settings() -> void:
 func _toggle_row(label: String, on: bool, setter: Callable) -> PanelContainer:
 	var row := _row()
 	var h: HBoxContainer = row.get_child(0)
-	var l := UiKit.text(label, "title", UiKit.INK)
+	var l := UiKit.text(label, "title", UiKit.NOTE_INK)
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(l)
-	var b := UiKit.action("켜짐" if on else "꺼짐", "sun" if on else "secondary", true)
-	b.custom_minimum_size.x = 104
+	var b := UiKit.game_button("켜짐" if on else "꺼짐", UiKit.TEAL_BTN if on else UiKit.GRAY_DARK)
 	b.pressed.connect(func():
 		setter.call(not on)
 		Sound.play_sfx("tap")
@@ -317,14 +319,9 @@ func _toggle_row(label: String, on: bool, setter: Callable) -> PanelContainer:
 
 # ─── 공통 ───────────────────────────────────────────
 
-## 목록 한 줄: 안쪽 칸 + 가로 줄 (get_child(0)이 HBoxContainer)
+## 목록 한 줄: 공책 줄 (get_child(0)이 HBoxContainer)
 func _row() -> PanelContainer:
-	var row := PanelContainer.new()
-	row.add_theme_stylebox_override("panel", UiKit.inset_box(UiKit.SPACE_MD, UiKit.RADIUS_MD))
-	var h := UiKit.hbox(UiKit.SPACE_MD)
-	h.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_child(h)
-	return row
+	return UiKit.note_row()
 
 
 func _add_fish_thumb(h: HBoxContainer, id: String, dark: bool) -> void:

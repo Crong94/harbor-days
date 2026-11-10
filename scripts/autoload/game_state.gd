@@ -26,6 +26,13 @@ var missed_payments := 0
 var day := 1
 ## 다음에 지도에 오면 보여 줄 알림 (상환, 상한 생선 등). 보여 주면 비운다
 var notices: Array = []
+## 오늘 아침 소식 (하루 서랍에서 다시 본다). 알림은 토스트로 사라져도 여기 남는다. 다음 날 아침에 새로 쓴다
+var news_today: Array = []
+## 어제 장부 (하루 서랍 맨 위 숫자)
+var yesterday_sales := 0
+var yesterday_spent := 0
+## 하루 서랍을 마지막으로 연 날. 오늘 아직 안 열었으면 탭에 빨간 점
+var drawer_seen_day := 0
 
 ## 낚시 기록. 항목 형식: {"id": "bolak", "size": 18.3, "day": 잡은 날}
 var caught_today: Array = []
@@ -306,11 +313,14 @@ func take_fish(id: String) -> Dictionary:
 ## 하루를 마치고 다음 날 아침으로 넘어간다.
 ## wake_minutes를 주지 않으면 DayFlow 규칙대로 (밤 낚시를 했으면 늦잠)
 func end_day(wake_minutes := -1) -> void:
+	yesterday_sales = sales_today
+	yesterday_spent = spent_today
+	news_today = []
 	# 오래된 생선은 밤새 상해서 버린다
 	var spoiled := spoiling_tonight()
 	if not spoiled.is_empty():
 		inventory = inventory.filter(func(e): return not spoiled.has(e))
-		notices.append("아이스박스에서 생선 %d마리가 상해서 버렸어요. 잡은 다음 날 저녁까지 팔아요" % spoiled.size())
+		_news("아이스박스에서 생선 %d마리가 상해서 버렸어요. 잡은 다음 날 저녁까지 팔아요" % spoiled.size())
 	day += 1
 	# 매달 1일은 대출 상환일
 	var r := Loan.settle(day, money, debt, monthly_repayment, arrears)
@@ -321,7 +331,7 @@ func end_day(wake_minutes := -1) -> void:
 			missed_payments += 1
 		arrears = r.arrears
 		debt = r.debt
-		notices.append(Loan.notice(r))
+		_news(Loan.notice(r))
 	time_minutes = wake_minutes if wake_minutes >= 0 else DayFlow.wake_time(night_fished)
 	opened_today = false
 	night_fished = false
@@ -337,6 +347,12 @@ func clock_text() -> String:
 	var h := m / 60
 	var period := "새벽" if h < 6 else ("오전" if h < 12 else ("오후" if h < 18 else "저녁" if h < 21 else "밤"))
 	return "%s %s %02d:%02d" % [Calendar.short_text(day), period, h, m % 60]
+
+
+## 아침 소식 한 줄: 토스트로 띄우고(notices) 하루 서랍에도 남긴다(news_today)
+func _news(t: String) -> void:
+	notices.append(t)
+	news_today.append(t)
 
 
 ## 쌓인 알림을 꺼내고 비운다

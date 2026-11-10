@@ -7,6 +7,8 @@ extends Control
 ## 구성: 위 유리 상단바 / 준호와 말풍선 / 아래 종이 시트(낚싯대·릴 탭과 상품 목록)
 
 const MAP_SCENE := "res://scenes/map/map.tscn"
+## 상품 오른쪽 칸 크기 (사기, 장착, 쓰는 중, 잠김 모두 같다)
+const SHOP_BTN := Vector2(124, 52)
 
 const GREETINGS := [
 	"형, 어서 오세요! 오늘은 뭐 보러 오셨어요?",
@@ -55,8 +57,7 @@ func _build_top_bar() -> void:
 	UiKit.outlined(title, 10)
 	row.add_child(title)
 	row.add_child(UiKit.spacer())
-	var out := UiKit.action("나가기", "secondary", true)
-	out.custom_minimum_size.x = 104
+	var out := UiKit.game_button("나가기", UiKit.GRAY_DARK)
 	out.pressed.connect(func(): UiKit.go_to(self, MAP_SCENE))
 	row.add_child(out)
 
@@ -91,13 +92,12 @@ func _build_junho() -> void:
 
 ## 아래 종이 시트: 탭과 상품 목록
 func _build_sheet() -> void:
-	var sheet := PanelContainer.new()
-	sheet.add_theme_stylebox_override("panel", UiKit.paper_box(22, UiKit.RADIUS_LG, 3))
+	var sheet := UiKit.note_paper(20, 20)
 	sheet.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	sheet.offset_left = 12
-	sheet.offset_right = -12
+	sheet.offset_left = 18
+	sheet.offset_right = -18
 	sheet.offset_top = GameHeader.BOTTOM + 344.0
-	sheet.offset_bottom = -16
+	sheet.offset_bottom = -22
 	add_child(sheet)
 	var v := UiKit.vbox(UiKit.SPACE_MD)
 	sheet.add_child(v)
@@ -152,11 +152,7 @@ func _item_card(kind: String, id: String, item: Dictionary, stats: Array) -> Pan
 	var owned: Array = GameState.owned_rods if kind == "rod" else GameState.owned_reels
 	var equipped: String = GameState.equipped_rod if kind == "rod" else GameState.equipped_reel
 	var card := PanelContainer.new()
-	var s := UiKit.inset_box(UiKit.SPACE_LG, UiKit.RADIUS_LG)
-	if id == equipped:
-		s.border_color = UiKit.CORAL
-		s.set_border_width_all(2)
-	card.add_theme_stylebox_override("panel", s)
+	card.add_theme_stylebox_override("panel", _card_box(id == equipped))
 	var h := UiKit.hbox(UiKit.SPACE_LG)
 	h.alignment = BoxContainer.ALIGNMENT_CENTER
 	card.add_child(h)
@@ -173,41 +169,47 @@ func _item_card(kind: String, id: String, item: Dictionary, stats: Array) -> Pan
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.add_child(UiKit.text(item.name, "title", UiKit.INK))
 	info.add_child(UiKit.paragraph(item.desc, "caption", UiKit.INK_SOFT))
-	var stat_row := UiKit.hbox(UiKit.SPACE_XS)
+	var stat_row := UiKit.hbox(UiKit.SPACE_MD)
 	for st in stats:
-		stat_row.add_child(UiKit.badge(st, Color(UiKit.SEA, 0.14), UiKit.SEA))
+		stat_row.add_child(_stat_text(st))
 	info.add_child(stat_row)
 	h.add_child(info)
 
+	# 오른쪽 칸은 단추든 상태 표시든 같은 크기 (SHOP_BTN)
 	if id == equipped:
-		h.add_child(UiKit.badge("사용 중", UiKit.CORAL, Color.WHITE))
+		h.add_child(UiKit.status_tag("쓰는 중", UiKit.GOLD_SOFT, UiKit.GOLD_DARK, SHOP_BTN))
 	elif id in owned:
-		var eq := UiKit.action("장착", "secondary", true)
-		eq.custom_minimum_size.x = 104
+		var eq := UiKit.game_button("장착", UiKit.TEAL_BTN, SHOP_BTN)
 		eq.pressed.connect(func():
 			_equip(kind, id)
 			_say("좋죠! %s, 손에 착 붙을 거예요." % item.name))
 		h.add_child(eq)
 	elif item.get("unlock", "shop") == "story":
-		var lock := UiKit.vbox(2)
+		var lock := UiKit.vbox(4)
 		lock.alignment = BoxContainer.ALIGNMENT_CENTER
-		lock.add_child(UiKit.badge("잠김", UiKit.INK_MUTED, Color.WHITE))
-		lock.add_child(UiKit.text(item.get("unlock_text", ""), "caption", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
+		lock.add_child(UiKit.status_tag("잠김", Color(UiKit.NOTE_DARK, 0.8), UiKit.NOTE_INK_SOFT, SHOP_BTN))
+		var why := UiKit.paragraph(item.get("unlock_text", ""), "caption", UiKit.NOTE_INK_SOFT, SHOP_BTN.x, HORIZONTAL_ALIGNMENT_CENTER)
+		lock.add_child(why)
 		h.add_child(lock)
 	else:
-		var buy := UiKit.action(GameState.format_won(item.price), "primary", true)
-		buy.custom_minimum_size.x = 128
+		var buy := UiKit.game_button(GameState.format_won(item.price), UiKit.CORAL_DEEP, SHOP_BTN, 19)
 		buy.disabled = GameState.money < item.price
 		buy.pressed.connect(_buy.bind(kind, id))
 		h.add_child(buy)
 	return card
 
 
+## 상품 칸: 공책 위 옅은 칸. 쓰는 것은 금테
+func _card_box(on: bool) -> StyleBoxFlat:
+	var s := UiKit.box(Color(UiKit.GOLD_SOFT, 0.7) if on else Color(UiKit.NOTE_DARK, 0.28), 18, UiKit.GOLD_DARK if on else Color(UiKit.NOTE_DARK, 0.6), 2 if on else 1, 14)
+	return s
+
+
 ## 미끼 한 줄: 아이콘, 이름, 잘 무는 고기, 가진 수, 사기
 func _bait_card(id: String) -> PanelContainer:
 	var b := BaitDB.bait(id)
 	var card := PanelContainer.new()
-	card.add_theme_stylebox_override("panel", UiKit.inset_box(UiKit.SPACE_LG, UiKit.RADIUS_LG))
+	card.add_theme_stylebox_override("panel", _card_box(false))
 	var h := UiKit.hbox(UiKit.SPACE_LG)
 	h.alignment = BoxContainer.ALIGNMENT_CENTER
 	card.add_child(h)
@@ -222,13 +224,12 @@ func _bait_card(id: String) -> PanelContainer:
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.add_child(UiKit.text("%s  ·  %d개 묶음" % [b.name, b.amount], "title", UiKit.INK))
 	info.add_child(UiKit.paragraph(b.desc, "caption", UiKit.INK_SOFT))
-	var stat_row := UiKit.hbox(UiKit.SPACE_XS)
-	stat_row.add_child(UiKit.badge("잘 무는 고기: " + BaitDB.liked_names(id), Color(UiKit.SEA, 0.18), UiKit.INK))
+	var stat_row := UiKit.hbox(UiKit.SPACE_MD)
+	stat_row.add_child(_stat_text("잘 무는 고기: " + BaitDB.liked_names(id)))
 	info.add_child(stat_row)
 	info.add_child(UiKit.text("가진 것 %d개" % maxi(GameState.bait_count(id), 0), "caption", UiKit.INK_SOFT))
 	h.add_child(info)
-	var buy := UiKit.action(GameState.format_won(b.price), "primary", true)
-	buy.custom_minimum_size.x = 128
+	var buy := UiKit.game_button(GameState.format_won(b.price), UiKit.CORAL_DEEP, SHOP_BTN, 19)
 	buy.disabled = GameState.money < b.price
 	buy.pressed.connect(func():
 		var err := GameState.buy_bait(id)
@@ -268,3 +269,11 @@ func _say(t: String) -> void:
 	_talk.text = GameState.line(t)
 	_talk.visible_ratio = 0.0
 	create_tween().tween_property(_talk, "visible_ratio", 1.0, 0.4)
+
+
+## 능력치 한 토막 (알약 대신 청록 글자)
+func _stat_text(t: String) -> Label:
+	var l := UiKit.text(t, "body", UiKit.TEAL_BTN)
+	l.add_theme_font_override("font", UiKit.font("bold"))
+	l.add_theme_font_size_override("font_size", 15)
+	return l
