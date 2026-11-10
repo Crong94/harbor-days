@@ -8,7 +8,7 @@
 - 폰트: `assets/fonts/NotoSansKR-Regular.ttf` (한글 11,172자 전체 포함, OFL)
 
 ## Git과 GitHub (중요)
-- 원격 저장소: GitHub `crong94/oneului-bada` (**공개**). 기준 브랜치는 `main`.
+- 원격 저장소: GitHub `Crong94/oneului-bada` (**공개**). 기준 브랜치는 `main`.
 - 로컬에서 커밋하고 GitHub에 push한다. 작업을 시작할 때 `git pull`, 끝나면 `git push`.
 - 공개 저장소라서 비밀번호, 토큰, 개인 메일, 집 위치 같은 개인 정보는 파일과 커밋 메시지에 넣지 않는다.
 - 커밋 작성자는 이 저장소 로컬 설정 `Songok Kim <thddhr14@gmail.com>`만 쓴다. 회사 메일로 찍히면 push 전에 고친다 (`git config user.email`로 확인).
@@ -17,7 +17,7 @@
 - 큰 파일(참조 그림 원본, APK)은 계속 git 밖, 구글 드라이브 `오늘의바다_백업`에 둔다.
 
 ## 다음 세션에서 이어 받는 법 (자세한 내용은 docs/HANDOFF.md)
-1. 처음이면 `git clone https://github.com/crong94/oneului-bada.git`, 이미 있으면 `git pull`
+1. 처음이면 `git clone https://github.com/Crong94/oneului-bada.git`, 이미 있으면 `git pull`
 2. 참조 그림이 필요하면 드라이브 `오늘의바다_백업/ref`를 `docs/ref/`에 받는다.
 3. Godot가 없으면 `tools/setup_godot.sh` 실행 (클라우드 세션). 회사 PC는 설치하지 않는다.
 

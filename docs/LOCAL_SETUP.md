@@ -22,7 +22,7 @@ cd /d/games
 ```
 
 ```bash
-git clone https://github.com/crong94/oneului-bada.git
+git clone https://github.com/Crong94/oneului-bada.git
 ```
 
 3. 이 저장소에서만 개인 메일로 커밋하도록 설정한다 (회사 PC는 전역 설정이 회사 메일이라 꼭 한다)
@@ -65,7 +65,7 @@ git log --oneline -3
 ## 6. 매일 작업 흐름 (로컬과 GitHub)
 
 - 시작할 때 `git pull`, 끝나면 커밋하고 `git push`
-- 회사 PC에는 Godot를 깔지 않는다. 회사에서 고친 것은 push하면 GitHub Actions가 테스트를 돌린다. 결과는 github.com/crong94/oneului-bada → Actions 탭
+- 회사 PC에는 Godot를 깔지 않는다. 회사에서 고친 것은 push하면 GitHub Actions가 테스트를 돌린다. 결과는 github.com/Crong94/oneului-bada → Actions 탭
 - 웹 빌드가 필요하면 Actions 탭 → CI → Run workflow → "웹 빌드도 만들기" 체크. 결과 zip은 7일 보관
 - 저장소가 공개라서 개인 정보, 비밀번호, 토큰은 넣지 않는다
 - `./tools/backup.sh`(bundle, zip)는 GitHub가 안 될 때만 쓰는 예비 백업이다
