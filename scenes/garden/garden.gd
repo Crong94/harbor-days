@@ -7,10 +7,13 @@ extends Control
 
 const MAP_SCENE := "res://scenes/map/map.tscn"
 ## 지도 그림에서 텃밭이 있는 자리 (1536x1024 기준 픽셀)
-const MAP_REGION := Rect2(835, 380, 420, 250)
+const MAP_REGION := Rect2(880, 380, 330, 196)
 const ART_H := 330.0
 
 var _header: GameHeader
+var _art: Control # 지도에서 자른 텃밭 그림 (전용 그림이 오면 null)
+var _art_map: TextureRect
+var _art_rows: Control
 var _rows: VBoxContainer
 var _produce: Label
 var _hint: Label
@@ -35,22 +38,73 @@ func _ready() -> void:
 	UiKit.fade_in(self)
 
 
-## 위쪽 텃밭 그림. 전용 그림이 없으면 지도에서 텃밭 자리를 잘라 보여 준다
+## 위쪽 텃밭 그림. 전용 그림이 없으면 지도에서 텃밭 자리를 잘라 보여 주고, 심은 작물 조각을 이랑마다 덮는다
 func _build_art() -> void:
-	var r := TextureRect.new()
 	if ArtSlot.has_art("bg_garden"):
+		var r := TextureRect.new()
 		r.texture = load(ArtSlot.art_path("bg_garden"))
-	elif ArtSlot.has_art("map_village"):
-		var at := AtlasTexture.new()
-		at.atlas = load(ArtSlot.art_path("map_village"))
-		at.region = MAP_REGION
-		r.texture = at
-	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	r.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	r.offset_bottom = GameHeader.BOTTOM + ART_H
-	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(r)
+		r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		r.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+		r.offset_bottom = GameHeader.BOTTOM + ART_H
+		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(r)
+		return
+	# 지도에서 텃밭 자리를 잘라 화면 폭에 꽉 채운다. 이랑 조각은 같은 비율로 그 위에 얹는다
+	_art = Control.new()
+	_art.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	_art.offset_bottom = GameHeader.BOTTOM + ART_H
+	_art.clip_contents = true
+	_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_art)
+	if not ArtSlot.has_art("map_village"):
+		return
+	_art_map = TextureRect.new()
+	var at := AtlasTexture.new()
+	at.atlas = load(ArtSlot.art_path("map_village"))
+	at.region = MAP_REGION
+	_art_map.texture = at
+	_art_map.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_art_map.stretch_mode = TextureRect.STRETCH_SCALE
+	_art_map.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_art.add_child(_art_map)
+	_art_rows = Control.new()
+	_art_rows.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_art.add_child(_art_rows)
+	_art.resized.connect(_layout_art)
+	_layout_art.call_deferred()
+
+
+## 잘라 온 지도를 비율을 지켜 꽉 채우고, 이랑 조각 자리를 같은 배율로 맞춘다
+func _layout_art() -> void:
+	if not _art_map:
+		return
+	var k := maxf(_art.size.x / MAP_REGION.size.x, _art.size.y / MAP_REGION.size.y)
+	var ds := MAP_REGION.size * k
+	var off := (_art.size - ds) / 2.0
+	_art_map.position = off
+	_art_map.size = ds
+	_art_rows.position = off + (CropDB.PLOT_RECT.position - MAP_REGION.position) * k
+	_art_rows.size = CropDB.PLOT_RECT.size * k
+
+
+## 이랑마다 심은 작물과 자란 정도에 맞는 조각을 뒤 이랑부터 덮는다
+func _refresh_art() -> void:
+	if not _art_rows:
+		return
+	for c in _art_rows.get_children():
+		c.queue_free()
+	for i in GameState.garden.size():
+		var path := CropDB.row_art(GameState.garden[i], GameState.day, i)
+		if path.is_empty() or not ResourceLoader.exists(path):
+			continue
+		var r := TextureRect.new()
+		r.texture = load(path)
+		r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		r.stretch_mode = TextureRect.STRETCH_SCALE
+		r.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_art_rows.add_child(r)
 
 
 func _build_top_bar() -> void:
@@ -103,6 +157,7 @@ func _build_sheet() -> void:
 
 func _refresh() -> void:
 	_header.refresh()
+	_refresh_art()
 	for c in _rows.get_children():
 		c.queue_free()
 	var ready := 0

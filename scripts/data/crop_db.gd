@@ -9,6 +9,10 @@ extends RefCounted
 
 const SLOTS := 4
 
+## 지도 그림(map_village, 1536x1024)에서 이랑 조각을 덮을 자리. tools/make_garden_rows.py가 알려 준다
+const PLOT_RECT := Rect2(976, 433, 138, 101)
+const ROW_ART_DIR := "res://assets/art/garden/"
+
 const EMPTY := "empty"
 const GROWING := "growing"
 const READY := "ready"
@@ -65,6 +69,14 @@ static func days_left(slot: Dictionary, today: int) -> int:
 	if slot.is_empty():
 		return 0
 	return maxi(0, int(crop(slot.crop).days) - (today - int(slot.day)))
+
+
+## 지도 위에 덮을 이랑 조각 그림 경로. 빈 칸이면 빈 문자열 (지도 그림의 빈 밭이 그대로 보인다)
+static func row_art(slot: Dictionary, today: int, index: int) -> String:
+	var st := stage(slot, today)
+	if st == EMPTY:
+		return ""
+	return ROW_ART_DIR + "%s_%s_%d.png" % [slot.crop, st, index]
 
 
 ## 자란 정도 0~1 (그림을 고를 때 쓴다)

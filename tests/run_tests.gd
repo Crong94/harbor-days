@@ -813,6 +813,14 @@ func _test_garden() -> void:
 	_eq(int(gs.produce.get("daepa", 0)), 4, "대파 네 단")
 	_eq(CropDB.stage(gs.garden[0], gs.day), CropDB.EMPTY, "거두면 빈 칸")
 	_eq(gs.plant_crop(0, "kkaennip"), "", "빈 칸에 다시 심기")
+	_eq(CropDB.row_art({}, 5, 0), "", "빈 이랑은 지도 조각 없음")
+	for id in CropDB.CROPS:
+		for st in [CropDB.GROWING, CropDB.READY]:
+			for k in CropDB.SLOTS:
+				var p := CropDB.ROW_ART_DIR + "%s_%s_%d.png" % [id, st, k]
+				_eq(ResourceLoader.exists(p), true, "지도 조각 " + p.get_file())
+	_eq(CropDB.row_art({"crop": "mu", "day": 1}, 1, 2).get_file(), "mu_growing_2.png", "자라는 무 조각")
+	_eq(CropDB.row_art({"crop": "mu", "day": 1}, 9, 3).get_file(), "mu_ready_3.png", "다 자란 무 조각")
 	gs.free()
 	_eq(Locations.is_unlocked("garden", {}), true, "텃밭은 처음부터 열림")
 	_eq(Locations.is_unlocked("coop", {}), false, "닭장은 처음엔 잠김")

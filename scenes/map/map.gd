@@ -18,6 +18,7 @@ var _view: Control # 지도를 잘라 보여 주는 창
 var _world: Control # 지도 그림과 핀을 담고 통째로 움직인다
 var _map: TextureRect
 var _pins := {} # id → Control
+var _garden_layer: Control
 var _header: GameHeader
 var _sheet: PanelContainer
 var _sheet_title: Label
@@ -59,6 +60,10 @@ func _ready() -> void:
 	if ArtSlot.has_art("map_village"):
 		_map.texture = load(ArtSlot.art_path("map_village"))
 	_world.add_child(_map)
+	# 텃밭 이랑 조각 (심은 작물이 지도에 보인다). 핀보다 아래
+	_garden_layer = Control.new()
+	_garden_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_world.add_child(_garden_layer)
 	_rebuild_pins()
 
 	# 헤더 아래 글자가 잘 읽히게 위쪽만 살짝 어둡게
@@ -103,6 +108,9 @@ func _layout_world() -> void:
 	var ms := _map_size()
 	_world.size = ms
 	_map.size = ms
+	var ts := _map.texture.get_size() if _map.texture else Vector2(1536, 1024)
+	_garden_layer.position = CropDB.PLOT_RECT.position / ts * ms
+	_garden_layer.size = CropDB.PLOT_RECT.size / ts * ms
 	_layout_pins()
 	_center_on(GameState.current_location, false)
 
@@ -198,6 +206,7 @@ func _process(delta: float) -> void:
 # ─── 핀 ─────────────────────────────────────────────
 
 func _rebuild_pins() -> void:
+	_rebuild_garden()
 	for id in _pins:
 		_pins[id].queue_free()
 	_pins.clear()
@@ -253,6 +262,23 @@ func _make_pin(id: String) -> Control:
 	b.pressed.connect(_on_pin_pressed.bind(id))
 	UiKit._add_press_motion(b)
 	return b
+
+
+## 텃밭 이랑마다 심은 작물과 자란 정도에 맞는 조각을 뒤 이랑부터 차례로 덮는다
+func _rebuild_garden() -> void:
+	for c in _garden_layer.get_children():
+		c.queue_free()
+	for i in GameState.garden.size():
+		var path := CropDB.row_art(GameState.garden[i], GameState.day, i)
+		if path.is_empty() or not ResourceLoader.exists(path):
+			continue
+		var r := TextureRect.new()
+		r.texture = load(path)
+		r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		r.stretch_mode = TextureRect.STRETCH_SCALE
+		r.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_garden_layer.add_child(r)
 
 
 ## 장소 핀을 지도 그림 위 비율 위치에 놓는다. 핀의 가운데 아래가 그 위치를 가리킨다
