@@ -228,7 +228,7 @@ func _test_fishing() -> void:
 	_run_until(l, [], always, 0.5)
 	l.release()
 	_eq(l.state, S.CASTING, "떼면 던지기")
-	_eq(l.cast_power > 0.4 and l.cast_power < 0.7, true, "0.5초 힘 (%.2f)" % l.cast_power)
+	_eq(l.cast_power > 0.25 and l.cast_power < 0.5, true, "0.5초 힘 (%.2f)" % l.cast_power)
 	_run_until(l, [S.WAITING], never, 2.0)
 	_eq(l.state, S.WAITING, "던진 뒤 기다리기")
 

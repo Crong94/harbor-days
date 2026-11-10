@@ -20,7 +20,7 @@ extends RefCounted
 
 enum State { READY, CHARGING, CASTING, WAITING, BITE, REELING, CAUGHT, FAILED }
 
-const POWER_SPEED := 0.95 # 힘 게이지가 차오르는 속도 (초당)
+const POWER_SPEED := 0.7 # 힘 게이지가 차오르는 속도 (초당). 2026-11-10 0.95에서 낮춤 (NICE 구간이 0.1초뿐이라 너무 어려웠다)
 const CAST_TIME := 0.8
 const WAIT_MIN := 2.5
 const WAIT_MAX := 6.0
@@ -49,17 +49,24 @@ const CAST_NICE := 0.05
 const CAST_GOOD := 0.12
 
 ## 줄다리기
-const TENSION_DOWN := 0.95
+const TENSION_DOWN := 0.7 # 손을 떼면 1초에 풀리는 장력
 const REEL_SPEED := 0.17
 const HP_DRAIN := 0.15 # 누르고 감을 때 물고기 체력이 깎이는 속도 (힘 0.5 기준 근처)
 const HP_COUNTER := 0.24 # 반대로 버틸 때 더 깎이는 양
 const COUNTER_STEER := 0.35 # 이만큼 이상 반대로 끌어야 버티기로 친다
 const EXHAUSTED_REEL := 2.4 # 지친 물고기를 감는 속도 배율
-const BREAK_HOLD := 0.35 # 장력이 최대인 채로 버티면 줄이 끊기는 시간
+const BREAK_HOLD := 0.9 # 장력이 최대인 채로 버티면 줄이 끊기는 시간 (2026-11-10 사용자: 너무 어려움. 0.35에서 늘림)
 const SLACK_LIMIT := 2.2
 const SLACK_LIMIT_FORGIVING := 3.5
 const FAIL_SHOW_TIME := 2.0
 const FAIL_SKIP_AFTER := 0.45 # 실패 안내가 뜬 뒤 이만큼 지나면 눌러서 바로 다음 캐스팅을 시작할 수 있다
+## 장력 오르는 속도 (2026-11-10 낮춤. 사람 반응 0.35초를 넣은 tools/fight_balance.gd로 맞췄다)
+const TENSION_REEL := 0.12 # 누르고 감을 때 기본
+const TENSION_PULL := 0.24 # 물고기가 당기는 힘만큼 더
+const TENSION_RUN_HELD := 0.42 # 차고 나가는데 그대로 감을 때
+const TENSION_RUN_FREE := 0.12 # 차고 나가는데 손을 뗐을 때
+## 장력 구간: 이보다 낮으면 느슨함(파랑, 감는 힘이 덜 들어간다), DANGER부터 위험(빨강). 그 사이가 알맞음(초록)
+const TENSION_SLACK := 0.2
 ## 장력 단계 (화면 색, 깜빡임, 진동에 쓴다)
 const TENSION_WARN := 0.62
 const TENSION_DANGER := 0.85
@@ -399,7 +406,7 @@ func _update_reel(dt: float, held: bool) -> void:
 	countering = run_dir != 0 and held and steer * run_dir <= -COUNTER_STEER
 	if run_dir != 0 and not countering:
 		fish_x = clampf(fish_x + run_dir * 0.9 * dt, -1.0, 1.0)
-		escape += (0.25 + s * 0.4) * easy * dt
+		escape += (0.12 + s * 0.22) * easy * dt
 	else:
 		fish_x = move_toward(fish_x, 0.0, (0.9 if countering else 0.35) * dt)
 		escape = maxf(0.0, escape - (0.45 if countering else 0.2) * dt)
@@ -408,16 +415,16 @@ func _update_reel(dt: float, held: bool) -> void:
 	# 다만 힘센 고기는 버티는 동안에도 장력이 오르니, 쉬는 틈에 손을 떼서 식혀야 한다. 좋은 장비일수록 덜 오른다
 	var pull := fish_pull()
 	if held and countering:
-		tension += (0.06 + maxf(0.0, s - 0.55) * 0.9 * tm) * dt
+		tension += (0.03 + maxf(0.0, s - 0.6) * 0.5 * tm) * dt
 	elif held:
-		tension += (0.26 + pull * 0.45) * dt * tm
+		tension += (TENSION_REEL + pull * TENSION_PULL) * dt * tm
 	else:
 		tension -= TENSION_DOWN * dt
 	if run_dir != 0 and not countering:
 		if held:
-			tension += _run_power * 0.95 * dt * tm # 차고 나가는데 그대로 감으면 줄이 위험하다
+			tension += _run_power * TENSION_RUN_HELD * dt * tm # 차고 나가는데 그대로 감으면 줄이 위험하다
 		else:
-			tension += _run_power * 0.3 * dt * tm
+			tension += _run_power * TENSION_RUN_FREE * dt * tm
 			distance += 0.07 * dt # 손을 떼면 줄이 풀려 나간다
 	if exhausted:
 		tension = minf(tension, 0.7)
@@ -443,6 +450,8 @@ func _update_reel(dt: float, held: bool) -> void:
 			k *= 0.4
 		if exhausted:
 			k = EXHAUSTED_REEL
+		elif tension < TENSION_SLACK:
+			k *= 0.6 # 줄이 느슨하면 감아도 덜 끌려온다 (알맞은 장력을 유지하는 게 요령)
 		distance -= REEL_SPEED * k * reel_mult * dt
 	distance = clampf(distance, 0.0, 1.0)
 
