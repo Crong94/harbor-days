@@ -666,6 +666,14 @@ func _record_catch() -> void:
 	var best: float = GameState.dex.get(logic.fish_id, 0.0)
 	_card_new = best == 0.0
 	_card_record = best > 0.0 and logic.fish_size > best
+	# 일지 메모 (오늘의 한 줄 후보)
+	var fname: String = FishDB.get_fish(logic.fish_id).name
+	if _card_new:
+		GameState.note("처음으로 %s 잡았다. 도감에 한 칸이 찼다." % Josa.attach(fname, "을/를"), 4 if FishDB.get_fish(logic.fish_id).rarity != "common" else 3)
+	elif FishDB.is_trophy(logic.fish_id, logic.fish_size):
+		GameState.note("%s %.1fcm. 손이 떨릴 만큼 큰 놈이었다." % [fname, logic.fish_size], 3)
+	elif _card_record:
+		GameState.note("%s 최대 기록을 %.1fcm로 늘렸다." % [fname, logic.fish_size], 2)
 	GameState.dex[logic.fish_id] = maxf(best, logic.fish_size)
 
 

@@ -11,7 +11,7 @@ extends RefCounted
 
 const EVENTS := [
 	{
-		"id": "mansu_mend", "place": "breakwater", "day": 2, "needs": ["first_guest_done"], "time": [5 * 60, 11 * 60],
+		"id": "mansu_mend", "note": "방파제 노인은 박만수 할아버지였다. 견제하는 법을 배웠다.", "place": "breakwater", "day": 2, "needs": ["first_guest_done"], "time": [5 * 60, 11 * 60],
 		"set": ["met_mansu"],
 		"lines": [
 			{"speaker": "", "text": "방파제 끝에 어제 그 노인이 또 앉아 있다. 오늘은 혼자 막걸리 한 병을 옆에 두었다."},
@@ -24,7 +24,7 @@ const EVENTS := [
 		],
 	},
 	{
-		"id": "yongpal_first", "place": "market", "day": 2, "needs": [],
+		"id": "yongpal_first", "note": "시장 경매사 오용팔 아저씨를 만났다. 남는 고기는 시장에 넘기면 된다.", "place": "market", "day": 2, "needs": [],
 		"set": ["met_yongpal"],
 		"lines": [
 			{"speaker": "", "text": "셔터가 반쯤 내려간 시장 안쪽에서 누가 커다란 종을 닦고 있다."},
@@ -36,7 +36,7 @@ const EVENTS := [
 		],
 	},
 	{
-		"id": "kyungja_store", "place": "store", "day": 3, "needs": [],
+		"id": "kyungja_store", "note": "경자상회 할머니 서랍에 외상장부가 수십 권 있었다.", "place": "store", "day": 3, "needs": [],
 		"set": ["met_kyungja"],
 		"lines": [
 			{"speaker": "", "text": "유리문에 붙은 담배 광고가 다 바랬다. 계산대 뒤에 작은 할머니가 장부를 넘기고 있다."},
@@ -50,7 +50,7 @@ const EVENTS := [
 		],
 	},
 	{
-		"id": "bokja_diner", "place": "diner", "day": 4, "needs": [],
+		"id": "bokja_diner", "note": "복자네 밥집 사장님이 망하지만 말고 버텨 보라고 했다.", "place": "diner", "day": 4, "needs": [],
 		"set": ["met_bokja"],
 		"lines": [
 			{"speaker": "", "text": "점심 장사를 막 끝낸 밥집에서 고소한 냄새가 흘러나온다. 앞치마를 두른 아주머니가 팔짱을 끼고 나온다."},
@@ -63,7 +63,7 @@ const EVENTS := [
 		],
 	},
 	{
-		"id": "mansu_tide", "place": "breakwater", "day": 5, "needs": ["met_mansu"], "time": [5 * 60, 11 * 60],
+		"id": "mansu_tide", "note": "만수 할아버지한테 물때를 배웠다. 감성돔 한 마리 올리면 갯바위에 데려가 준단다.", "place": "breakwater", "day": 5, "needs": ["met_mansu"], "time": [5 * 60, 11 * 60],
 		"set": ["learned_tide_talk"],
 		"lines": [
 			{"speaker": "박만수", "text": "니 물때 볼 줄 아나."},
@@ -129,6 +129,8 @@ static func finish(ev: Dictionary, gs: Object) -> void:
 		gs.flags[f] = true
 	if int(ev.get("money", 0)) > 0:
 		gs.earn(int(ev.money))
+	if ev.has("note"):
+		gs.note(ev.note, 3)
 
 
 ## 장소 화면이 없는 곳의 잡담 한 묶음. 없으면 빈 배열

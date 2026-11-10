@@ -1,10 +1,11 @@
 class_name GameMenu
 extends CanvasLayer
-## 헤더의 메뉴 버튼으로 여는 아래 시트. 탭 네 개: 가방, 도감, 장비, 설정.
+## 헤더의 메뉴 버튼으로 여는 아래 시트. 탭 다섯 개: 가방, 도감, 장비, 일지, 설정.
 ## CanvasLayer라서 어느 장면에서 열어도 맨 위에 뜬다. GameHeader가 만든다.
 ##
 ## 가방: 아이스박스(GameState.inventory)를 어종별로 묶어 마리 수, 최대 크기, 값
-## 도감: FishDB 어종. 잡은 건 그림과 최대 기록, 못 잡은 건 어두운 그림자와 "???"
+## 도감: FishDB 어종. 잡은 건 그림과 최대 기록, 못 잡은 건 어두운 그림자와 "???". 잡은 카드를 누르면 자세히 (사는 곳, 시간, 날씨, 미끼, 버릇)
+## 일지: 하루가 끝날 때마다 쌓이는 장부 한 장 (Journal). 최근 것부터
 ## 장비: 가진 낚싯대, 릴, 미끼 중 고르기 (바꾸면 gear_changed)
 ## 설정: 배경음악, 효과음, 진동, 화면 흔들림 켜고 끄기, 타이틀로
 
@@ -12,7 +13,7 @@ signal closed
 signal gear_changed
 
 const TITLE_SCENE := "res://scenes/title/title.tscn"
-const TABS := [["bag", "가방"], ["dex", "도감"], ["gear", "장비"], ["settings", "설정"]]
+const TABS := [["bag", "가방"], ["dex", "도감"], ["gear", "장비"], ["log", "일지"], ["settings", "설정"]]
 const SHEET_H := 940.0 # 가장 클 때 높이. 내용이 적으면 줄어든다
 const SHEET_MIN := 520.0
 const CHROME := 200.0 # 시트 안 목록 말고 나머지(여백, 제목 줄, 탭) 높이
@@ -25,6 +26,7 @@ var _tab := "bag"
 var _title_armed := false
 var _scroll: ScrollContainer
 var _height := SHEET_H
+var _dex_pick := "" # 도감에서 자세히 보는 어종
 
 
 func _ready() -> void:
@@ -104,6 +106,7 @@ func _make_tabs() -> PanelContainer:
 		b.pressed.connect(func():
 			_tab = id
 			_title_armed = false
+			_dex_pick = ""
 			Sound.play_sfx("tap", 0.05, -8.0)
 			_refresh())
 		_tab_buttons[id] = b
@@ -123,6 +126,8 @@ func _refresh() -> void:
 			_build_dex()
 		"gear":
 			_build_gear()
+		"log":
+			_build_log()
 		_:
 			_build_settings()
 	_fit_height()
@@ -175,11 +180,16 @@ func _build_bag() -> void:
 # ─── 도감 ───────────────────────────────────────────
 
 func _build_dex() -> void:
+	if not _dex_pick.is_empty():
+		_build_dex_detail(_dex_pick)
+		return
 	var found := 0
 	for id in FishDB.FISH:
 		if GameState.dex.get(id, 0.0) > 0.0:
 			found += 1
-	_list.add_child(UiKit.text("북쪽 방파제  ·  발견 %d / %d" % [found, FishDB.FISH.size()], "label", UiKit.INK_SOFT))
+	var head := UiKit.text("북쪽 방파제  ·  발견 %d / %d  ·  잡은 고기를 누르면 자세히" % [found, FishDB.FISH.size()], "body", UiKit.NOTE_INK_SOFT)
+	head.add_theme_font_size_override("font_size", 16)
+	_list.add_child(head)
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", UiKit.SPACE_SM)
@@ -190,26 +200,142 @@ func _build_dex() -> void:
 		var f := FishDB.get_fish(id)
 		var best: float = GameState.dex.get(id, 0.0)
 		var caught := best > 0.0
-		var card := PanelContainer.new()
-		card.add_theme_stylebox_override("panel", UiKit.inset_box(UiKit.SPACE_MD, UiKit.RADIUS_MD))
+		var card := Button.new()
+		card.flat = true
+		card.focus_mode = Control.FOCUS_NONE
+		card.disabled = not caught
+		card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if caught else Control.CURSOR_ARROW
+		var face := UiKit.box(Color(UiKit.NOTE_DARK, 0.3), 16, Color(UiKit.NOTE_DARK, 0.7), 1, 10)
+		var down := UiKit.box(Color(UiKit.NOTE_DARK, 0.6), 16, Color(UiKit.NOTE_DARK, 0.7), 1, 10)
+		for st in ["normal", "hover", "disabled", "focus"]:
+			card.add_theme_stylebox_override(st, face)
+		card.add_theme_stylebox_override("pressed", down)
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var v := UiKit.vbox(4)
+		card.custom_minimum_size.y = 136
+		var v := UiKit.vbox(2)
+		v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		v.offset_top = 8
+		v.offset_bottom = -8
+		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(v)
-		var art := UiKit.icon_rect("fish_" + id, 70)
+		var art := UiKit.icon_rect("fish_" + id, 66)
 		if art:
-			art.custom_minimum_size = Vector2(0, 70)
+			art.custom_minimum_size = Vector2(0, 66)
 			if not caught:
 				art.modulate = UiKit.SILHOUETTE # 못 잡은 물고기는 그림자만
 			v.add_child(art)
 		var name_row := UiKit.hbox(6, BoxContainer.ALIGNMENT_CENTER)
-		name_row.add_child(UiKit.text(f.name if caught else "???", "title", UiKit.INK if caught else UiKit.INK_SOFT))
-		var rar := FishDB.rarity(id)
-		if caught and rar != FishDB.RARITY.common:
-			name_row.add_child(UiKit.badge(rar.name, rar.color, UiKit.INK))
+		name_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		name_row.add_child(UiKit.text(f.name if caught else "???", "title", UiKit.NOTE_INK if caught else UiKit.NOTE_INK_SOFT))
+		if caught and FishDB.rarity(id) != FishDB.RARITY.common:
+			name_row.add_child(_rarity_text(id))
 		v.add_child(name_row)
-		v.add_child(UiKit.text("최대 %.1fcm" % best if caught else "아직 못 잡았어요", "caption", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
+		var sub := UiKit.text("최대 %.1fcm" % best if caught else "아직 못 잡았어요", "body", UiKit.NOTE_INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER)
+		sub.add_theme_font_size_override("font_size", 15)
+		v.add_child(sub)
+		var pick: String = id
+		card.pressed.connect(func():
+			Sound.play_sfx("page", 0.05, -6.0)
+			_dex_pick = pick
+			_refresh())
 		grid.add_child(card)
 
+
+## 희귀도: 알약 대신 희귀도 색 글자
+func _rarity_text(id: String) -> Label:
+	var rar := FishDB.rarity(id)
+	var c: Color = rar.color
+	var l := UiKit.text(rar.name, "label", c.darkened(0.25))
+	l.add_theme_font_size_override("font_size", 21)
+	return l
+
+
+## 도감 자세히: 설명과 낚는 요령 (사는 곳, 시간, 날씨, 미끼, 버릇)
+func _build_dex_detail(id: String) -> void:
+	var f := FishDB.get_fish(id)
+	var back := UiKit.game_button("‹ 도감", UiKit.GRAY_DARK)
+	back.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	back.pressed.connect(func():
+		_dex_pick = ""
+		_refresh())
+	_list.add_child(back)
+	var top := UiKit.hbox(UiKit.SPACE_MD)
+	top.alignment = BoxContainer.ALIGNMENT_CENTER
+	var art := UiKit.icon_rect("fish_" + id, 110)
+	if art:
+		art.custom_minimum_size = Vector2(200, 110)
+		top.add_child(art)
+	var tv := UiKit.vbox(0)
+	tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var nr := UiKit.hbox(8)
+	nr.alignment = BoxContainer.ALIGNMENT_CENTER
+	nr.add_child(UiKit.text(f.name, "h2", UiKit.NOTE_INK))
+	nr.add_child(_rarity_text(id))
+	tv.add_child(nr)
+	var best: float = GameState.dex.get(id, 0.0)
+	tv.add_child(UiKit.text("최대 기록 %.1fcm  ·  %d~%dcm" % [best, int(f.min_cm), int(f.max_cm)], "body", UiKit.NOTE_INK_SOFT))
+	top.add_child(tv)
+	_list.add_child(top)
+	var desc := UiKit.paragraph(f.desc, "body", UiKit.NOTE_INK)
+	desc.add_theme_font_size_override("font_size", 19)
+	_list.add_child(desc)
+	_list.add_child(UiKit.gap(4))
+	for row in DexInfo.facts(id):
+		_list.add_child(_fact_row(row[0], row[1]))
+
+
+func _fact_row(key: String, value: String) -> Control:
+	var row := UiKit.note_row()
+	var h: HBoxContainer = row.get_child(0)
+	var k := UiKit.text(key, "title", UiKit.TEAL_BTN)
+	k.add_theme_font_size_override("font_size", 19)
+	k.custom_minimum_size.x = 132
+	h.add_child(k)
+	var v := UiKit.paragraph(value, "body", UiKit.NOTE_INK)
+	v.add_theme_font_size_override("font_size", 18)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(v)
+	return row
+
+
+# ─── 일지 ───────────────────────────────────────────
+
+## 장부 한 장씩 (최근 것부터): 날짜 · 날씨 · 물때 / 잡은 고기 / 매출과 지출 / 오늘의 한 줄
+func _build_log() -> void:
+	if GameState.journal.is_empty():
+		_list.add_child(_empty_note("하루를 마치면 여기에 장부가 한 장씩 쌓여요"))
+		return
+	var pages: Array = GameState.journal.duplicate()
+	pages.reverse()
+	for pg in pages.slice(0, 30):
+		var v := UiKit.vbox(2)
+		v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var head := UiKit.text("%s  ·  %s  ·  %s" % [Calendar.text(int(pg.day)), pg.weather, pg.tide], "title", UiKit.NOTE_INK)
+		head.add_theme_font_size_override("font_size", 21)
+		v.add_child(head)
+		v.add_child(_log_line("잡은 고기", Journal.caught_text(pg.caught)))
+		v.add_child(_log_line("매출 / 지출", "%s / %s" % [GameState.format_won(int(pg.sales)), GameState.format_won(int(pg.spent))]))
+		var one := UiKit.paragraph(pg.line, "body", UiKit.NOTE_INK)
+		one.add_theme_font_override("font", UiKit.font("serif_bold")) # 손으로 쓴 일기 느낌
+		one.add_theme_font_size_override("font_size", 19)
+		v.add_child(one)
+		var row := UiKit.note_row()
+		(row.get_child(0) as HBoxContainer).add_child(v)
+		_list.add_child(row)
+		_list.add_child(UiKit.gap(6))
+
+
+func _log_line(key: String, value: String) -> Control:
+	var h := UiKit.hbox(10)
+	var k := UiKit.text(key, "body", UiKit.NOTE_INK_SOFT)
+	k.add_theme_font_size_override("font_size", 16)
+	k.custom_minimum_size.x = 96
+	h.add_child(k)
+	var v := UiKit.paragraph(value, "body", UiKit.NOTE_INK)
+	v.add_theme_font_size_override("font_size", 17)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(v)
+	return h
 
 # ─── 장비 ───────────────────────────────────────────
 

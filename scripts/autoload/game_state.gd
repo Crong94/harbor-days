@@ -33,6 +33,10 @@ var yesterday_sales := 0
 var yesterday_spent := 0
 ## 하루 서랍을 마지막으로 연 날. 오늘 아직 안 열었으면 탭에 빨간 점
 var drawer_seen_day := 0
+## 장부 일지 (Journal). 하루가 끝날 때마다 한 장씩
+var journal: Array = []
+## 오늘 있었던 일 메모 [{"p": 중요도, "text"}]. 그중 가장 중요한 것이 일지의 "오늘의 한 줄"이 된다
+var notes_today: Array = []
 
 ## 낚시 기록. 항목 형식: {"id": "bolak", "size": 18.3, "day": 잡은 날}
 var caught_today: Array = []
@@ -252,6 +256,7 @@ func offer_to_order(fish_id: String, size_cm: float) -> int:
 		order_done = true
 		_deliver_order(o)
 		earn(o.reward)
+		note("%s 부탁한 %s %d마리를 보냈다." % [Josa.attach(Orders.call_name(o.customer), "이/가"), FishDB.get_fish(o.fish).name, o.count], 2)
 		return o.reward
 	return 0
 
@@ -321,6 +326,10 @@ func take_fish(id: String) -> Dictionary:
 ## 하루를 마치고 다음 날 아침으로 넘어간다.
 ## wake_minutes를 주지 않으면 DayFlow 규칙대로 (밤 낚시를 했으면 늦잠)
 func end_day(wake_minutes := -1) -> void:
+	journal.append(Journal.page(self))
+	if journal.size() > Journal.MAX_PAGES:
+		journal.pop_front()
+	notes_today = []
 	yesterday_sales = sales_today
 	yesterday_spent = spent_today
 	news_today = []
@@ -331,7 +340,7 @@ func end_day(wake_minutes := -1) -> void:
 		_news("아이스박스에서 생선 %d마리가 상해서 버렸어요. 잡은 다음 날 저녁까지 팔아요" % spoiled.size())
 	Coop.next_day(self)
 	day += 1
-	# 매달 1일은 대출 상환일
+	# 매달 1일은 대출, 월세, 공과금이 나가는 날 (Loan)
 	var r := Loan.settle(day, money, debt, monthly_repayment, arrears)
 	if not r.is_empty():
 		if r.paid > 0:
@@ -356,6 +365,11 @@ func clock_text() -> String:
 	var h := m / 60
 	var period := "새벽" if h < 6 else ("오전" if h < 12 else ("오후" if h < 18 else "저녁" if h < 21 else "밤"))
 	return "%s %s %02d:%02d" % [Calendar.short_text(day), period, h, m % 60]
+
+
+## 오늘 있었던 일을 일지에 메모한다. 중요도가 가장 높은 메모가 그날의 한 줄이 된다 (템플릿 그대로 넣어도 된다)
+func note(text: String, priority := 1) -> void:
+	notes_today.append({"p": priority, "text": line(text)})
 
 
 ## 아침 소식 한 줄: 토스트로 띄우고(notices) 하루 서랍에도 남긴다(news_today)

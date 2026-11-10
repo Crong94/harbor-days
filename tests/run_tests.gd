@@ -34,6 +34,7 @@ func _init() -> void:
 	_test_brief()
 	_test_story()
 	_test_fishing_depth()
+	_test_journal()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -929,27 +930,29 @@ func _test_month() -> void:
 	_eq(Loan.days_left(25), 7, "상환까지 이레")
 	_eq(Loan.settle(1, 0, 100, 10, 0), {}, "첫날은 상환 없음")
 	_eq(Loan.settle(20, 999999, 100, 10, 0), {}, "달 중간엔 상환 없음")
-	var ok := Loan.settle(32, 600000, 30000000, 550000, 0)
-	_eq(ok.paid, 550000, "통장이 넉넉하면 갚음")
+	var ok := Loan.settle(32, 900000, 30000000, 550000, 0)
+	_eq(ok.paid, 550000 + Loan.RENT + 50000, "통장이 넉넉하면 대출, 월세, 봄 공과금을 냄")
 	_eq(ok.debt, 30000000 - 550000, "갚은 만큼 대출이 줄어듦")
 	var bad := Loan.settle(32, 100000, 30000000, 550000, 0)
 	_eq(bad.paid, 0, "모자라면 못 갚음")
-	_eq(bad.arrears, 550000, "못 갚은 돈은 밀림")
-	var catch_up := Loan.settle(62, 2000000, 30000000, 550000, 550000)
-	_eq(catch_up.paid, 1100000, "다음 달엔 밀린 돈까지 냄")
+	_eq(bad.arrears, 800000, "못 낸 돈은 밀림")
+	var catch_up := Loan.settle(62, 2000000, 30000000, 550000, 800000)
+	_eq(catch_up.paid, 1600000, "다음 달엔 밀린 돈까지 냄")
 	_eq(catch_up.arrears, 0, "밀린 돈 정리")
-	_eq(Loan.settle(32, 999999, 300000, 550000, 0).paid, 300000, "남은 대출보다 더 내지 않음")
+	_eq(Loan.settle(32, 999999, 300000, 550000, 0).loan, 300000, "남은 대출보다 더 내지 않음")
+	_eq(Loan.settle(32, 999999, 0, 550000, 0).paid, 250000, "대출을 다 갚아도 월세와 공과금은 나감")
+	_eq(Loan.bills(Calendar.next_month_start(150)) > Loan.bills(32), true, "여름 공과금이 더 비쌈")
 	_eq(Loan.header_text(10, 550000, 0, 30000000), "", "상환일이 멀면 헤더에 안 보임")
-	_eq(Loan.header_text(29, 550000, 0, 30000000), "상환 D-3 · 55만", "상환일이 가까우면 보임")
-	_eq(Loan.notice(ok).contains("갚았어요"), true, "상환 알림")
-	_eq(Loan.notice(bad).contains("못 갚았어요"), true, "연체 알림")
+	_eq(Loan.header_text(29, 550000, 0, 30000000), "고정비 D-3 · 80만", "1일이 가까우면 보임")
+	_eq(Loan.notice(ok).contains("냈어요"), true, "고정비 알림")
+	_eq(Loan.notice(bad).contains("못 냈어요"), true, "연체 알림")
 
 	var gs = load("res://scripts/autoload/game_state.gd").new()
 	gs.day = 31
-	gs.money = 700000
+	gs.money = 900000
 	gs.end_day()
 	_eq(gs.day, 32, "4월 1일 아침")
-	_eq(gs.money, 150000, "상환금이 빠짐")
+	_eq(gs.money, 100000, "고정비가 빠짐")
 	_eq(gs.debt, 30000000 - 550000, "대출 잔액")
 	_eq(gs.notices.size(), 1, "상환 알림이 쌓임")
 	_eq(gs.pop_notices().size(), 1, "알림 꺼내기")
@@ -958,7 +961,7 @@ func _test_month() -> void:
 	gs.money = 100000
 	gs.end_day()
 	_eq(gs.money, 100000, "모자라면 그대로")
-	_eq(gs.arrears, 550000, "연체")
+	_eq(gs.arrears, 800000, "연체")
 	_eq(gs.missed_payments, 1, "연체한 달 수")
 	gs.free()
 
@@ -1054,7 +1057,7 @@ func _test_brief() -> void:
 	var b := DayBrief.build(gs)
 	_eq(b.title, "3월 31일 (수) 오늘", "서랍 제목")
 	_eq(b.stats[0].value, "42,000원", "맨 위 어제 번 돈")
-	_eq(b.stats[2].name, "상환 D-1", "다음 상환")
+	_eq(b.stats[2].name, "고정비 D-1", "다음 달 고정비")
 	var names: Array = b.sections.map(func(s): return s.name)
 	_eq(names, ["지금 할 일", "오늘 주문", "오늘의 바다", "아침 소식"], "서랍 분류")
 	var todo: Array = b.sections[0].rows
@@ -1242,3 +1245,36 @@ func _test_fishing_depth() -> void:
 			lost_by_jump += 1
 	_eq(jumped > 0, true, "학공치 바늘털이 (%d번)" % jumped)
 	_eq(lost_by_jump > 0, true, "바늘털이 때 손을 떼면 놓침 (%d번)" % lost_by_jump)
+
+
+## 장부 일지와 도감 자세히
+func _test_journal() -> void:
+	_eq(Journal.line([], 0, 0, 0).contains("못 잡고"), true, "아무것도 안 한 날")
+	_eq(Journal.line([], 5, 40000, 4000), "5마리 잡고 36,000원 남겼다.", "숫자로 짓는 한 줄")
+	_eq(Journal.line([{"p": 1, "text": "a"}, {"p": 3, "text": "b"}, {"p": 2, "text": "c"}], 5, 0, 0), "b", "가장 중요한 메모")
+	_eq(Journal.caught_text({"mangsang": 2, "bolak": 4}), "볼락 4, 망상어 2", "잡은 고기 한 줄 (도감 순서)")
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.day = 12
+	gs.caught_today = [{"id": "bolak", "size": 15.0}, {"id": "bolak", "size": 17.0}]
+	gs.sales_today = 30000
+	gs.note("처음으로 볼락을 잡았다.", 3)
+	gs.note("그냥 메모", 1)
+	gs.end_day()
+	_eq(gs.journal.size(), 1, "하루가 끝나면 한 장")
+	_eq(gs.journal[0].day, 12, "그날 날짜")
+	_eq(gs.journal[0].caught, {"bolak": 2}, "잡은 고기 셈")
+	_eq(gs.journal[0].line, "처음으로 볼락을 잡았다.", "오늘의 한 줄")
+	_eq(gs.notes_today.size(), 0, "다음 날 메모 비움")
+	# 주문을 채우면 메모가 남는다
+	var o := Orders.of(gs.day)
+	for i in o.count:
+		gs.offer_to_order(o.fish, o.min_cm + 1.0)
+	_eq(gs.notes_today.size(), 1, "주문 메모")
+	gs.free()
+	# 도감 자세히
+	for id in FishDB.FISH:
+		_eq(DexInfo.facts(id).size() >= 5, true, "%s 낚는 요령" % id)
+	_eq(DexInfo.facts("bolak")[1][1], "어두운 새벽과 밤", "볼락은 어두울 때")
+	_eq(DexInfo.facts("hakgongchi")[0][1], "먼 물", "학공치는 먼 물")
+	_eq(DexInfo.facts("ureok").back()[0], "버릇", "우럭 버릇")
+	_eq(Locations.is_unlocked("hall", {"chapter2_done": true}), false, "마을회관은 할 일이 생길 때까지 잠김")

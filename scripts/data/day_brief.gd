@@ -5,7 +5,7 @@ extends RefCounted
 ##
 ## 여울에서 고친 점
 ## - 같은 일이 여러 칸(오늘 저녁 VIP, 예약, 아침 소식)에 겹쳐 나오던 것을 한 번만 보여 준다
-## - 긴 소식 문장 대신 맨 위 숫자 세 칸(어제 번 돈, 통장, 다음 상환)으로 먼저 보여 준다
+## - 긴 소식 문장 대신 맨 위 숫자 세 칸(어제 번 돈, 통장, 다음 달 고정비)으로 먼저 보여 준다
 ## - "지금 할 일"은 지금 시각에 맞춰 할 수 있는 것만, 하는 순서대로. 줄을 누르면 지도에서 그 장소를 고른다
 ## - 남은 시간과 마감은 오른쪽에 짧게 (예: "~11:00", "D-3")
 ##
@@ -36,11 +36,11 @@ static func _stats(gs: Object) -> Array:
 		var net: int = gs.yesterday_sales - gs.yesterday_spent
 		out.append({"name": "어제 번 돈", "value": _won(net), "tone": "good" if net >= 0 else "bad"})
 	out.append({"name": "통장", "value": _won(gs.money), "tone": "info"})
-	if gs.debt > 0:
-		var due: int = mini(gs.monthly_repayment + gs.arrears, gs.debt)
-		var left := Loan.days_left(gs.day)
-		var short: bool = gs.money < due
-		out.append({"name": "상환 D-%d" % left, "value": _won(due), "tone": "bad" if (short and left <= Loan.WARN_DAYS) or gs.arrears > 0 else "info"})
+	# 다음 1일에 나갈 돈 (대출, 월세, 공과금, 밀린 돈)
+	var left := Loan.days_left(gs.day)
+	var due := Loan.due(Calendar.next_month_start(gs.day), gs.monthly_repayment, gs.arrears, gs.debt)
+	var short: bool = gs.money < due
+	out.append({"name": "고정비 D-%d" % left, "value": _won(due), "tone": "bad" if (short and left <= Loan.WARN_DAYS) or gs.arrears > 0 else "info"})
 	return out
 
 
@@ -101,7 +101,7 @@ static func _sea(day: int, m: int) -> Array:
 static func _news(gs: Object) -> Array:
 	var rows: Array = []
 	for t in gs.news_today:
-		var bad: bool = t.contains("못 갚") or t.contains("상해서")
+		var bad: bool = t.contains("못 냈") or t.contains("상해서")
 		rows.append({"text": t, "state": "", "tone": "bad" if bad else "info", "target": ""})
 	return rows
 

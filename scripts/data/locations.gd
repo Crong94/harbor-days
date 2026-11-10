@@ -7,6 +7,7 @@ extends RefCounted
 ## 위쪽에 항구와 빨간 등대 방파제, 가운데 가게 거리, 아래쪽 언덕 마을과 해변, 오른쪽 터널과 동백섬.
 ## 핀은 보통 pos 위에 서서 아래 끝이 pos를 가리킨다. "pin": "below"면 pos 아래에 매달린다 (위에 자리가 없을 때).
 ## unlock은 GameState.flags 이름이다. 빈 문자열이면 처음부터 열려 있다.
+## 할 일이 아직 없는 곳(마을회관, 분교, 민박)은 그곳 이야기가 생길 때 켤 표시로 잠가 둔다 (hall_open, met_haesol, met_jiwoo)
 ## "hidden": true인 곳은 열리기 전까지 지도에 점도 보이지 않는다 (숨은 장소).
 
 const LIST := {
@@ -59,15 +60,15 @@ const LIST := {
 		"scene": "", "desc": "마을과 바다가 한눈에 보이는 정자",
 	},
 	"hall": {
-		"name": "마을회관", "pos": Vector2(0.329, 0.459), "unlock": "chapter2_done",
+		"name": "마을회관", "pos": Vector2(0.329, 0.459), "unlock": "hall_open",
 		"scene": "", "desc": "게시판과 마을 의뢰",
 	},
 	"school": {
-		"name": "물빛분교", "pos": Vector2(0.555, 0.488), "unlock": "chapter2_done",
+		"name": "물빛분교", "pos": Vector2(0.555, 0.488), "unlock": "met_haesol",
 		"scene": "", "desc": "학생이 한 명뿐인 분교",
 	},
 	"guesthouse": {
-		"name": "등대민박", "pos": Vector2(0.254, 0.198), "unlock": "chapter2_done",
+		"name": "등대민박", "pos": Vector2(0.254, 0.198), "unlock": "met_jiwoo",
 		"scene": "", "desc": "방 다섯 개짜리 민박",
 	},
 	"rocks": {

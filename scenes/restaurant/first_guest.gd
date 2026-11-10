@@ -222,6 +222,7 @@ func _guest_arrives() -> void:
 		{"speaker": "최순덕", "text": "{shop|이/가}라... 이름 좋네. 오래 가라고."},
 	]
 	GameState.earn(FIRST_SALE)
+	GameState.note("순덕 할머니가 첫 손님으로 왔다. 이 정도면 해볼 만하겠는데?", 9)
 	GameState.spend(FIRST_COST)
 	GameState.flags["met_sundeok"] = true
 	_dialogue.play(lines)

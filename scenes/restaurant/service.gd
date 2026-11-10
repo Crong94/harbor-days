@@ -121,6 +121,10 @@ func _serve_regulars() -> void:
 		GameState.inventory.remove_at(i)
 	GameState.earn(result.sales)
 	rep_change += result.served.size() * DayFlow.REP_SERVED + result.missed * DayFlow.REP_MISS
+	if result.missed > 0:
+		GameState.note("생선이 모자라 손님 %d명이 그냥 돌아갔다. 내일은 더 잡아 와야지." % result.missed, 2)
+	elif result.served.size() >= DayFlow.GUESTS_MAX:
+		GameState.note("손님 %d명이 다 생선구이를 먹고 갔다. 가게가 북적였다." % result.served.size(), 1)
 	_list_panel.show()
 	UiKit.rise_in(_list_panel)
 	var tw := create_tween()
@@ -222,6 +226,11 @@ func _special_served() -> void:
 	UiKit.pop_in(_cook_panel)
 	special_price = DayFlow.special_price(special_fish.id, special_fish.size, st)
 	GameState.earn(special_price)
+	var who := Orders.call_name(special.name)
+	if st >= 3:
+		GameState.note("%s 내 생선구이를 먹고 또 오겠다고 했다." % Josa.attach(who, "이/가"), 3)
+	elif st <= 1:
+		GameState.note("%s 아쉬운 얼굴로 돌아갔다. 불 앞에서 더 참아야겠다." % Josa.attach(who, "이/가"), 2)
 	rep_change += st
 	_header.refresh()
 	var react: Array = Orders.customer(special.name).get("react", ["잘 먹었어요.", "잘 먹었어요.", "잘 먹었어요."])
