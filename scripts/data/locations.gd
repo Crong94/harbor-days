@@ -20,7 +20,7 @@ const LIST := {
 	},
 	"garden": {
 		"name": "우리 텃밭", "pos": Vector2(0.684, 0.454), "unlock": "",
-		"scene": "", "desc": "집 근처 작은 텃밭",
+		"scene": "res://scenes/garden/garden.tscn", "desc": "이랑 네 줄에 채소를 기르는 작은 텃밭",
 	},
 	"coop": {
 		"name": "닭장", "pos": Vector2(0.658, 0.508), "unlock": "coop_open", "pin": "below",

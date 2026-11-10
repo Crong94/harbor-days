@@ -86,6 +86,7 @@ scenes/prologue   사직서(플레이어명 입력), 간판(가게명 입력)
 scenes/fishing    방파제 찌낚시. 첫날은 새벽 튜토리얼(첫 물고기 볼락), 그 뒤는 아무 시간대 자유 낚시. 캐스팅 포인트, 챔질 PERFECT, 좌우 줄다리기, 미끼, 물때·날씨, 주문
 scenes/restaurant 〈첫 번째 손님〉 식당 장면 (볼락구이, 최순덕)
 scenes/shop       준호네 낚시방 (장비 구매, 장착)
+scenes/garden     우리 텃밭. 이랑 네 줄에 심고 거두기 (CropDB)
 scenes/map        마을 지도. 장소 선택, 이동 시간, 해금 (scripts/data/locations.gd)
 scripts/fishing   FishingLogic (낚시 규칙, 헤드리스 테스트 가능)
 scripts/cooking   CookingLogic (간 맞추기, 굽기 규칙)
