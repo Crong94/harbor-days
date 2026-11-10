@@ -67,6 +67,8 @@ const TENSION_RUN_HELD := 0.42 # 차고 나가는데 그대로 감을 때
 const TENSION_RUN_FREE := 0.12 # 차고 나가는데 손을 뗐을 때
 ## 장력 구간: 이보다 낮으면 느슨함(파랑, 감는 힘이 덜 들어간다), DANGER부터 위험(빨강). 그 사이가 알맞음(초록)
 const TENSION_SLACK := 0.2
+## 지친 물고기를 감을 때 장력이 머무는 값 (초록 알맞음 구간 안)
+const EXHAUSTED_TENSION := 0.4
 ## 장력 단계 (화면 색, 깜빡임, 진동에 쓴다)
 const TENSION_WARN := 0.62
 const TENSION_DANGER := 0.85
@@ -414,20 +416,21 @@ func _update_reel(dt: float, held: bool) -> void:
 	# 반대로 끌어 버티면 낚싯대가 힘을 받아 줘서 장력이 조금만 오른다 (안전한 선택).
 	# 다만 힘센 고기는 버티는 동안에도 장력이 오르니, 쉬는 틈에 손을 떼서 식혀야 한다. 좋은 장비일수록 덜 오른다
 	var pull := fish_pull()
-	if held and countering:
+	if exhausted:
+		# 지친 물고기는 버티지 못한다: 감아도 장력이 오르지 않고 알맞은 장력으로 천천히 돌아온다 (2026-11-10 사용자 요청)
+		tension = move_toward(tension, EXHAUSTED_TENSION, 0.6 * dt)
+	elif held and countering:
 		tension += (0.03 + maxf(0.0, s - 0.6) * 0.5 * tm) * dt
 	elif held:
 		tension += (TENSION_REEL + pull * TENSION_PULL) * dt * tm
 	else:
 		tension -= TENSION_DOWN * dt
-	if run_dir != 0 and not countering:
+	if run_dir != 0 and not countering and not exhausted:
 		if held:
 			tension += _run_power * TENSION_RUN_HELD * dt * tm # 차고 나가는데 그대로 감으면 줄이 위험하다
 		else:
 			tension += _run_power * TENSION_RUN_FREE * dt * tm
 			distance += 0.07 * dt # 손을 떼면 줄이 풀려 나간다
-	if exhausted:
-		tension = minf(tension, 0.7)
 	tension = clampf(tension, 0.0, 1.0)
 
 	# 물고기 체력

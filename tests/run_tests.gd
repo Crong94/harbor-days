@@ -1245,6 +1245,23 @@ func _test_fishing_depth() -> void:
 			lost_by_jump += 1
 	_eq(jumped > 0, true, "학공치 바늘털이 (%d번)" % jumped)
 	_eq(lost_by_jump > 0, true, "바늘털이 때 손을 떼면 놓침 (%d번)" % lost_by_jump)
+	# 지친 물고기는 감아도 장력이 오르지 않는다
+	var e := _new_logic(80)
+	e.forgiving = false
+	_cast(e)
+	_run_until(e, [S.BITE], func(_x): return false, 20.0)
+	e.press()
+	e.fish_hp = 0.0
+	e.tension = 0.8
+	e.update(1.0 / 60.0, true)
+	_eq(e.exhausted, true, "지침")
+	var start := e.tension
+	var top := start
+	for i in 120:
+		e.update(1.0 / 60.0, true)
+		top = maxf(top, e.tension) if e.state == S.REELING else top
+	_eq(top <= start + 0.0001, true, "지친 뒤 감아도 장력이 오르지 않음 (%.3f → %.3f)" % [start, top])
+	_eq(e.state == S.CAUGHT or e.tension < start, true, "알맞은 장력으로 돌아옴")
 
 
 ## 장부 일지와 도감 자세히
