@@ -42,6 +42,8 @@ func _init() -> void:
 	_test_gear_help()
 	_test_sides()
 	_test_walkers()
+	_test_kitchen()
+	_test_staff()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -1386,10 +1388,14 @@ func _run_dining(d: DiningLogic, good: bool) -> void:
 		if good:
 			if d.holding < 0 and not d.pass_dishes.is_empty():
 				d.take(0)
+			if d.holding < 0 and not d.helper_kitchen:
+				# 빈손이면 주방 앞에 가서 굽는다
+				var k: Vector2 = Vector2(0.5, DiningLogic.FLOOR_MIN.y) - d.player
+				d.move = k.normalized() if k.length() > 0.01 else Vector2.ZERO
 			if d.holding >= 0:
 				var to: Vector2 = DiningLogic.serve_spot(d.guests[d.holding].seat) - d.player
 				d.move = to.normalized() if to.length() > 0.02 else Vector2.ZERO
-			else:
+			elif d.helper_kitchen:
 				d.move = Vector2.ZERO
 		d.update(1.0 / 30.0)
 		t += 1.0 / 30.0
@@ -1425,7 +1431,7 @@ func _test_dining() -> void:
 	_run_dining(c, false)
 	_eq(c.served.size(), 0, "안 나르면 아무도 못 받음")
 	_eq(c.angry, n, "안 나르면 다 화나서 감")
-	_eq(c.inventory.size(), 12 - n, "구운 접시는 버려지고 생선은 돌아오지 않음")
+	_eq(c.inventory.size(), 12, "주방에 아무도 없으면 안 익어서 생선이 다 돌아옴")
 	var q := DiningLogic.new()
 	q.setup(4, _fish_box(3), names)
 	q.guests = [{"name": "x", "seat": 0, "fish": "bolak", "size": 20.0, "entry": {"id": "bolak", "size": 20.0}, "price": 9000, "state": DiningLogic.GuestState.SEATED, "wait": 0.0, "eat": 0.0, "cooked": false}]
@@ -1472,6 +1478,7 @@ func _test_dining() -> void:
 	var al := DiningLogic.new()
 	al.setup(4, _fish_box(12), names)
 	al.helper_serve = true
+	al.helper_kitchen = true
 	_run_dining(al, false)
 	_eq(al.served.size(), al.served.size() + al.angry - al.angry, "알바 셈")
 	_eq(al.angry, 0, "알바가 나르면 화난 손님 없음")
@@ -1609,3 +1616,60 @@ func _test_walkers() -> void:
 	for k in range(1, 8):
 		cols[k * 100 + 7] = 0.0
 	_eq(GuestSD.find_cuts_n(cols, 8), [0, 107, 207, 307, 407, 507, 607, 707, 800], "여덟 칸 경계")
+
+
+## 요리는 주인공이 주방 앞에 있을 때만, 주방 알바가 있으면 혼자
+func _test_kitchen() -> void:
+	var d := DiningLogic.new()
+	d.guests = [{"name": "x", "seat": 0, "fish": "bolak", "size": 15.0, "entry": {}, "price": 9000, "state": DiningLogic.GuestState.SEATED, "wait": 0.0, "eat": 0.0, "cooked": false}]
+	d.queue = [0]
+	d.player = DiningLogic.START
+	_eq(d.in_kitchen(), false, "처음 자리는 주방 앞이 아님")
+	for i in 30:
+		d.update(1.0 / 10.0)
+	_eq(d.pass_dishes.is_empty() and d.cooking[0].left == d.cooking[0].total, true, "주방에 없으면 안 익음")
+	d.player = Vector2(0.5, DiningLogic.FLOOR_MIN.y)
+	_eq(d.in_kitchen(), true, "통로 맨 위는 주방 앞")
+	for i in 100:
+		d.update(1.0 / 10.0)
+	_eq(d.pass_dishes, [0], "주방 앞에 있으면 익어서 나옴")
+	var e := DiningLogic.new()
+	e.helper_kitchen = true
+	e.guests = d.guests.duplicate(true)
+	e.guests[0].cooked = false
+	e.queue = [0]
+	for i in 100:
+		e.update(1.0 / 10.0)
+	_eq(e.pass_dishes, [0], "주방 알바가 있으면 혼자 익음")
+	# 서빙 알바는 시간이 걸려 갖다준다
+	e.helper_serve = true
+	e.update(0.1)
+	_eq(e.helper_dish, 0, "서빙 알바가 접시를 집음")
+	for i in 40:
+		e.update(0.1)
+	_eq(e.guests[0].state, DiningLogic.GuestState.EATING, "서빙 알바가 갖다줌")
+	_eq(e.served.size(), 1, "알바가 낸 것도 매출")
+	# 혼자 하는 잘하는 플레이어: 주방과 손님 사이를 오가며 다 받는다
+	var a := DiningLogic.new()
+	a.setup(4, _fish_box(12), ["손님"])
+	_run_dining(a, true)
+	_eq(a.angry, 0, "혼자서도 잘 오가면 화난 손님 없음 (%d명 중 %d)" % [a.schedule.size() + a.served.size(), a.angry])
+
+
+## 알바 (StaffDB): 한 번 뽑으면 계속, 역할마다 한 명, 일당
+func _test_staff() -> void:
+	var staff := {}
+	_eq(StaffDB.wages(staff), 0, "알바 없으면 일당 0")
+	_eq(StaffDB.hire(staff, "yeoul"), true, "여울 뽑기")
+	_eq(StaffDB.in_role(staff, "serve"), "yeoul", "여울은 서빙")
+	_eq(StaffDB.hire(staff, "sera"), true, "세라 뽑기")
+	_eq(StaffDB.in_role(staff, "kitchen"), "sera", "세라는 주방")
+	_eq(StaffDB.wages(staff), 35000, "일당 합 2만 + 1만5천")
+	StaffDB.fire(staff, "yeoul")
+	_eq([StaffDB.is_hired(staff, "yeoul"), StaffDB.wages(staff)], [false, 15000], "그만두면 일당도 빠짐")
+	_eq(StaffDB.hire(staff, "없는사람"), false, "없는 알바는 못 뽑음")
+	for id in StaffDB.LIST:
+		_eq(ArtSlot.has_art(StaffDB.LIST[id].art), true, "%s 그림" % id)
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	_eq(SaveGame.fields(gs).has("staff"), true, "알바는 저장됨")
+	gs.free()

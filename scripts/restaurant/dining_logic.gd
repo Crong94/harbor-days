@@ -10,7 +10,8 @@ extends RefCounted
 ##   → 손님은 EAT_TIME초 먹고 값을 내고 나간다. 빨리 받으면 하트(값 더), 너무 오래 기다리면 화나서 그냥 간다
 ## 생선이 떨어지면 들어온 손님은 그냥 돌아간다 (평판 깎임). 재료는 낚시로 잡은 생선뿐이다.
 ## 좌표는 바닥 비율 (x 0 왼쪽 ~ 1 오른쪽, y 0 위 ~ 1 아래). 배경 그림이 오면 SEATS, PASS만 맞춘다.
-## 나중에 알바를 뽑으면 요리나 서빙을 맡긴다 (helper_serve: 완성 접시를 알아서 갖다준다).
+## 요리 (2026-11-11 사용자): 주방 알바가 없으면 주인공이 주방 앞(통로 맨 위)에 서 있는 동안만 화로가 익는다.
+## 알바 (한 번 뽑으면 계속, StaffDB): 주방 알바는 혼자 굽고(helper_kitchen), 서빙 알바는 완성 접시를 알아서 나른다(helper_serve).
 
 enum GuestState { SEATED, EATING, LEFT }
 
@@ -29,6 +30,8 @@ const SLOW_CUT := 0.85 # 참을성이 바닥나기 직전(마지막 20%)에 받�
 const EAT_TIME := 6.0
 const MOVE_SPEED := 0.55 # 주인공 걷는 속도 (바닥 비율/초)
 const REACH := 0.07 # 서빙 자리에 닿았다고 보는 거리
+const HELPER_TRIP := 3.5 # 서빙 알바가 한 접시 갖다주는 데 걸리는 시간 (초)
+const KITCHEN_DEPTH := 0.03 # 통로 맨 위에서 이만큼 안은 주방 앞 (요리가 익는 곳)
 
 ## 배치 (2026-11-11 사용자 확정): 바가 왼쪽, 앞, 오른쪽으로 이어진 U자. 위쪽은 주방으로 열린다.
 ## 시점은 정면에서 약 25도 내려다본 거의 직교 투영 (배경 bg_shop_inside_night/day, 941x1671).
@@ -58,7 +61,10 @@ var pass_dishes: Array = [] # 완성 접시 (guest index)
 var holding := -1 # 주인공 손에 든 접시 (guest index, -1이면 빈손)
 var player := START
 var move := Vector2.ZERO # 방향 버튼 (-1~1)
-var helper_serve := false # 알바: 완성 접시를 알아서 갖다준다 (나중에)
+var helper_serve := false # 서빙 알바: 완성 접시를 알아서 갖다준다 (한 접시에 HELPER_TRIP초)
+var helper_kitchen := false # 주방 알바: 주인공이 없어도 화로가 익는다
+var helper_dish := -1 # 서빙 알바가 들고 가는 접시 (guest index)
+var helper_left := 0.0
 var seat_bonus: Array = [] # 자리마다 더 참아 주는 시간 (초). 편한 의자 (ShopDecor.seat_comfort)
 
 var served: Array = [] # {guest, fish, size, price, heart}
@@ -95,7 +101,11 @@ func time_left() -> float:
 	return maxf(0.0, OPEN_SECONDS - time)
 
 
+var _last_dt := 0.0
+
+
 func update(dt: float) -> void:
+	_last_dt = dt
 	time += dt
 	_arrive()
 	_cook(dt)
@@ -206,13 +216,24 @@ func _arrive() -> void:
 		events.append({"type": "order", "guest": gi})
 
 
+## 주인공이 주방 앞에 서 있는가
+func in_kitchen() -> bool:
+	return player.y <= FLOOR_MIN.y + KITCHEN_DEPTH
+
+
+## 지금 화로가 익고 있는가 (주방 알바가 있거나 주인공이 주방 앞에)
+func cooking_now() -> bool:
+	return helper_kitchen or in_kitchen()
+
+
 func _cook(dt: float) -> void:
 	while cooking.size() < STOVES and not queue.is_empty():
 		var gi: int = queue.pop_front()
 		cooking.append({"guest": gi, "left": cook_time(guests[gi].size), "total": cook_time(guests[gi].size)})
-	for c in cooking:
-		# 내놓는 자리가 꽉 차면 다 구운 접시는 화로에서 기다린다
-		c.left = maxf(0.0, c.left - dt)
+	if cooking_now():
+		for c in cooking:
+			# 내놓는 자리가 꽉 차면 다 구운 접시는 화로에서 기다린다
+			c.left = maxf(0.0, c.left - dt)
 	var still := []
 	for c in cooking:
 		if c.left <= 0.0 and pass_dishes.size() < PASS_MAX:
@@ -248,6 +269,11 @@ func _leave_angry(gi: int) -> void:
 	if queue.has(gi):
 		queue.erase(gi)
 		inventory.append(g.entry)
+	for c in cooking:
+		if c.guest == gi and c.left >= c.total:
+			inventory.append(g.entry) # 화로에 올렸지만 아직 안 익었으면 생선은 돌아온다
+	if helper_dish == gi:
+		helper_dish = -1
 	pass_dishes.erase(gi)
 	if holding == gi:
 		holding = -1
@@ -264,10 +290,8 @@ func _walk(dt: float) -> void:
 
 
 func _try_serve() -> void:
-	if helper_serve and holding < 0 and not pass_dishes.is_empty():
-		holding = pass_dishes.pop_front() # 알바가 집어 바로 갖다준다
-		_serve(holding)
-		return
+	if helper_serve:
+		_helper_step()
 	if holding < 0:
 		return
 	var g: Dictionary = guests[holding]
@@ -275,7 +299,23 @@ func _try_serve() -> void:
 		_serve(holding)
 
 
-func _serve(gi: int) -> void:
+## 서빙 알바: 완성 접시를 하나 집어 HELPER_TRIP초 뒤 그 손님에게 낸다
+func _helper_step() -> void:
+	if helper_dish < 0:
+		if pass_dishes.is_empty():
+			return
+		helper_dish = pass_dishes.pop_front()
+		helper_left = HELPER_TRIP
+		return
+	helper_left -= _last_dt
+	if helper_left <= 0.0:
+		var gi := helper_dish
+		helper_dish = -1
+		if guests[gi].state == GuestState.SEATED:
+			_serve(gi, false)
+
+
+func _serve(gi: int, by_player := true) -> void:
 	var g: Dictionary = guests[gi]
 	var price := pay(g.price, g.wait)
 	var heart: bool = g.wait <= PATIENCE * QUICK
@@ -287,5 +327,6 @@ func _serve(gi: int) -> void:
 	g.paid = price
 	sales += price
 	served.append({"guest": g.name, "fish": g.fish, "size": g.size, "price": price, "heart": heart, "side": side})
-	events.append({"type": "served", "guest": gi, "heart": heart, "price": price, "side": side})
-	holding = -1
+	events.append({"type": "served", "guest": gi, "heart": heart, "price": price, "side": side, "helper": not by_player})
+	if by_player:
+		holding = -1

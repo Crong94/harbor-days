@@ -82,6 +82,8 @@ var reputation := 0
 ## 식당 가구와 장식 (ShopDecor). 놓은 것 {슬롯 id: 물건 id}, 산 것 [물건 id]
 var shop_decor := {}
 var owned_decor: Array = []
+## 뽑은 알바 {역할: 알바 id} (StaffDB). 한 번 뽑으면 그만두게 할 때까지 매일 나온다
+var staff := {}
 
 ## 우리 텃밭 (CropDB). 칸 네 개, 칸마다 {} 또는 {"crop": id, "day": 심은 날}
 var garden: Array = CropDB.new_garden()

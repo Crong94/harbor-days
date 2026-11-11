@@ -21,6 +21,9 @@ var special := {} # {"name", "fish"}
 var special_fish := {} # 특별 손님에게 낼 생선 {"id", "size"}
 var special_price := 0
 var special_side := "" # 특별 손님 접시에 붙인 곁들임
+var wage_paid := 0 # 오늘 알바 일당
+var _staff_panel: Control
+var _staff_list: VBoxContainer
 var rep_change := 0
 
 var _header: GameHeader
@@ -131,6 +134,9 @@ func _serve_regulars() -> void:
 
 func _on_floor_finished(r: Dictionary) -> void:
 	result = r
+	wage_paid = StaffDB.wages(GameState.staff)
+	if wage_paid > 0:
+		GameState.spend(wage_paid)
 	GameState.earn(int(r.sales))
 	rep_change += r.served.size() * DayFlow.REP_SERVED + int(r.missed) * DayFlow.REP_MISS + int(r.get("hearts", 0))
 	if int(r.get("angry", 0)) > 0:
@@ -316,7 +322,12 @@ func _show_ledger() -> void:
 		_ledger_rows.add_child(_row("곁들임", "보통 손님 %d접시 (위 매출에 포함)" % sides, "+" + GameState.format_won(int(result.get("side_sales", 0))), UiKit.LEAF))
 	if int(result.get("missed", 0)) > 0:
 		_ledger_rows.add_child(_row("돌아간 손님", "%d명" % result.missed, "", UiKit.INK_MUTED))
-	_ledger_rows.add_child(_row("지출", "미끼, 장비", ("-" if GameState.spent_today > 0 else "") + GameState.format_won(GameState.spent_today), UiKit.DANGER))
+	if wage_paid > 0:
+		var names := []
+		for id in GameState.staff.values():
+			names.append(StaffDB.get_staff(id).name)
+		_ledger_rows.add_child(_row("알바 일당", ", ".join(PackedStringArray(names)), "-" + GameState.format_won(wage_paid), UiKit.DANGER))
+	_ledger_rows.add_child(_row("지출", "미끼, 장비, 알바", ("-" if GameState.spent_today > 0 else "") + GameState.format_won(GameState.spent_today), UiKit.DANGER))
 	_ledger_rows.add_child(UiKit.divider())
 	_ledger_rows.add_child(_row("순이익", "", GameState.format_won(GameState.sales_today - GameState.spent_today), UiKit.INK, true))
 	_ledger_rows.add_child(_row("평판", "", ("+%d" % rep_change) if rep_change >= 0 else str(rep_change), UiKit.CORAL if rep_change >= 0 else UiKit.DANGER))
@@ -430,7 +441,71 @@ func _build_ledger() -> void:
 	_night_btn.pressed.connect(_go_night_fishing)
 	row.add_child(_night_btn)
 	v.add_child(row)
+	var staff_btn := UiKit.action("알바 관리", "mint", true)
+	staff_btn.pressed.connect(_open_staff)
+	v.add_child(staff_btn)
 	_ledger.hide()
+	_build_staff_panel()
+
+
+## 알바 관리 창: 알바마다 맡는 일, 일당, 뽑기·그만두게 하기. 한 번 뽑으면 다음 영업부터 매일 나온다
+func _build_staff_panel() -> void:
+	_staff_panel = Control.new()
+	_staff_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_staff_panel)
+	_staff_panel.add_child(UiKit.scrim(0.6))
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_staff_panel.add_child(center)
+	var panel := UiKit.paper_panel(28)
+	panel.custom_minimum_size = Vector2(640, 0)
+	center.add_child(panel)
+	var v := UiKit.vbox(UiKit.SPACE_MD)
+	panel.add_child(v)
+	v.add_child(UiKit.text("알바 관리", "h1", UiKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UiKit.text("한 번 뽑으면 그만두게 할 때까지 영업하는 날마다 나와요", "caption", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
+	_staff_list = UiKit.vbox(UiKit.SPACE_MD)
+	v.add_child(_staff_list)
+	var close := UiKit.action("닫기", "secondary")
+	close.pressed.connect(func(): _staff_panel.hide())
+	v.add_child(close)
+	_staff_panel.hide()
+
+
+func _open_staff() -> void:
+	for c in _staff_list.get_children():
+		c.queue_free()
+	for id in StaffDB.LIST:
+		var st: Dictionary = StaffDB.LIST[id]
+		var row := UiKit.hbox(UiKit.SPACE_MD)
+		var face := TextureRect.new()
+		face.custom_minimum_size = Vector2(96, 96)
+		face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		if ArtSlot.has_art(st.art):
+			face.texture = load(ArtSlot.art_path(st.art))
+		row.add_child(face)
+		var info := UiKit.vbox(2)
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info.add_child(UiKit.text("%s · %s · 일당 %s" % [st.name, StaffDB.ROLES[st.role], GameState.format_won(st.wage)], "label", UiKit.INK))
+		info.add_child(UiKit.paragraph(st.desc, "caption", UiKit.INK_SOFT))
+		row.add_child(info)
+		var hired := StaffDB.is_hired(GameState.staff, id)
+		var b := UiKit.action("그만두게 하기" if hired else "뽑기", "secondary" if hired else "primary", true)
+		b.pressed.connect(_toggle_staff.bind(id))
+		row.add_child(b)
+		_staff_list.add_child(row)
+	_staff_panel.show()
+	UiKit.fade_in(_staff_panel, 0.2)
+
+
+func _toggle_staff(id: String) -> void:
+	if StaffDB.is_hired(GameState.staff, id):
+		StaffDB.fire(GameState.staff, id)
+	else:
+		StaffDB.hire(GameState.staff, id)
+	Sound.play_sfx("tap")
+	_open_staff()
 
 
 ## 한 줄: 이름, 설명, 금액

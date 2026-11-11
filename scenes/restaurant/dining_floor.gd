@@ -21,6 +21,8 @@ var logic := DiningLogic.new()
 var _guests := {} # guest index → GuestSD
 var _faces := {} # 손님 이름 → 그림 id
 var _player_tex: Texture2D
+var _staff_tex := {} # 역할 → {stand, walk[]} (알바 그림)
+const STAFF_H := 170.0
 var _player_back: Texture2D
 var _player_face_left := false
 var _player_up := false
@@ -39,6 +41,15 @@ var _pad: Joystick
 func start(day: int, inventory: Array) -> void:
 	logic.setup(day, inventory, DayFlow.GUESTS)
 	logic.seat_bonus = ShopDecor.seat_comfort(GameState.shop_decor)
+	logic.helper_serve = StaffDB.in_role(GameState.staff, "serve") != ""
+	logic.helper_kitchen = StaffDB.in_role(GameState.staff, "kitchen") != ""
+	_staff_tex.clear()
+	for role in GameState.staff:
+		var st := StaffDB.get_staff(GameState.staff[role])
+		var walk := []
+		for a in st.get("walk", []):
+			walk.append(_load_art(a))
+		_staff_tex[role] = {"stand": _load_art(st.get("art", "")), "walk": walk}
 	logic.pantry = GameState.produce # 곁들임은 GameState에서 바로 빠진다
 	logic.reserve = Sides.reserve_for(GameState)
 	_load_decor()
@@ -288,8 +299,16 @@ func _draw_floor() -> void:
 		var p := stove + Vector2(k * (DISH + 10.0), 0)
 		var done: float = 1.0 - float(c.left) / maxf(float(c.total), 0.01)
 		ci.draw_circle(p, DISH * 0.42, Color(UiKit.NIGHT_DEEP, 0.75))
-		ci.draw_arc(p, DISH * 0.42, -PI / 2.0, -PI / 2.0 + TAU * clampf(done, 0.0, 1.0), 40, UiKit.SUN, 6.0, true)
+		var lit := logic.cooking_now()
+		ci.draw_arc(p, DISH * 0.42, -PI / 2.0, -PI / 2.0 + TAU * clampf(done, 0.0, 1.0), 40, UiKit.SUN if lit else Color(UiKit.FOAM, 0.35), 6.0, true)
 		_dish(ci, c.guest, p, DISH * 0.55, 0.55)
+	# 주방에 아무도 없으면 화로가 멈춘다: 짧게 알려 준다
+	if not logic.cooking.is_empty() and not logic.cooking_now():
+		var kt := "주방에 서 있어야 구워져요"
+		var kw := font.get_string_size(kt, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+		var kp := stove + Vector2(-kw / 2.0, -DISH * 0.6)
+		ci.draw_string_outline(font, kp, kt, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, 8, UiKit.OUTLINE)
+		ci.draw_string(font, kp, kt, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, UiKit.FOAM)
 	# 서빙 자리: 지금 든 접시의 손님 앞 통로에 옅은 고리
 	if logic.holding >= 0:
 		_ellipse(ci, to_screen(DiningLogic.serve_spot(logic.guests[logic.holding].seat)), 30.0 + sin(_t * 6.0) * 3.0, Color(UiKit.SUN, 0.7), 3.0)
@@ -315,6 +334,7 @@ func _draw_floor() -> void:
 		ci.draw_circle(p, r, UiKit.PAPER)
 		ci.draw_arc(p, r + 6.0, -PI / 2.0, -PI / 2.0 + TAU * clampf(left, 0.0, 1.0), 40, col, 6.0, true)
 		_dish(ci, gi, p, r * 1.5, 1.0)
+	_draw_staff(ci)
 	# 주인공 (앞모습, 위로 걸을 땐 뒷모습). 든 접시는 머리 위에
 	var pp := to_screen(logic.player)
 	var tex := _player_back if _player_up and _player_back else _player_tex
@@ -347,6 +367,40 @@ func _draw_floor() -> void:
 		var tw := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x
 		ci.draw_string_outline(font, Vector2(size.x / 2.0 - tw / 2.0, floor_rect().position.y + 20.0), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, 9, UiKit.OUTLINE)
 		ci.draw_string(font, Vector2(size.x / 2.0 - tw / 2.0, floor_rect().position.y + 20.0), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, UiKit.FOAM)
+
+
+## 알바: 주방 알바는 화로 옆에 서 있고, 서빙 알바는 접시를 들고 주방에서 손님 앞까지 걸어간다
+func _draw_staff(ci: Control) -> void:
+	if _staff_tex.has("kitchen"):
+		_draw_sprite(ci, _staff_tex.kitchen.stand, to_screen(DiningLogic.PASS) + Vector2(-120.0, 6.0), false)
+	if _staff_tex.has("serve"):
+		var home := to_screen(Vector2(DiningLogic.AISLE.y, DiningLogic.FLOOR_MIN.y))
+		var at := home
+		var walk: Array = _staff_tex.serve.walk
+		var tex: Texture2D = _staff_tex.serve.stand
+		var flip := false
+		if logic.helper_dish >= 0 and logic.helper_dish < logic.guests.size():
+			var goal := to_screen(DiningLogic.serve_spot(logic.guests[logic.helper_dish].seat))
+			var k := 1.0 - clampf(logic.helper_left / DiningLogic.HELPER_TRIP, 0.0, 1.0)
+			at = home.lerp(goal, minf(1.0, k * 1.6)) # 가서 잠깐 서 있다가 낸다
+			flip = goal.x < home.x
+			if k < 0.62 and not walk.is_empty():
+				tex = walk[int(_t * 6.0) % walk.size()]
+		_draw_sprite(ci, tex, at, flip)
+		if logic.helper_dish >= 0:
+			var hp := at + Vector2(0, -STAFF_H - 8.0)
+			ci.draw_circle(hp, DISH * 0.45, Color(UiKit.PAPER, 0.95))
+			_dish(ci, logic.helper_dish, hp, DISH * 0.8, 1.0)
+
+
+func _draw_sprite(ci: Control, tex: Texture2D, feet: Vector2, flip: bool) -> void:
+	if tex == null:
+		return
+	var h := STAFF_H
+	var w := h * tex.get_width() / float(tex.get_height())
+	ci.draw_set_transform(feet, 0.0, Vector2(-1.0 if flip else 1.0, 1.0))
+	ci.draw_texture_rect(tex, Rect2(-w / 2.0, -h, w, h), false)
+	ci.draw_set_transform_matrix(Transform2D.IDENTITY)
 
 
 func _dish(ci: Control, gi: int, c: Vector2, w: float, alpha: float) -> void:
