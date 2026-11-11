@@ -94,7 +94,7 @@ jobs:
           test -s build/android/out.apk
           ver=$(grep -m1 '^version/name=' export_presets.cfg | cut -d'"' -f2)
           tag="${{ inputs.tag }}"
-          if [ -z "$tag" ]; then tag="v${ver}-$(date +%m%d)-${GITHUB_SHA::7}"; fi
+          if [ -z "$tag" ]; then tag="v${ver}-$(TZ=Asia/Seoul date +%m%d)-${GITHUB_SHA::7}"; fi
           echo "TAG=$tag" >> $GITHUB_ENV
           mv build/android/out.apk "build/android/oneului-bada-${tag}.apk"
 
