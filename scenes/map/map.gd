@@ -19,6 +19,10 @@ var _world: Control # 지도 그림과 핀을 담고 통째로 움직인다
 var _map: TextureRect
 var _pins := {} # id → Control
 var _garden_layer: Control
+var _walker_layer: Control # 걷는 주민 (텃밭 위, 핀 아래)
+var _walkers := {} # id → MapWalker
+var _walk_t := 0.0
+var _talk_i := {} # 주민마다 다음에 할 말 번호
 var _header: GameHeader
 var _sheet: PanelContainer
 var _sheet_title: Label
@@ -65,6 +69,10 @@ func _ready() -> void:
 	_garden_layer = Control.new()
 	_garden_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_world.add_child(_garden_layer)
+	_walker_layer = Control.new()
+	_walker_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_world.add_child(_walker_layer)
+	_rebuild_walkers()
 	_rebuild_pins()
 
 	# 헤더 아래 글자가 잘 읽히게 위쪽만 살짝 어둡게
@@ -195,6 +203,7 @@ func _can_drag_from(p: Vector2) -> bool:
 
 
 func _process(delta: float) -> void:
+	_update_walkers(delta)
 	# 손을 떼면 조금 미끄러지다 멈춘다
 	if _press or _velocity.length() < 5.0:
 		if not _press:
@@ -202,6 +211,57 @@ func _process(delta: float) -> void:
 		return
 	_world.position = _clamp_pos(_world.position + _velocity * delta)
 	_velocity *= pow(FLING_KEEP, delta)
+
+
+# ─── 걷는 주민 ──────────────────────────────────────
+
+const WALKER_H := 0.055 # 주민 키 (지도 높이 비율)
+
+
+## 지금 시각에 나와 있는 주민만 만든다 (걷기 그림이 있는 사람만)
+func _rebuild_walkers() -> void:
+	for c in _walker_layer.get_children():
+		c.queue_free()
+	_walkers.clear()
+	for w in Walkers.active(GameState.time_minutes):
+		if not MapWalker.has_sheet(w.id):
+			continue
+		var m := MapWalker.new()
+		m.walker_id = w.id
+		m.tapped.connect(_on_walker_tapped)
+		_walker_layer.add_child(m)
+		_walkers[w.id] = m
+
+
+func _update_walkers(delta: float) -> void:
+	_walk_t += delta
+	var ms := _world.size
+	var h := ms.y * WALKER_H
+	var i := 0
+	for id in _walkers:
+		var m: MapWalker = _walkers[id]
+		var w := Walkers.get_walker(id)
+		var p := Walkers.pose(w.path, _walk_t, i * 0.37)
+		var f := Walkers.frame(p.dir, _walk_t)
+		m.size = Vector2(h * 0.8, h)
+		m.position = (p.pos as Vector2) * ms - Vector2(m.size.x / 2.0, m.size.y)
+		if m.cell != f[0] or m.flip != f[1]:
+			m.cell = f[0]
+			m.flip = f[1]
+			m.queue_redraw()
+		i += 1
+
+
+## 주민을 누르면 한마디 (지도 아래 알림)
+func _on_walker_tapped(id: String) -> void:
+	if _moved or (_dialogue and _dialogue.visible):
+		return
+	var w := Walkers.get_walker(id)
+	var n: int = _talk_i.get(id, 0)
+	_talk_i[id] = n + 1
+	var lines: Array = w.lines
+	Sound.play_sfx("tap", 0.05, -6.0)
+	_show_toast("%s: %s" % [w.name, GameState.line(lines[n % lines.size()])])
 
 
 # ─── 핀 ─────────────────────────────────────────────

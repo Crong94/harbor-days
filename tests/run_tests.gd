@@ -41,6 +41,7 @@ func _init() -> void:
 	_test_shop_decor()
 	_test_gear_help()
 	_test_sides()
+	_test_walkers()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -1577,3 +1578,34 @@ func _test_sides() -> void:
 	b.setup(4, _fish_box(12), ["손님"])
 	_run_dining(b, true)
 	_eq(a.sales - b.sales, Sides.EGG_BONUS * 2, "곁들임만큼 매출이 더 많음")
+
+
+## 지도 위 걷는 주민 (Walkers)
+func _test_walkers() -> void:
+	var path := [Vector2(0.0, 0.0), Vector2(0.06, 0.0)]
+	_eq(is_equal_approx(Walkers.path_length(path), 0.06), true, "길 길이")
+	var walk := 0.06 / Walkers.SPEED
+	var p0 := Walkers.pose(path, 0.0)
+	_eq([p0.pos, p0.dir], [Vector2(0, 0), Vector2.RIGHT], "처음엔 시작점에서 오른쪽으로")
+	var mid := Walkers.pose(path, walk / 2.0)
+	_eq(is_equal_approx(mid.pos.x, 0.03), true, "반쯤 가면 가운데")
+	_eq(Walkers.pose(path, walk + 0.5).dir, Vector2.ZERO, "끝에서 잠깐 섬")
+	var back := Walkers.pose(path, walk + Walkers.PAUSE + walk / 2.0)
+	_eq(back.dir, Vector2.LEFT, "되돌아올 땐 왼쪽으로")
+	_eq(Walkers.frame(Vector2.ZERO, 3.0), [0, false], "서 있으면 앞모습")
+	_eq(Walkers.frame(Vector2.LEFT, 0.0), [4, true], "왼쪽은 옆모습 뒤집기")
+	_eq(Walkers.frame(Vector2.UP, 0.0)[0] in [2, 3], true, "위로 가면 뒷모습")
+	_eq(Walkers.active(6 * 60).map(func(w): return w.id), ["mansu"], "새벽엔 만수만")
+	_eq(Walkers.active(23 * 60).is_empty(), true, "밤엔 아무도 없음")
+	var all_have := true
+	for w in Walkers.LIST:
+		if not ResourceLoader.exists("res://assets/art/sd_guest/%s_walk.png" % w.id):
+			all_have = false
+	_eq(all_have, true, "걷는 주민 모두 걷기 그림 있음")
+	# 여덟 칸 자르기
+	var cols := PackedFloat32Array()
+	cols.resize(800)
+	cols.fill(5.0)
+	for k in range(1, 8):
+		cols[k * 100 + 7] = 0.0
+	_eq(GuestSD.find_cuts_n(cols, 8), [0, 107, 207, 307, 407, 507, 607, 707, 800], "여덟 칸 경계")

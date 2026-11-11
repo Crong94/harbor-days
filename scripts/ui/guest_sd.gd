@@ -33,11 +33,16 @@ static func has_sheet(id: String) -> bool:
 
 ## 열마다 그림이 있는 정도(알파 합)에서 세 칸 경계를 찾는다. [0, a, b, 너비]
 static func find_cuts(cols: PackedFloat32Array) -> Array:
+	return find_cuts_n(cols, 3)
+
+
+## n칸 시트의 경계: k/n 근처(그림 너비의 CUT_SEARCH 안)에서 가장 빈 열. [0, ..., 너비]
+static func find_cuts_n(cols: PackedFloat32Array, n: int) -> Array:
 	var w := cols.size()
 	var cuts := [0]
-	for k in [1, 2]:
-		var mid := int(w * k / 3.0)
-		var r := int(w * CUT_SEARCH)
+	for k in range(1, n):
+		var mid := int(w * k / float(n))
+		var r := int(w * CUT_SEARCH * 3.0 / n)
 		var best := mid
 		for x in range(maxi(1, mid - r), mini(w - 1, mid + r) + 1):
 			# 같은 값이면 가운데에 가까운 쪽
