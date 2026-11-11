@@ -3,7 +3,7 @@ extends Control
 ## 저녁 영업 판 (규칙은 DiningLogic). 식당 정면 단면 배경 위에 손님이 앉고, 주인공이 접시를 들고 걷는다.
 ##   완성 접시(내놓는 자리)를 누르면 주인공 손에 들린다 → 십자키(또는 방향키)로 그 손님 곁까지 걸어가면 내려놓는다
 ##   손님 머리 위: 주문한 요리 그림과 기다림 고리(초록 → 노랑 → 빨강)
-## 배치 (2026-11-11 사용자 확정): 정면 단면 두 단. 단마다 서빙 통로 → 가로 바 → 의자 4석, 오른쪽 계단으로 오간다 (DiningLogic.WALK)
+## 배치 (2026-11-11 사용자): 세로로 긴 식당. 위 주방, 양옆 세로 바 카운터에 손님이 벽 쪽에 앉아 가운데를 보고, 주인공은 가운데 통로를 오간다
 ## 그림: 배경 bg_shop_inside_night (그림 세션이 받는 중), 손님 SD sd_guest/<id>_react.png, 요리 dish/<recipe>.png
 ## 이름 없는 손님 SD가 오기 전까지는 주민 SD가 대신 앉는다 (TEMP_FACES).
 ## 끝나면 finished(결과)를 보낸다. 결과 모양은 예전 DayFlow.serve_regulars와 같다 (장부가 그대로 쓴다).
@@ -245,9 +245,11 @@ func _seat_screen(gi: int) -> Vector2:
 	return to_screen(DiningLogic.SEATS[logic.guests[gi].seat])
 
 
-## 주문 말풍선 자리: 손님 머리 위 (정면 단면, 손님은 등을 보이고 바를 향해 앉는다)
+## 주문 말풍선 자리: 손님 옆 통로 쪽 (세로 바라서 위아래 손님과 겹치지 않게)
 func _bubble_pos(gi: int) -> Vector2:
-	return _seat_screen(gi) + Vector2(0, -GUEST_H - 30.0)
+	var seat: Vector2 = DiningLogic.SEATS[logic.guests[gi].seat]
+	var side := 1.0 if seat.x < 0.5 else -1.0
+	return _seat_screen(gi) + Vector2(side * (GUEST_H * 0.42 + 40.0), -GUEST_H * 0.55)
 
 
 func _place_guests() -> void:

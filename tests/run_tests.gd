@@ -1385,9 +1385,8 @@ func _run_dining(d: DiningLogic, good: bool) -> void:
 			if d.holding < 0 and not d.pass_dishes.is_empty():
 				d.take(0)
 			if d.holding >= 0:
-				var goal := DiningLogic.serve_spot(d.guests[d.holding].seat)
-				var to: Vector2 = DiningLogic.next_waypoint(d.player, goal) - d.player
-				d.move = to.normalized() if to.length() > 0.01 else Vector2.ZERO
+				var to: Vector2 = DiningLogic.serve_spot(d.guests[d.holding].seat) - d.player
+				d.move = to.normalized() if to.length() > 0.02 else Vector2.ZERO
 			else:
 				d.move = Vector2.ZERO
 		d.update(1.0 / 30.0)
@@ -1466,19 +1465,7 @@ func _test_dining() -> void:
 	w.move = Vector2(-1, 0)
 	for i in 300:
 		w.update(1.0 / 30.0)
-	_eq(is_equal_approx(w.player.x, 0.06), true, "통로 왼쪽 끝에서 멈춤 (%.3f)" % w.player.x)
-	# 통로 가운데에서 아래로는 못 내려간다 (바가 막음). 계단에서만 단을 바꾼다
-	var v := DiningLogic.new()
-	v.move = Vector2(0, 1)
-	for i in 60:
-		v.update(1.0 / 30.0)
-	_eq(v.player.y <= DiningLogic.UPPER_Y + 0.0201, true, "통로 가운데서 아래로는 막힘 (%.3f)" % v.player.y)
-	v.player = Vector2(DiningLogic.STAIR_X, DiningLogic.UPPER_Y)
-	for i in 90:
-		v.update(1.0 / 30.0)
-	_eq(is_equal_approx(v.player.y, DiningLogic.LOWER_Y + 0.02), true, "계단으로는 아래 단까지 (%.3f)" % v.player.y)
-	_eq(DiningLogic.next_waypoint(DiningLogic.START, DiningLogic.serve_spot(5)), Vector2(DiningLogic.STAIR_X, DiningLogic.UPPER_Y), "다른 단 손님은 계단부터")
-	_eq(DiningLogic.next_waypoint(DiningLogic.START, DiningLogic.serve_spot(2)), DiningLogic.serve_spot(2), "같은 단은 바로")
+	_eq(w.player.x, DiningLogic.FLOOR_MIN.x, "왼쪽 끝에서 멈춤")
 	# 알바가 서빙을 맡으면 알아서 갖다준다
 	var al := DiningLogic.new()
 	al.setup(4, _fish_box(12), names)
@@ -1498,9 +1485,9 @@ func _test_dining() -> void:
 func _test_shop_decor() -> void:
 	var decor := {}
 	var owned := []
-	_eq(DiningLogic.SEATS.size(), 8, "손님 자리 8석 (위 단 4, 아래 단 4)")
+	_eq(DiningLogic.SEATS.size(), 10, "손님 자리 10석 (왼쪽 4, 오른쪽 4, 아래 2)")
 	var chairs := ShopDecor.slots().filter(func(s): return s.kind == "chair").size()
-	_eq(chairs, 8, "의자 슬롯은 자리마다")
+	_eq(chairs, 10, "의자 슬롯은 자리마다")
 	_eq(ShopDecor.item_in(decor, "chair_3"), "chair_basic", "안 놓으면 기본 의자")
 	_eq(ShopDecor.item_in(decor, "bar_0"), "bar_none", "바 위는 기본 빈 자리")
 	_eq(ShopDecor.art_of("bar_none"), "", "빈 자리는 그리지 않음")
@@ -1510,7 +1497,7 @@ func _test_shop_decor() -> void:
 	_eq(ShopDecor.place(decor, owned, "chair_0", "chair_wood"), true, "산 의자 놓기")
 	_eq(ShopDecor.place(decor, owned, "bar_0", "chair_wood"), false, "의자를 바 위에 놓을 순 없음")
 	_eq(ShopDecor.place(decor, owned, "nope", "chair_wood"), false, "없는 슬롯")
-	_eq(ShopDecor.place_all(decor, owned, "chair", "chair_wood"), 8, "의자 한 번에 바꾸기")
+	_eq(ShopDecor.place_all(decor, owned, "chair", "chair_wood"), 10, "의자 한 번에 바꾸기")
 	_eq(ShopDecor.place(decor, owned, "wall_0", "wall_none"), true, "기본 물건은 사지 않아도 놓음")
 	decor["bar_1"] = "chair_wood" # 망가진 저장값
 	_eq(ShopDecor.item_in(decor, "bar_1"), "bar_none", "종류가 틀린 값은 기본으로")
@@ -1521,12 +1508,13 @@ func _test_shop_decor() -> void:
 	d.seat_bonus = comfort
 	_eq(d.patience_of(0), DiningLogic.PATIENCE + 5.0, "편한 의자 자리는 더 참음")
 	_eq(d.patience_of(99), DiningLogic.PATIENCE, "모르는 자리는 기본")
-	# 손님은 바로 위 통로에서 받는다
-	_eq(DiningLogic.serve_spot(5), Vector2(0.32, DiningLogic.LOWER_Y), "아래 단 손님 서빙 자리")
+	# 아래 바 밑 손님은 통로 아래 모서리에서 받는다
+	var sp := DiningLogic.serve_spot(8)
+	_eq(sp, Vector2(DiningLogic.AISLE.x, DiningLogic.AISLE_BOTTOM), "아래 왼쪽 손님 서빙 자리")
 	var ok := true
 	for i in DiningLogic.SEATS.size():
 		var q := DiningLogic.serve_spot(i)
-		if not DiningLogic.walkable(q):
+		if q.x < DiningLogic.FLOOR_MIN.x or q.x > DiningLogic.FLOOR_MAX.x or q.y < DiningLogic.FLOOR_MIN.y or q.y > DiningLogic.FLOOR_MAX.y:
 			ok = false
 	_eq(ok, true, "모든 서빙 자리가 통로 안")
 	# 저장된다

@@ -32,14 +32,14 @@ const DEFAULTS := {"chair": "chair_basic", "bar": "bar_none", "wall": "wall_none
 
 ## 바 위 장식, 벽 장식, 화분 자리 (의자 자리는 DiningLogic.SEATS를 그대로 따른다)
 const EXTRA_SLOTS := [
-	{"id": "bar_0", "kind": "bar", "pos": Vector2(0.23, 0.31)},
-	{"id": "bar_1", "kind": "bar", "pos": Vector2(0.59, 0.31)},
-	{"id": "bar_2", "kind": "bar", "pos": Vector2(0.23, 0.70)},
-	{"id": "bar_3", "kind": "bar", "pos": Vector2(0.59, 0.70)},
-	{"id": "wall_0", "kind": "wall", "pos": Vector2(0.12, 0.10)},
-	{"id": "wall_1", "kind": "wall", "pos": Vector2(0.72, 0.10)},
-	{"id": "plant_0", "kind": "plant", "pos": Vector2(0.06, 0.97)},
-	{"id": "plant_1", "kind": "plant", "pos": Vector2(0.94, 0.97)},
+	{"id": "bar_0", "kind": "bar", "pos": Vector2(0.31, 0.40)},
+	{"id": "bar_1", "kind": "bar", "pos": Vector2(0.69, 0.40)},
+	{"id": "bar_2", "kind": "bar", "pos": Vector2(0.31, 0.68)},
+	{"id": "bar_3", "kind": "bar", "pos": Vector2(0.69, 0.68)},
+	{"id": "wall_0", "kind": "wall", "pos": Vector2(0.06, 0.25)},
+	{"id": "wall_1", "kind": "wall", "pos": Vector2(0.94, 0.25)},
+	{"id": "plant_0", "kind": "plant", "pos": Vector2(0.06, 0.88)},
+	{"id": "plant_1", "kind": "plant", "pos": Vector2(0.94, 0.88)},
 ]
 
 
