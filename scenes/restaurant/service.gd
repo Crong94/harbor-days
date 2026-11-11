@@ -9,6 +9,8 @@ extends Control
 
 const MAP_SCENE := "res://scenes/map/map.tscn"
 const FISHING_SCENE := "res://scenes/fishing/fishing.tscn"
+const GUEST_W := 300.0
+const GUEST_H := 400.0
 
 enum Step { INTRO, REGULARS, SPECIAL_TALK, COOK, SPECIAL_DONE, LEDGER }
 
@@ -35,6 +37,7 @@ var _gauge: Control
 var _ledger: Control
 var _ledger_rows: VBoxContainer
 var _night_btn: Button
+var _guest: GuestSD # 특별 손님 SD (대화창 오른쪽 위, 얼굴 그림 자리에 선다)
 var _held := false
 var _sizzle := 0.0
 var _recipe := {}
@@ -64,6 +67,14 @@ func _ready() -> void:
 	_build_list()
 	_build_cook_panel()
 	_build_ledger()
+	_guest = GuestSD.new()
+	_guest.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	_guest.offset_left = -GUEST_W - 4
+	_guest.offset_right = -4
+	_guest.offset_top = -DialogueBox.BOTTOM - DialogueBox.HEIGHT - GUEST_H + 26
+	_guest.offset_bottom = -DialogueBox.BOTTOM - DialogueBox.HEIGHT + 26
+	_guest.hide()
+	add_child(_guest)
 	_dialogue = DialogueBox.new()
 	add_child(_dialogue)
 	_dialogue.finished.connect(_on_dialogue_finished)
@@ -106,6 +117,7 @@ func _on_dialogue_finished() -> void:
 		Step.SPECIAL_TALK:
 			_start_cooking()
 		Step.SPECIAL_DONE:
+			_guest_leaves()
 			_show_ledger()
 
 
@@ -167,6 +179,7 @@ func _special_arrives() -> void:
 	step = Step.SPECIAL_TALK
 	_list_panel.hide()
 	Sound.play_sfx("door")
+	_guest_enters()
 	var fname: String = FishDB.get_fish(special_fish.id).name
 	var want_name: String = FishDB.get_fish(special.fish).name
 	var wanted: bool = special_fish.id == special.fish
@@ -196,6 +209,7 @@ func _start_cooking() -> void:
 	_gauge.show()
 	_cook_panel.show()
 	UiKit.fade_in(_cook_panel, 0.3)
+	_guest.hide() # 굽는 동안은 화로만
 
 
 func _on_phase_changed() -> void:
@@ -233,11 +247,35 @@ func _special_served() -> void:
 		GameState.note("%s 아쉬운 얼굴로 돌아갔다. 불 앞에서 더 참아야겠다." % Josa.attach(who, "이/가"), 2)
 	rep_change += st
 	_header.refresh()
+	if not _guest.guest_id.is_empty():
+		_guest.set_pose(GuestSD.pose_for_stars(st))
+		_guest.show()
+		UiKit.fade_in(_guest, 0.25)
 	var react: Array = Orders.customer(special.name).get("react", ["잘 먹었어요.", "잘 먹었어요.", "잘 먹었어요."])
 	_dialogue.play([
 		{"speaker": special.name, "text": react[clampi(3 - st, 0, 2)]},
 		{"speaker": "", "text": "%s %s을 내고 갔다." % [Josa.attach(Orders.call_name(special.name), "이/가"), GameState.format_won(special_price)]},
 	])
+
+
+## 특별 손님 SD: 시트가 있는 사람만 서고, 그동안은 대화창 얼굴 그림을 띄우지 않는다
+func _guest_enters() -> void:
+	var id := GuestSD.id_for(special.get("name", ""))
+	if not GuestSD.has_sheet(id):
+		return
+	_guest.guest_id = id
+	_guest.set_pose("stand")
+	_guest.show()
+	UiKit.rise_in(_guest, 0.0, 40.0)
+	_dialogue.on_stage = [id]
+
+
+func _guest_leaves() -> void:
+	_dialogue.on_stage = []
+	if _guest.visible:
+		var tw := _guest.create_tween()
+		tw.tween_property(_guest, "modulate:a", 0.0, 0.3)
+		tw.tween_callback(_guest.hide)
 
 
 # ─── 입력 (굽기) ────────────────────────────────────

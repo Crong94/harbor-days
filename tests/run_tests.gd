@@ -36,6 +36,7 @@ func _init() -> void:
 	_test_fishing_depth()
 	_test_journal()
 	_test_fight_view()
+	_test_guest_sd()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -1342,3 +1343,25 @@ func _test_fight_view() -> void:
 	var st := FightView.steer_from_drag(-60.0, 110.0)
 	_eq(st * 1.0 <= -FishingLogic.COUNTER_STEER, true, "왼쪽으로 60px 끌면 오른쪽으로 가는 물고기를 버팀")
 	_eq(FightView.steer_from_drag(-20.0, 110.0) <= -FishingLogic.COUNTER_STEER, false, "살짝 끈 건 버티기가 아님")
+
+
+## 손님 SD: 반응 시트 세 칸 자르기, 별 수에 따른 몸짓
+func _test_guest_sd() -> void:
+	# 빈 열이 1/3, 2/3 근처에 있으면 그 자리에서 자른다
+	var cols := PackedFloat32Array()
+	cols.resize(300)
+	for x in 300:
+		cols[x] = 5.0
+	cols[95] = 0.0
+	cols[210] = 1.0
+	_eq(GuestSD.find_cuts(cols), [0, 95, 210, 300], "가장 빈 열에서 자름")
+	# 빈 열이 범위 밖이면 3등분 자리 그대로
+	cols.fill(5.0)
+	cols[10] = 0.0
+	_eq(GuestSD.find_cuts(cols), [0, 100, 200, 300], "빈 열이 멀면 3등분")
+	_eq(GuestSD.id_for("김복자"), "bokja", "주문 손님 이름으로 그림 id")
+	_eq(GuestSD.id_for("모르는 사람"), "", "모르는 사람은 그림 없음")
+	_eq(GuestSD.has_sheet(""), false, "id 없으면 시트 없음")
+	_eq(GuestSD.pose_for_stars(3), "happy", "별 셋이면 만족")
+	_eq(GuestSD.pose_for_stars(2), "stand", "별 둘이면 그냥 서 있음")
+	_eq(GuestSD.pose_for_stars(1), "sad", "별 하나면 아쉬움")
