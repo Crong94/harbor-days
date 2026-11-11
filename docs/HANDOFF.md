@@ -18,12 +18,13 @@
 - 애매하거나 모호한 부분이 있다면 질문을 통해 해결하고 넘어간다.
 
 ## 지금까지 상황 (환경: 코드, 사용자 PC의 로컬 레포. 회사 PC면 Godot 없음)
-- 레포: 노트북 main 2f86faa 뒤에 이어가기 문서 커밋 하나. GitHub Crong94/harbor-days(공개) main은 2868ed1까지 올라가 있고 그 뒤 커밋들은 아직 노트북에만 있다. 기기 사이는 드라이브 `오늘의바다_백업`의 bundle로 잇는다(노트북 build/backup의 가장 최근 oneului-bada-*.bundle, 사용자가 드라이브에 올렸는지 확인). 회사 PC라면 bundle이나 GitHub에서 받아 시작한다
-- 먼저 읽을 것: CLAUDE.md(그림 규칙), docs/그림_요청_목록.md, docs/줄다리기_UI_설계와_그림정리_2026-11-11.md(1장 그림 정리, 1-1장 손님 SD 양식), 기획서 docs/오늘의바다_시나리오_v3.md(인물 설정)
-- 대화창 얼굴(완료): assets/art/portrait/<id>_<normal|smile|sad>.png 21장, 7명. 순덕, 용팔은 여울 폴더 표정 묶음. 만수는 회사 PC 70대 노인 어부(portrait_parkmansu). 복자는 회사 PC 투명본. 경자, 준호, 주인공은 ChatGPT "인물 일러스트 생성" 대화. 원본은 docs/ref/인물/(여울/, 회사PC/). 쓰는 코드는 scripts/data/portraits.gd
-- 순덕 전신 일러스트: assets/art/npc_sundeok.png(여울, 한 손을 머리에 얹고 웃으며 서 있음), npc_sundeok_pot.png(여울, 냄비 들고 웃음). 차분한 동작(영감 흑백 사진을 두 손에 든 모습)은 "인물 일러스트 생성" 대화에서 요청했고, 회사 PC가 드라이브 art_inbox/2026-11-11/grandma_fullbody_photo.png로 받아 둔 것이 그 그림이다. 아직 게임에 안 넣었다
-- 그 밖에 이미 받은 것: 할머니 집 배경 bg_sundeok_house.jpg, 닭 hen.png, 작물 아이콘 6장, 지도 텃밭 조각 48장(assets/art/garden), 확장 지도 map_village.png
-- 회사 PC가 받은 손님 SD(드라이브 art_inbox/2026-11-11): 박만수, 최순덕, 김복자 걷기 8칸(sd_walk_*)과 반응 3종(sd_react_*) 확정. 이준호 걷기 1차(턱수염 자국이 빠져 앳돼 보여 검토 중). 아직 assets/art로 옮기지 않았다
+- 레포: main 3bc02aa까지 GitHub Crong94/harbor-days(공개)에 push됨. 그 뒤 그림 커밋이 생기면 다음에 push. 기기 사이는 드라이브 `오늘의바다_백업`의 bundle로 잇는다(11-12 최신 oneului-bada-20261112-0648.bundle, 사용자가 올렸는지 확인)
+- 먼저 읽을 것: CLAUDE.md(그림 규칙), docs/그림_요청_목록.md(식당 영업 개편용 표, 마을 배경 표), docs/줄다리기_UI_설계와_그림정리_2026-11-11.md(1-1장 손님 SD 양식), 기획서 docs/오늘의바다_시나리오_v3.md(인물 설정)
+- ChatGPT 프로젝트 "오늘의바다"(링크는 공개 레포라 적지 않는다. 사용자에게 받는다). 쓰던 대화: "식당 내부 시안 비교"(식당 배경, 가구), "착석 시트 제작"(앉은 손님). 착석 대화에 소품을 요청하면 사람이 섞여 나오니 사람 외 그림은 다른 대화에서
+- 11-11~12 그림 세션에서 넣은 것: npc_sundeok_photo.png, 손님 SD 다섯 명(mansu, sundeok, bokja, junho, gyeongja)의 걷기·반응(assets/art/sd_guest/<id>_walk.png, _react.png)과 앉은 자세(_seat_back.png 뒷모습 4칸, _seat_side.png 오른쪽 옆모습 4칸: 기다림, 먹는 중, 만족, 화남. 서 있는 키 442px로 맞춰 게임은 배율 0.339 하나), 식당 내부 확정본 bg_shop_inside_night/day.png(정면 U자 바, 오른쪽 벽 입구, 왼쪽 창 바다), 2호점 보관용 bg_shop2_inside_*.png, 가구 여덟 가지 assets/art/decor/(chair_basic, chair_wood, chair_cushion, bar_flower, bar_lamp, wall_menu, wall_fish, plant_pot). 모두 게임에 반영됨
+- 받았지만 아직 안 넣은 것: 김해솔 세 표정(docs/ref/인물/haesol/haesol_3표정_1차_투명.png, 사용자 검토 전), 이름 없는 손님 관광객 걷기 1차(docs/ref/sd/보통손님/), 수산시장 1~3안·항구 1~3안(docs/ref/배경/, 3안 추천, 사용자 확정 전)
+- 마을 배경은 반드시 지도 해당 부분을 잘라 첨부한다(docs/ref/배경/지도조각/). 사용자 지적 11-11
+- 식당에 쓸 그림은 SD를 게임 크기로 배경에 올린 확인 그림을 함께 첨부하면 크기가 맞게 나온다
 
 ## 확정된 결정
 - 그림은 직접 만들지 않는다(코드 장식 그림도 금지). 모두 ChatGPT로 받는다. 사용자에게 ChatGPT 대화 링크(또는 프로젝트 "오늘의바다" 링크)를 먼저 받는다
@@ -47,12 +48,14 @@
 - 같은 폴더에서 개발 세션이 동시에 돈다. assets/art, docs/ref, docs/그림_요청_목록.md, 그림 정리 문서만 고친다. scripts, scenes, tests는 건드리지 않는다
 
 ## 이번에 해 줬으면 하는 것
-1. ChatGPT 링크를 받는다. 드라이브 art_inbox/2026-11-11의 grandma_fullbody_photo.png를 받아 투명 확인 후 assets/art/npc_sundeok_photo.png로 넣는다(키 1000px 안, 다른 순덕 전신과 비슷한 크기). 원본은 docs/ref/인물/
-2. 드라이브 art_inbox/2026-11-11의 손님 SD(박만수, 최순덕, 김복자 걷기·반응)를 docs/ref/sd/로 받고 투명 확인. 게임 자리는 개발 세션이 정하므로 assets/art/sd_guest/<id>_walk.png, <id>_react.png 이름으로만 넣어 둔다
-3. 손님 SD 남은 인물: 이준호(걷기 1차 확정 여부를 사용자에게 묻고 반응 3종), 문경자(걷기, 반응), 김해솔(시나리오에서 설정 확인 → 대화창 세 표정부터 → SD). 박만수, 김복자 확정 시트를 화풍 기준으로 첨부
-4. 아직 요청 안 한 배경: 식당 내부 낮 bg_shop_inside_day, 저녁 bg_shop_inside_night(세로 9:16, 테이블 4개, 첫 손님 장면과 저녁 영업에 씀), 수산시장, 항구. 시안 2장씩 받아 비교하게 한다
-5. 받은 것마다 docs/그림_요청_목록.md에 ✅와 원본 위치를 적는다
-마지막: 그림 파일과 그림 문서만 골라 커밋(메시지 끝에 [skip ci]). 다운로드 폴더 정리. 원본 드라이브 업로드. 노트북이면 ./tools/backup.sh 후 새 bundle을 드라이브에 올리라고 안내. GitHub push는 사용자가 원할 때만
+1. ChatGPT 링크(프로젝트)를 확인하고 Chrome으로 연다
+2. 알바 그림: 개발 세션이 Yeoul 레포에서 가져온 assets/art/staff(여울 서빙, 차세라 주방)는 음영이 진해 우리 SD 화풍과 다르다. 우리 화풍으로 다시 받을지 사용자에게 묻고, 받으면 손님 SD 양식(걷기 8칸, 반응 3종)에 서빙·조리 동작
+3. 이름 없는 손님 SD 4~6명(관광객 반응 3종, 낚시꾼, 학생, 회사원 등): 걷기, 반응, 앉은 자세(앉은 자세는 투명 배경 확인과 키 442px 맞춤 필수, 스크래치 스크립트가 없으면 다시 짠다)
+4. 손님 입구 걷기 그림(개발 세션 후보), 주인공 서빙 걷기 시트
+5. 김해솔: 세 표정 검토 받고 portrait/에 넣기, 그 뒤 SD 걷기·반응·앉은 자세
+6. 수산시장·항구 3안 확정 받아 assets/art/bg_market.png, bg_harbor_day.png
+7. 받은 것마다 docs/그림_요청_목록.md에 ✅와 원본 위치를 적는다
+마지막: 그림 파일과 그림 문서만 골라 커밋(메시지 끝에 [skip ci]). 다운로드 폴더 정리. 원본 드라이브 art_inbox/<날짜> 업로드. 노트북이면 ./tools/backup.sh 후 새 bundle을 드라이브에 올리라고 안내. GitHub push는 사용자가 원할 때만
 ```
 
 ## 세션 B: 개선과 개발
