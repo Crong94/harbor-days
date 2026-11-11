@@ -33,7 +33,7 @@ const HINTS := {
 	FishingLogic.State.CASTING: "",
 	FishingLogic.State.WAITING: "찌를 지켜봐요. 톡톡 떨릴 땐 참고, 쭉 잠길 때 채요. 조용할 때 누르면 줄을 거둬요",
 	FishingLogic.State.BITE: "지금! 고리가 찌에 딱 맞을 때 눌러요",
-	FishingLogic.State.REELING: "누르고 있으면 감겨요. 아래 판에 방향이 뜨면 손가락을 그쪽으로 끌어요",
+	FishingLogic.State.REELING: "", # 첫 줄다리기 안내는 화면 가운데에 그린다 (_draw_fight_guide)
 }
 
 ## 뒤쪽 시점 세로 낚시 화면. 북쪽 방파제 끝에서 동쪽 바다를 본다 (왼쪽 북, 오른쪽 남, 등 뒤 서).
@@ -93,13 +93,6 @@ var _bait_btn: Button
 var _bait_icon: TextureRect
 var _bait_label: Label
 var _mend_btn: Button
-var _fight_panel: PanelContainer # 화면 아래 엄지 자리 줄다리기 판
-var _fight_style_idle: StyleBoxFlat
-var _fight_style_held: StyleBoxFlat
-var _tension_slot: Control # 줄다리기 판 안 장력 게이지 자리 (그리기는 _draw_fight_gauges)
-var _reel_slot: Control # 감아 온 정도 얇은 막대 자리
-var _steer_slot: Control # 끌기 줄 자리
-var _line_label: Label # 남은 줄 (m)
 var _prompt_row: CenterContainer # 아래 가운데 지금 할 일 (짧게)
 var _prompt_pill: PanelContainer
 var _prompt: Label
@@ -158,12 +151,13 @@ var _was_exhausted := false
 var _last_run := 0
 var _last_jumps := 0
 var _hint_sticky := false # 실패 안내를 READY에서도 남겨 두는지
-var _steer_grab := false # 줄다리기 판을 눌러 끌기 줄의 원을 직접 잡았는지
 var _was_countering := false
 var _tutor_fight_shown := false
 var _bite_dip := 0.0 # 입질 순간 찌가 쏙 들어갔다 올라오는 연출 (1에서 0으로)
 var _ripples: Array = [] # 찌 둘레 물결 {t, p(바다 좌표), r}
 var _touches: Array = [] # 누른 자리 고리 {t, p(화면 좌표)}
+var _trail: Array = [] # 줄다리기 중 손가락이 지나간 자취 {t, p(화면 좌표)}
+var _guide_on := false # 첫 줄다리기 조작 안내를 보여 주는 중인지
 var _in_nice_zone := false
 var _haptic_pull := 0.0 # 줄다리기 반복 진동 간격
 var _haptic_danger := 0.0
@@ -171,8 +165,10 @@ var _last_tension_level := 0
 var _bend_base := 0.0 # 떨림을 빼고 따라가는 낚싯대 휨
 const RIPPLE_TIME := 0.7
 const TOUCH_TIME := 0.32
+const TRAIL_TIME := 0.45
+const ROLL_BASE := 22.0 # 낚싯대가 평소 오른쪽으로 벌어진 정도 (도)
+const ROLL_STEER := 26.0 # 좌우로 버틸 때 낚싯대가 그쪽으로 눕는 정도 (도)
 ## 줄다리기 판 기본 여백 (위험할 때 이 자리에서 떨린다)
-const FIGHT_MARGIN := 16.0
 
 
 func _ready() -> void:
@@ -295,10 +291,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		_key_steer = (1.0 if right else 0.0) - (1.0 if left else 0.0)
 		return
 	if event is InputEventMouseMotion and _held:
-		if _steer_grab:
-			_drag_steer = _lane_steer(event.position.x) # 원을 잡고 미는 중: 손가락 밑에 원이 붙는다
-		else:
-			_drag_steer = clampf((event.position.x - _press_x) / STEER_RANGE, -1.0, 1.0)
+		# 처음 누른 곳보다 왼쪽(오른쪽)에 있는 동안 낚싯대를 그쪽으로 눕혀 버틴다
+		_drag_steer = FightView.steer_from_drag(event.position.x - _press_x, STEER_RANGE)
+		if logic.state == FishingLogic.State.REELING:
+			if _trail.is_empty() or _trail[-1].p.distance_to(event.position) > 14.0:
+				_trail.append({"t": 0.0, "p": event.position})
 		return
 	var is_action := false
 	var pressed := false
@@ -308,10 +305,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		if pressed:
 			_press_x = event.position.x
 			_drag_steer = 0.0
-			# 줄다리기 판을 누르면 끌기 줄의 원을 잡은 것으로 본다 (손가락 위치 = 원 위치)
-			_steer_grab = _fight_panel.visible and _fight_panel.get_global_rect().grow(24.0).has_point(event.position)
-			if _steer_grab:
-				_drag_steer = _lane_steer(event.position.x)
 	elif event is InputEventKey and event.keycode == KEY_SPACE and not event.echo:
 		is_action = true
 		pressed = event.pressed
@@ -348,13 +341,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				_refresh_bait()
 
 
-## 끌기 줄 위 손가락 x를 -1~1로 (줄 가운데가 0, 양 끝이 -1과 1)
-func _lane_steer(x: float) -> float:
-	var r := _steer_slot.get_global_rect()
-	var half := maxf(1.0, r.size.x / 2.0 - r.size.y / 2.0)
-	return clampf((x - (r.position.x + r.size.x / 2.0)) / half, -1.0, 1.0)
-
-
 func _steer() -> float:
 	return clampf(_drag_steer + _key_steer, -1.0, 1.0) if _held else 0.0
 
@@ -385,6 +371,11 @@ func _process(delta: float) -> void:
 	for tc in _touches:
 		tc.t += delta
 	_touches = _touches.filter(func(tc): return tc.t < TOUCH_TIME)
+	for tr in _trail:
+		tr.t += delta
+	_trail = _trail.filter(func(tr): return tr.t < TRAIL_TIME)
+	if logic.state != FishingLogic.State.REELING:
+		_guide_on = false
 	if _landing > 0.0:
 		_landing -= delta
 		if _landing <= 0.0:
@@ -399,7 +390,7 @@ func _process(delta: float) -> void:
 	_header.set_minutes(minutes)
 	var n := GameState.caught_today.size()
 	_header.set_badge("%d마리" % n if n > 0 else "")
-	# 화면은 지금 할 일만 보여 준다: 조용할 때는 주문과 오늘의 바다, 싸울 때는 줄다리기 카드 하나
+	# 화면은 지금 할 일만 보여 준다: 조용할 때는 주문과 오늘의 바다, 싸울 때는 판도 글자도 없이 낚싯대와 줄만
 	var calm := logic.state in [FishingLogic.State.READY, FishingLogic.State.FAILED] and not _in_story and not _ending
 	var fighting := logic.state == FishingLogic.State.REELING
 	_header.show_bar(not fighting)
@@ -408,7 +399,6 @@ func _process(delta: float) -> void:
 	_order_card.visible = calm and not order.is_empty()
 	_bait_btn.visible = calm
 	_mend_btn.visible = not _in_story and logic.state == FishingLogic.State.WAITING
-	_fight_panel.visible = fighting
 	# 안내 말풍선 (튜토리얼 설명, 실패 이유): 줄다리기 중에는 헤더가 숨으니 맨 위, 조용할 때는 주문 쪽지와 그만하기 줄 아래, 나머지는 헤더 바로 아래
 	var below := GameHeader.BOTTOM + 12.0
 	if fighting:
@@ -419,8 +409,6 @@ func _process(delta: float) -> void:
 	_hint_pill.visible = not _hint.text.is_empty() and not _in_story
 	_update_order_card()
 	_update_prompt()
-	if _fight_panel.visible:
-		_update_fight_panel()
 
 	for s in _splashes:
 		s.t += delta
@@ -494,9 +482,6 @@ func _watch_fight_events(delta: float) -> void:
 			_pop_text("바위로 파고들어요!", UiKit.CORAL, _to_screen(_fish_point()) + Vector2(0, -90), 34, true)
 		elif logic.run_count == 1 and logic.habit() == "long":
 			_pop_text("길게 차고 나가요!", UiKit.CORAL, _to_screen(_fish_point()) + Vector2(0, -90), 32, true)
-		if tutorial and not _tutor_fight_shown:
-			_tutor_fight_shown = true
-			_set_hint("물고기가 도망가요! 누른 채로 손가락을 %s으로 끌어요" % ("오른쪽" if logic.run_dir < 0 else "왼쪽"), UiKit.CORAL_DEEP)
 	_last_run = logic.run_dir
 	if logic.countering and not _was_countering:
 		Sound.play_sfx("tick", 0.05)
@@ -613,6 +598,11 @@ func _on_hooked() -> void:
 	Haptics.play("perfect" if perfect else "hook")
 	_was_exhausted = false
 	_last_tension_level = 0
+	_trail.clear()
+	# 조작 안내는 첫 줄다리기 때만 (첫날 튜토리얼의 첫 물고기)
+	if tutorial and not _tutor_fight_shown:
+		_tutor_fight_shown = true
+		_guide_on = true
 	GameState.best_streak = maxi(GameState.best_streak, logic.perfect_streak)
 	# 앞서 뜬 "지금!" 같은 글자는 치우고 판정 글자만 또렷하게
 	for c in _fx.get_children():
@@ -781,56 +771,6 @@ func _build_hud() -> void:
 	oh.add_child(_order_prog)
 	_order_card.visible = false
 
-	# 줄다리기 판 (화면 아래 엄지 자리, 남색 판): 글자 없이 남은 거리 길과 크게 줄 장력. 물고기 힘은 물속 물고기 위에 따로
-	# 누르고 있으면 테두리가 햇살 노랑으로 바뀌어 감고 있다는 걸 바로 알 수 있다
-	_fight_panel = PanelContainer.new()
-	_fight_style_idle = UiKit.chunky(UiKit.GLASS_STRONG, UiKit.RADIUS_LG, 0, 4)
-	_fight_style_idle.content_margin_left = 20
-	_fight_style_idle.content_margin_right = 20
-	_fight_style_idle.content_margin_top = 10
-	_fight_style_idle.content_margin_bottom = 16
-	_fight_style_held = _fight_style_idle.duplicate()
-	_fight_style_held.border_color = UiKit.SUN
-	_fight_panel.add_theme_stylebox_override("panel", _fight_style_idle)
-	_fight_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	_fight_panel.offset_left = FIGHT_MARGIN
-	_fight_panel.offset_right = -FIGHT_MARGIN
-	_fight_panel.offset_bottom = -22
-	_fight_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_fight_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_fight_panel)
-	var fv := UiKit.vbox(10)
-	fv.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_fight_panel.add_child(fv)
-	# 글자 없이 그림 표시만: 위는 물고기가 발밑으로 다가오는 길, 아래는 크게 줄 장력 (그리기는 _draw_fight_gauges)
-	# 맨 위: 끌기 줄. 물고기가 도망가면 손가락을 끌 쪽만 보여 준다 (한 가지 뜻만. 그리기는 _draw_steer_lane)
-	_steer_slot = UiKit.gap(52)
-	_steer_slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	fv.add_child(_steer_slot)
-	# 위: 왼쪽 "줄 장력", 오른쪽 남은 줄 (m). 무엇이 걸렸는지는 보여 주지 않는다 (잡아 올려야 안다)
-	var top_row := UiKit.hbox(UiKit.SPACE_SM)
-	top_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var tl := UiKit.text("줄 장력", "label", UiKit.FOAM_SOFT)
-	top_row.add_child(tl)
-	top_row.add_child(UiKit.spacer())
-	var ll := UiKit.text("남은 줄", "label", UiKit.FOAM_SOFT)
-	ll.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	top_row.add_child(ll)
-	_line_label = UiKit.text("", "number", UiKit.SUN)
-	_line_label.add_theme_font_size_override("font_size", 30)
-	UiKit.outlined(_line_label, 8)
-	top_row.add_child(_line_label)
-	fv.add_child(top_row)
-	# 가운데: 큰 장력 게이지 (여울 텐션 게이지: 파랑 느슨함, 초록 알맞음, 빨강 위험)
-	_tension_slot = UiKit.gap(48)
-	_tension_slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	fv.add_child(_tension_slot)
-	# 아래: 감아 온 정도 (얇은 금색 막대)
-	_reel_slot = UiKit.gap(10)
-	_reel_slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	fv.add_child(_reel_slot)
-	_fight_panel.hide()
-
 	# 지금 할 일 (아래 가운데 엄지 자리, 짧게). 입질 때는 산호색으로 콩콩 뛴다
 	_prompt_row = CenterContainer.new()
 	_prompt_row.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
@@ -997,22 +937,6 @@ func _update_prompt() -> void:
 	_prompt_pill.pivot_offset = _prompt_pill.size / 2.0
 	var s := 1.0 + (0.09 * absf(sin(_t * 10.0)) if hot else 0.0)
 	_prompt_pill.scale = Vector2(s, s)
-
-
-## 줄다리기 판: 누르는 중 테두리, 위험할 때 떨림
-func _update_fight_panel() -> void:
-	_line_label.text = "%dm" % int(ceil(logic.distance * logic.cast_power * 30.0))
-	var lvl := FishingLogic.tension_level(logic.tension)
-	var held := _held
-	if _fight_panel.get_meta("held", false) != held:
-		_fight_panel.set_meta("held", held)
-		_fight_panel.add_theme_stylebox_override("panel", _fight_style_held if held else _fight_style_idle)
-	# 줄 끊김 직전에는 판이 덜덜 떤다 (화면 흔들림 설정을 따른다)
-	var j := 0.0
-	if lvl == 2 and GameState.screen_shake_on:
-		j = randf_range(-1.0, 1.0) * (3.0 + 5.0 * logic.break_progress())
-	_fight_panel.offset_left = FIGHT_MARGIN + j
-	_fight_panel.offset_right = -FIGHT_MARGIN + j
 
 
 ## 판정 글자가 튀어 올랐다가 사라진다 (스티커처럼 굵은 외곽선).
@@ -1432,7 +1356,7 @@ func _place_player() -> void:
 			# 누르면 숙이며 감고, 떼면 세워 버틴다. 물고기가 당기면 끌려 숙여진다
 			pitch = (48.0 if _held else 68.0) - logic.fish_pull() * 8.0
 			lean = -2.0 + logic.fish_x * 3.0
-			bend = 0.25 + logic.tension * 0.75
+			bend = FightView.rod_bend(logic.tension) # 장력은 휨새로 읽는다
 			if logic.exhausted:
 				pose = "reel"
 			elif logic.tension > 0.78:
@@ -1459,6 +1383,9 @@ func _place_player() -> void:
 		var k := logic.fish_pull() * (1.0 if logic.run_dir != 0 and not logic.countering else 0.45)
 		quiver = k * 0.09 * sin(_t * 23.0) + k * 0.05 * sin(_t * 9.0)
 		pitch += k * 2.5 * sin(_t * 17.0)
+		# 위험: 대 끝이 덜덜 떤다
+		if FishingLogic.tension_level(logic.tension) == 2:
+			quiver += 0.07 * sin(_t * 47.0) + 0.04 * sin(_t * 31.0)
 	elif logic.state == FishingLogic.State.BITE:
 		quiver = 0.05 * sin(_t * 20.0) * (1.0 - logic.bite_depth * 0.5)
 	_player.pitch = lerpf(_player.pitch, pitch, follow)
@@ -1466,6 +1393,14 @@ func _place_player() -> void:
 	_bend_base = lerpf(_bend_base, bend, 0.3)
 	_player.bend = clampf(_bend_base + quiver, 0.0, 1.0)
 	_player.pose = pose
+	# 누른 채 좌우로 끌면 낚싯대가 그쪽으로 눕는다. 대 끝 빛은 장력 (청록 알맞음, 빨강 위험은 깜빡임)
+	var fighting := logic.state == FishingLogic.State.REELING
+	var roll := ROLL_BASE + (_steer() * ROLL_STEER if fighting else 0.0)
+	_player.roll = lerpf(_player.roll, roll, 0.2)
+	var glow := FightView.tip_glow(logic.tension) if fighting and _hook_flash <= 0.0 else Color(0, 0, 0, 0)
+	if fighting and FishingLogic.tension_level(logic.tension) == 2:
+		glow.a *= 0.7 + 0.3 * sin(_t * 26.0)
+	_player.tip_glow = glow
 	_player.bend_toward = _float_pos() if logic.state in [FishingLogic.State.WAITING, FishingLogic.State.BITE, FishingLogic.State.REELING] else Vector2.ZERO
 
 
@@ -1641,28 +1576,28 @@ func _draw_line_layer(ci: Control) -> void:
 	var tip := _rod_tip()
 	if s in [FishingLogic.State.CASTING, FishingLogic.State.WAITING, FishingLogic.State.BITE, FishingLogic.State.REELING]:
 		var fp := _float_pos()
-		var sag := 0.0 if s == FishingLogic.State.REELING else 10.0 + 50.0 * _slack
+		var sag := FightView.line_sag(logic.tension) if s == FishingLogic.State.REELING else 10.0 + 50.0 * _slack
 		if logic.mending:
 			sag = 2.0 # 견제: 뒷줄을 잡아 팽팽하게
 		var col := Color(1, 1, 1, 0.75)
 		var width := 1.6
 		var buzz := 0.0
 		if s == FishingLogic.State.REELING:
-			# 팽팽할수록 빨개지고 굵어지며, 위험하면 줄이 윙윙 떤다
-			col = Color(1, 1, 1, 0.85).lerp(UiKit.DANGER, clampf((logic.tension - 0.62) / 0.3, 0.0, 1.0))
-			width = 1.6 + logic.tension * 1.6
+			# 느슨하면 처지고, 팽팽할수록 빨개지고 굵어지며, 위험하면 지그재그로 떤다
+			col = Color(1, 1, 1, 0.85).lerp(FightView.RED, FightView.line_red(logic.tension))
+			width = 1.6 + logic.tension * 1.8
 			if FishingLogic.tension_level(logic.tension) == 2:
-				buzz = 2.5 * sin(_t * 60.0)
+				buzz = (4.0 + 4.0 * logic.break_progress()) * (1.0 if fmod(_t * 22.0, 1.0) < 0.5 else -1.0)
 		var pts := PackedVector2Array()
 		for i in 25:
 			var k := i / 24.0
 			var p := tip.lerp(fp, k)
 			p.y += sin(k * PI) * sag
-			p.x += sin(k * PI) * buzz
+			p.x += sin(k * PI) * buzz * (1.0 if i % 2 == 0 else -1.0)
 			pts.append(p)
 		ci.draw_polyline(pts, col, width, true)
 		if s == FishingLogic.State.REELING:
-			_draw_fish_hp(ci, fp)
+			_draw_fish_mark(ci, fp)
 		if s == FishingLogic.State.CASTING and _float_tex:
 			var ts := _float_tex.get_size()
 			var h := FLOAT_H * 0.8
@@ -1671,16 +1606,38 @@ func _draw_line_layer(ci: Control) -> void:
 		_draw_landing(ci, tip)
 
 
-## 물고기 힘: 물속 물고기 바로 위에 따라다니는 작은 젤리 막대 (분홍, 지치면 연두). 화면 밖으로 나가지 않게
-func _draw_fish_hp(ci: Control, c: Vector2) -> void:
+## 물 위 물고기 표시 (T2): 줄이 들어가는 자리 위에 작은 힘 막대(분홍, 지치면 연두), 그 위에 남은 줄 숫자,
+## 막대 옆에 물고기가 가는 방향 갈매기표. 사용자는 그 반대로 끌어 버틴다. 화면 밖으로 나가지 않게
+func _draw_fish_mark(ci: Control, c: Vector2) -> void:
 	var sc := _depth_scale(_float_depth())
-	var w := 100.0
-	var h := 18.0
-	# 물고기 자리 바로 위
-	var top := c.y - 26.0 * sc - 22.0 - h
-	var x := clampf(c.x - w / 2.0, 16.0, size.x - 16.0 - w)
-	top = clampf(top, GameHeader.TOP_PAD + 8.0, size.y - h - 8.0)
+	var w := 96.0
+	var h := 16.0
+	var side := 46.0 # 갈매기표 자리
+	var top := c.y - 26.0 * sc - 20.0 - h
+	var x := clampf(c.x - w / 2.0, 16.0 + side, size.x - 16.0 - side - w)
+	top = clampf(top, GameHeader.TOP_PAD + 44.0, size.y - h - 8.0)
 	UiKit.draw_bar(ci, Rect2(x, top, w, h), logic.fish_hp, UiKit.LEAF if logic.exhausted else UiKit.PINK, true)
+	# 남은 줄
+	var font := UiKit.font("number")
+	var t := "%dm" % FightView.line_meters(logic.distance, logic.cast_power)
+	var fs := 26
+	var tw := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var tp := Vector2(x + (w - tw) / 2.0, top - 8.0)
+	ci.draw_string_outline(font, tp, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 8, UiKit.OUTLINE)
+	ci.draw_string(font, tp, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UiKit.FOAM)
+	# 물고기가 가는 방향: 막대 옆에서 그쪽으로 흘러가는 갈매기표 둘. 잘 버티면 연두, 놓치기 직전이면 산호
+	if logic.run_dir == 0 or logic.exhausted:
+		return
+	var d := float(logic.run_dir)
+	var col: Color = UiKit.LEAF if logic.countering else (UiKit.CORAL if logic.escape > 0.55 else UiKit.SUN)
+	var cy := top + h / 2.0
+	var x0 := (x + w + 12.0) if d > 0.0 else (x - 12.0)
+	var slide := 0.0 if logic.countering else fmod(_t * 2.2, 1.0) * 8.0
+	for i in 2:
+		var ax := x0 + d * (i * 14.0 + slide)
+		var pts := PackedVector2Array([Vector2(ax, cy - 10.0), Vector2(ax + d * 10.0, cy), Vector2(ax, cy + 10.0)])
+		ci.draw_polyline(pts, UiKit.OUTLINE, 9.0, true)
+		ci.draw_polyline(pts, Color(col, 1.0 - 0.35 * i), 4.5, true)
 
 
 ## 들어 올리기: 발 앞까지 끌려온 물고기를 낚싯대 탄력으로 방파제 위로 올린다
@@ -1714,7 +1671,12 @@ func _draw_hud() -> void:
 	if s == FishingLogic.State.CHARGING:
 		_draw_cast_gauge()
 	if s == FishingLogic.State.REELING:
-		_draw_fight_gauges()
+		# 손가락이 지나간 자취: 작은 점이 남았다가 사라진다
+		for tr in _trail:
+			var tk: float = 1.0 - tr.t / TRAIL_TIME
+			_hud_draw.draw_circle(tr.p, 3.0 + 4.0 * tk, Color(UiKit.FOAM, tk * 0.7))
+		if _guide_on:
+			_draw_fight_guide()
 	# 누른 자리 고리 (누르는 순간 바로 보이는 반응)
 	for tc in _touches:
 		var k: float = tc.t / TOUCH_TIME
@@ -1763,103 +1725,26 @@ func _draw_cast_gauge() -> void:
 	var font := UiKit.font("cute")
 	_hud_draw.draw_string_outline(font, Vector2(r.position.x - 6, r.position.y - 14), "거리", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, 8, UiKit.OUTLINE)
 	_hud_draw.draw_string(font, Vector2(r.position.x - 6, r.position.y - 14), "거리", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, UiKit.FOAM)
-## 줄다리기 게이지 (2026-11-10 다시 짬, 여울 텐션 게이지 방식):
-## 한 줄짜리 큰 장력 게이지. 파랑(느슨함: 감아도 덜 끌려오고 오래 두면 바늘이 빠짐), 초록(알맞음), 빨강(위험: 오래 있으면 끊어짐).
-## 지금 장력은 하얀 바늘과 그 구간 색으로 찬다. 아래 얇은 금색 막대는 감아 온 정도
-func _draw_fight_gauges() -> void:
-	var tr := _tension_slot.get_global_rect()
+
+
+## 첫 줄다리기 조작 안내: 주인공과 바다 사이, 낚싯대와 겹치지 않게 조금 왼쪽. 손가락 고리가 좌우로 오가며 자취를 남긴다
+func _draw_fight_guide() -> void:
+	var c := Vector2(size.x * 0.27, size.y * 0.735)
+	var span := 62.0
+	var ph := _t * 2.4
+	for i in 5:
+		var k := i / 5.0
+		_hud_draw.draw_circle(c + Vector2(sin(ph - k * 0.9) * span, 0), 5.0 * (1.0 - k), Color(UiKit.FOAM, 0.55 * (1.0 - k)))
+	var f := c + Vector2(sin(ph) * span, 0)
+	_hud_draw.draw_arc(f, 22.0, 0.0, TAU, 32, UiKit.OUTLINE, 8.0, true)
+	_hud_draw.draw_arc(f, 22.0, 0.0, TAU, 32, UiKit.FOAM, 4.0, true)
+	_hud_draw.draw_circle(f, 9.0, Color(UiKit.FOAM, 0.9))
 	var font := UiKit.font("cute")
-	var slack_x := tr.position.x + tr.size.x * FishingLogic.TENSION_SLACK
-	var danger_x := tr.position.x + tr.size.x * FishingLogic.TENSION_DANGER
-	# 바탕: 짙은 판 위 세 구간을 옅게
-	_hud_draw.draw_style_box(UiKit.box(UiKit.NIGHT_DEEP, 14, UiKit.OUTLINE, 3, 0), tr.grow(3))
-	var zones := [
-		[tr.position.x, slack_x, UiKit.SKY, "느슨"],
-		[slack_x, danger_x, UiKit.LEAF, "알맞음"],
-		[danger_x, tr.end.x, UiKit.DANGER, "위험"],
-	]
-	var lvl := FishingLogic.tension_level(logic.tension)
-	var cur := 0 if logic.tension < FishingLogic.TENSION_SLACK else (2 if lvl == 2 else 1)
-	for i in 3:
-		var z: Array = zones[i]
-		var zr := Rect2(z[0], tr.position.y, z[1] - z[0], tr.size.y)
-		var on: bool = i == cur
-		_hud_draw.draw_rect(zr.grow(-2), Color(z[2], 0.42 if on else 0.16))
-		var lw := font.get_string_size(z[3], HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
-		if zr.size.x > lw + 8:
-			# 가운데(알맞음)는 바늘이 자주 지나가서 글자를 왼쪽에 둔다
-			var lx: float = zr.position.x + 12.0 if i == 1 else zr.position.x + (zr.size.x - lw) / 2.0
-			_hud_draw.draw_string(font, Vector2(lx, zr.end.y - 8.0), z[3], HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(UiKit.FOAM, 0.9 if on else 0.45))
-	# 구간 경계
-	for x in [slack_x, danger_x]:
-		_hud_draw.draw_line(Vector2(x, tr.position.y), Vector2(x, tr.end.y), Color(UiKit.FOAM, 0.6), 2.0)
-	# 지금 장력 바늘: 위험이면 깜빡이며 떨린다
-	var nx := tr.position.x + tr.size.x * clampf(logic.tension, 0.0, 1.0)
-	if lvl == 2:
-		nx += randf_range(-2.0, 2.0)
-	var ncol: Color = [UiKit.SKY, UiKit.LEAF, UiKit.DANGER][cur]
-	if lvl == 2 and fmod(_t * 8.0, 1.0) > 0.55:
-		ncol = UiKit.FOAM
-	var knob := Rect2(nx - 9.0, tr.position.y - 8.0, 18.0, tr.size.y + 16.0)
-	_hud_draw.draw_style_box(UiKit.box(ncol, 9, UiKit.OUTLINE, 3, 0), knob)
-	# 끊어지기 직전: 게이지 둘레가 빨갛게 번쩍
-	if logic.break_progress() > 0.0:
-		_hud_draw.draw_style_box(UiKit.box(Color.TRANSPARENT, 18, Color(UiKit.DANGER, 0.5 + 0.5 * sin(_t * 30.0)), 4, 0), tr.grow(8))
-	# 감아 온 정도
-	var rr := _reel_slot.get_global_rect()
-	_hud_draw.draw_style_box(UiKit.box(Color(UiKit.FOAM, 0.15), 5, Color.TRANSPARENT, 0, 0), rr)
-	var done := clampf(1.0 - logic.distance, 0.0, 1.0)
-	if done > 0.0:
-		_hud_draw.draw_style_box(UiKit.box(UiKit.SUN if not logic.exhausted else UiKit.LEAF, 5, Color.TRANSPARENT, 0, 0), Rect2(rr.position, Vector2(maxf(10.0, rr.size.x * done), rr.size.y)))
-
-	_draw_steer_lane(_steer_slot.get_global_rect())
-
-
-## 끌기 줄 (2026-11-10 다시 짬. 화면 가장자리 큰 화살표와 "이쪽으로 끌어요"가 촌스럽고 헷갈렸다):
-## 엄지 자리 판 맨 위 한 줄. 물고기가 도망가면 손가락을 끌 쪽으로 얇은 갈매기표(›)가 흘러가고,
-## 그쪽 끝에 "여기까지" 칸이 생긴다. 흰 점은 지금 손가락 위치. 칸 안에 들어가면 초록으로 바뀐다.
-## 글자는 방향을 바로 말한다 ("왼쪽으로 끌어요"). 물고기가 가는 쪽은 물속 물보라로만 보여 준다
-func _draw_steer_lane(r: Rect2) -> void:
-	var font := UiKit.font("cute")
-	var cx := r.position.x + r.size.x / 2.0
-	var cy := r.position.y + r.size.y / 2.0
-	var half := r.size.x / 2.0 - r.size.y / 2.0
-	var rad := int(r.size.y / 2.0)
-	_hud_draw.draw_style_box(UiKit.box(Color(UiKit.NIGHT_DEEP, 0.9), rad, Color(UiKit.FOAM, 0.12), 2, 0), r)
-	if logic.run_dir == 0 or logic.exhausted:
-		var idle := "지쳤어요. 계속 감아요" if logic.exhausted else "누르고 있으면 감겨요"
-		var iw := font.get_string_size(idle, HORIZONTAL_ALIGNMENT_LEFT, -1, 19).x
-		_hud_draw.draw_string(font, Vector2(cx - iw / 2.0, cy + 7.0), idle, HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color(UiKit.LEAF if logic.exhausted else UiKit.FOAM, 0.55))
-		return
-	var want := -logic.run_dir # 손가락을 끌 쪽
-	var urgent := logic.escape > 0.55 and not logic.countering
-	var col: Color = UiKit.LEAF if logic.countering else (UiKit.CORAL if urgent else UiKit.SUN)
-	# "여기까지" 칸: 버티기로 치는 만큼 끈 자리부터 끝까지
-	var x0 := cx + want * half * FishingLogic.COUNTER_STEER
-	var x1 := cx + want * (half + r.size.y / 2.0 - 4.0)
-	var goal := Rect2(minf(x0, x1), r.position.y + 4.0, absf(x1 - x0), r.size.y - 8.0)
-	_hud_draw.draw_style_box(UiKit.box(Color(col, 0.28 + (0.15 * absf(sin(_t * 6.0)) if not logic.countering else 0.2)), rad - 4, Color(col, 0.9), 2, 0), goal)
-	# 흘러가는 갈매기표 (가운데에서 끌 쪽으로)
-	if not logic.countering:
-		for i in 4:
-			var k := fmod(_t * 1.3 + i / 4.0, 1.0)
-			var x := cx + want * k * half * 0.9
-			var a := sin(k * PI) * 0.9
-			var h := r.size.y * 0.24
-			var pts := PackedVector2Array([Vector2(x - want * h * 0.7, cy - h), Vector2(x, cy), Vector2(x - want * h * 0.7, cy + h)])
-			_hud_draw.draw_polyline(pts, Color(col, a), 4.0, true)
-	# 지금 손가락 위치
-	var fx := cx + clampf(logic.steer, -1.0, 1.0) * half
-	if logic.countering:
-		_hud_draw.draw_circle(Vector2(fx, cy), r.size.y * 0.42, Color(UiKit.LEAF, 0.35))
-	_hud_draw.draw_circle(Vector2(fx, cy), r.size.y * 0.26, UiKit.OUTLINE)
-	_hud_draw.draw_circle(Vector2(fx, cy), r.size.y * 0.21, UiKit.FOAM)
-	# 글자: 끌 쪽 반대편 절반 가운데에
-	var side := "왼쪽" if want < 0 else "오른쪽"
-	var t := "좋아요, 버텨요" if logic.countering else ("놓치겠어요! %s으로" % side if urgent else "%s으로 끌어요" % side)
-	var tw := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 21).x
-	var tx := cx - want * half * 0.5 - tw / 2.0
-	_hud_draw.draw_string(font, Vector2(tx, cy + 8.0), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 21, UiKit.LEAF if logic.countering else (UiKit.CORAL if urgent else UiKit.FOAM))
+	var t := "누르고 좌우로"
+	var tw := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x
+	var tp := Vector2(c.x - tw / 2.0, c.y + 62.0)
+	_hud_draw.draw_string_outline(font, tp, t, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, 10, UiKit.OUTLINE)
+	_hud_draw.draw_string(font, tp, t, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, UiKit.FOAM)
 
 
 ## 웹 빌드 자동 테스트용으로 현재 상태를 페이지에 알려 준다.

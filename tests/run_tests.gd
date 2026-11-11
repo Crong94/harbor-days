@@ -35,6 +35,7 @@ func _init() -> void:
 	_test_story()
 	_test_fishing_depth()
 	_test_journal()
+	_test_fight_view()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -1295,3 +1296,49 @@ func _test_journal() -> void:
 	_eq(DexInfo.facts("hakgongchi")[0][1], "먼 물", "학공치는 먼 물")
 	_eq(DexInfo.facts("ureok").back()[0], "버릇", "우럭 버릇")
 	_eq(Locations.is_unlocked("hall", {"chapter2_done": true}), false, "마을회관은 할 일이 생길 때까지 잠김")
+
+
+## 줄다리기 화면 T2: 장력을 낚싯대 휨, 대 끝 빛, 줄 처짐으로 바꾸는 규칙 (FightView)
+func _test_fight_view() -> void:
+	var slack := FishingLogic.TENSION_SLACK
+	var danger := FishingLogic.TENSION_DANGER
+	# 휨은 장력을 따라 끊김 없이 커진다
+	var prev := -1.0
+	var smooth := true
+	var rising := true
+	for i in 101:
+		var b := FightView.rod_bend(i / 100.0)
+		if b < prev:
+			rising = false
+		if prev >= 0.0 and b - prev > 0.05:
+			smooth = false
+		prev = b
+	_eq(rising, true, "휨은 장력이 오를수록 커짐")
+	_eq(smooth, true, "휨은 단계 없이 부드럽게 바뀜")
+	_eq(FightView.rod_bend(0.0) < 0.1, true, "느슨하면 거의 곧음")
+	_eq(FightView.rod_bend(0.5) > 0.3 and FightView.rod_bend(0.5) < 0.68, true, "알맞으면 활처럼")
+	_eq(FightView.rod_bend(danger) >= 0.68, true, "위험하면 크게 꺾임")
+	_eq(FightView.rod_bend(1.0), 1.0, "끝까지 당기면 최대 휨")
+	_eq(FightView.rod_bend(1.7), 1.0, "범위를 넘어도 최대 휨")
+	# 대 끝 빛: 느슨하면 없음, 알맞으면 청록, 위험하면 빨강
+	_eq(FightView.tip_glow(slack * 0.5).a, 0.0, "느슨하면 대 끝 빛 없음")
+	var mid := FightView.tip_glow(0.5)
+	_eq(mid.a > 0.3 and mid.g > mid.r, true, "알맞으면 청록빛")
+	var hot := FightView.tip_glow(danger + 0.05)
+	_eq(hot.a == 1.0 and hot.r > hot.g, true, "위험하면 빨갛게")
+	# 줄: 느슨할 때만 처지고, 위험 앞에서 붉어진다
+	_eq(FightView.line_sag(0.0), FightView.SAG_MAX, "장력 없으면 줄이 가장 처짐")
+	_eq(FightView.line_sag(slack), 0.0, "알맞음부터 줄이 곧음")
+	_eq(FightView.line_sag(0.9), 0.0, "위험해도 줄은 곧음")
+	_eq(FightView.line_red(0.5), 0.0, "알맞을 때 줄은 흰색")
+	_eq(FightView.line_red(danger), 1.0, "위험하면 줄이 다 붉음")
+	# 남은 줄 숫자
+	_eq(FightView.line_meters(1.0, 1.0), 30, "가장 멀리 던지면 30m")
+	_eq(FightView.line_meters(0.5, 0.6), 9, "절반 감으면 9m")
+	_eq(FightView.line_meters(0.0, 0.6), 0, "다 감으면 0m")
+	# 누른 채 끈 거리 → 버티기. 물고기가 오른쪽으로 가면 왼쪽으로 끌어야 버틴다
+	_eq(FightView.steer_from_drag(0.0, 110.0), 0.0, "제자리면 버티기 없음")
+	_eq(FightView.steer_from_drag(-400.0, 110.0), -1.0, "많이 끌어도 -1까지")
+	var st := FightView.steer_from_drag(-60.0, 110.0)
+	_eq(st * 1.0 <= -FishingLogic.COUNTER_STEER, true, "왼쪽으로 60px 끌면 오른쪽으로 가는 물고기를 버팀")
+	_eq(FightView.steer_from_drag(-20.0, 110.0) <= -FishingLogic.COUNTER_STEER, false, "살짝 끈 건 버티기가 아님")

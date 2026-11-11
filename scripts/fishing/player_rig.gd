@@ -26,7 +26,8 @@ const POSES := {
 	"wait": 2, "hum": 7, "bite": 8, "reel": 9, "strain": 10, "strain_hard": 11, "cheer": 12, "fail": 1,
 }
 const ROD_LENGTH := 470.0 # 화면에서 낚싯대 전체 길이 (px, 밑동 끝에서 대 끝까지)
-const BEND_MAX := 0.24 # 최대로 휠 때 대 끝이 옆으로 가는 정도 (대 몸통 길이 대비)
+const BEND_MAX := 0.30 # 최대로 휠 때 대 끝이 옆으로 가는 정도 (대 몸통 길이 대비)
+const BEND_DROP := 0.16 # 크게 휠 때 대 끝이 수면 쪽(화면 아래)으로 꺾이는 정도
 const BLANK_SEGMENTS := 16
 
 var rod_id := GearDB.DEFAULT_ROD
@@ -43,6 +44,8 @@ var lean := 0.0
 ## 대가 휜 정도 0~1과 휘는 쪽 (화면 좌표, 보통 찌나 물고기 위치)
 var bend := 0.0
 var bend_toward := Vector2.ZERO
+## 대 끝 빛 (줄다리기 장력 표시). 알파 0이면 그리지 않는다
+var tip_glow := Color(0, 0, 0, 0)
 
 var _frames: Array = []
 var _blank_tex: Texture2D
@@ -146,7 +149,7 @@ func _geom() -> Dictionary:
 	return {
 		"bw": bw, "bh": bh, "kw": kw, "kh": kh, "sb": sb, "s": s, "axis": axis, "right": right,
 		"fore": fore, "hand": hand, "grip_y": grip_y, "tube_x": tube_x, "blank_cx": bl[0] * kw,
-		"bend_vec": right * side * clampf(bend, 0.0, 1.0) * BEND_MAX * blank_len,
+		"bend_vec": (right * side * BEND_MAX + Vector2(0, BEND_DROP) * clampf(bend, 0.0, 1.0)) * clampf(bend, 0.0, 1.0) * blank_len,
 	}
 
 
@@ -183,6 +186,7 @@ func _draw() -> void:
 		draw_line(_hand(), tip_local(), Color("3a3a42"), 4.0, true)
 	else:
 		_draw_blank(g)
+		_draw_tip_glow(g)
 		# 밑동+릴: 그림을 대 방향으로 돌리고 길이만 원근으로 줄인다
 		var origin := _butt_point(g, 0.0, 0.0)
 		draw_set_transform_matrix(Transform2D(g.right * g.s, -g.axis * g.s * g.fore, origin))
@@ -213,3 +217,18 @@ func _draw_blank(g: Dictionary) -> void:
 			Vector2(0, y0 / g.kh), Vector2(1, y0 / g.kh), Vector2(1, y1 / g.kh), Vector2(0, y1 / g.kh),
 		])
 		draw_polygon(pts, white, uvs, _blank_tex)
+
+
+## 대 끝 빛: 끝에서 3분의 1을 따라 빛나는 선과 끝의 동그란 빛 (장력: 청록 알맞음, 빨강 위험)
+func _draw_tip_glow(g: Dictionary) -> void:
+	if tip_glow.a <= 0.01:
+		return
+	var pts := PackedVector2Array()
+	for k in 9:
+		pts.append(_blank_point(g, g.blank_cx, g.kh * 0.34 * (1.0 - k / 8.0)))
+	draw_polyline(pts, Color(tip_glow, tip_glow.a * 0.3), 11.0, true)
+	draw_polyline(pts, Color(tip_glow, tip_glow.a * 0.85), 4.5, true)
+	var tip := pts[pts.size() - 1]
+	for i in 4:
+		draw_circle(tip, 26.0 - i * 6.0, Color(tip_glow, tip_glow.a * (0.1 + i * 0.1)))
+	draw_circle(tip, 5.0, Color(tip_glow.lightened(0.5), tip_glow.a))
