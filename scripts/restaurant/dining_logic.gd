@@ -28,19 +28,21 @@ const QUICK_BONUS := 1.15 # 하트 손님 값 배수
 const SLOW_CUT := 0.85 # 참을성이 바닥나기 직전(마지막 20%)에 받으면 값 배수
 const EAT_TIME := 6.0
 const MOVE_SPEED := 0.55 # 주인공 걷는 속도 (바닥 비율/초)
-const REACH := 0.09 # 손님 곁에 닿았다고 보는 거리
+const REACH := 0.07 # 서빙 자리에 닿았다고 보는 거리
 
-## 자리 (바닥 비율). 위 줄은 카운터 의자 넷, 아래 줄은 테이블 둘
+## 배치 (2026-11-11 사용자): 세로로 긴 식당. 맨 위 주방, 양옆에 위아래로 긴 바 카운터, 가운데 통로, 맨 아래 입구.
+## 손님은 바 바깥(벽) 쪽 의자에 앉아 가운데를 본다. 한쪽 4석, 모두 8석. 주인공은 통로에서 바 너머로 접시를 놓는다.
 const SEATS := [
-	Vector2(0.2, 0.42), Vector2(0.4, 0.42), Vector2(0.6, 0.42), Vector2(0.8, 0.42),
-	Vector2(0.3, 0.72), Vector2(0.7, 0.72),
+	Vector2(0.13, 0.36), Vector2(0.13, 0.52), Vector2(0.13, 0.68), Vector2(0.13, 0.84),
+	Vector2(0.87, 0.36), Vector2(0.87, 0.52), Vector2(0.87, 0.68), Vector2(0.87, 0.84),
 ]
-## 완성 접시 내놓는 자리 (카운터 왼쪽 끝)
-const PASS := Vector2(0.08, 0.3)
-const START := Vector2(0.5, 0.88)
-## 걸어 다닐 수 있는 범위
-const FLOOR_MIN := Vector2(0.05, 0.3)
-const FLOOR_MAX := Vector2(0.95, 0.92)
+const AISLE_EDGE := 0.36 # 통로에서 바에 붙어 설 수 있는 x (왼쪽 바. 오른쪽은 1에서 뺀 값)
+## 완성 접시 내놓는 자리 (위 주방 가운데)
+const PASS := Vector2(0.5, 0.16)
+const START := Vector2(0.5, 0.3)
+## 걸어 다닐 수 있는 범위 (가운데 통로)
+const FLOOR_MIN := Vector2(0.36, 0.24)
+const FLOOR_MAX := Vector2(0.64, 0.92)
 
 var time := 0.0
 var inventory: Array = [] # 아이스박스 생선 {id, size, ...}. 주문할 때 여기서 뺀다
@@ -105,6 +107,12 @@ func take(pass_index: int) -> bool:
 	holding = g
 	events.append({"type": "take", "guest": g})
 	return true
+
+
+## 그 자리 손님에게 접시를 놓을 때 주인공이 서는 곳 (손님 앞 통로, 바에 붙어서)
+static func serve_spot(seat: int) -> Vector2:
+	var s: Vector2 = SEATS[seat]
+	return Vector2(AISLE_EDGE if s.x < 0.5 else 1.0 - AISLE_EDGE, s.y)
 
 
 func free_seats() -> Array:
@@ -247,7 +255,7 @@ func _try_serve() -> void:
 	if holding < 0:
 		return
 	var g: Dictionary = guests[holding]
-	if g.state == GuestState.SEATED and player.distance_to(SEATS[g.seat]) <= REACH:
+	if g.state == GuestState.SEATED and player.distance_to(serve_spot(g.seat)) <= REACH:
 		_serve(holding)
 
 

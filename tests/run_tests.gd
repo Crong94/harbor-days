@@ -1383,7 +1383,7 @@ func _run_dining(d: DiningLogic, good: bool) -> void:
 			if d.holding < 0 and not d.pass_dishes.is_empty():
 				d.take(0)
 			if d.holding >= 0:
-				var to: Vector2 = DiningLogic.SEATS[d.guests[d.holding].seat] - d.player
+				var to: Vector2 = DiningLogic.serve_spot(d.guests[d.holding].seat) - d.player
 				d.move = to.normalized() if to.length() > 0.02 else Vector2.ZERO
 			else:
 				d.move = Vector2.ZERO
@@ -1471,3 +1471,9 @@ func _test_dining() -> void:
 	_run_dining(al, false)
 	_eq(al.served.size(), al.served.size() + al.angry - al.angry, "알바 셈")
 	_eq(al.angry, 0, "알바가 나르면 화난 손님 없음")
+	# 십자키: 가운데는 방향 없음, 팔 쪽은 그 방향, 사이는 대각선
+	_eq(DPad.dir_from(Vector2(3, 2), 100.0), Vector2.ZERO, "십자키 가운데는 멈춤")
+	_eq(DPad.dir_from(Vector2(0, -80), 100.0), Vector2.UP, "위 팔은 위")
+	_eq(DPad.dir_from(Vector2(90, 5), 100.0), Vector2.RIGHT, "오른쪽 팔은 오른쪽")
+	var dg := DPad.dir_from(Vector2(-60, 60), 100.0)
+	_eq(dg.x < 0.0 and dg.y > 0.0 and is_equal_approx(dg.length(), 1.0), true, "사이는 대각선 (길이 1)")

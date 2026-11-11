@@ -16,7 +16,7 @@ enum Step { INTRO, REGULARS, SPECIAL_TALK, COOK, SPECIAL_DONE, LEDGER }
 
 var step := Step.INTRO
 var cook := CookingLogic.new()
-var result := {} # DayFlow.serve_regulars 결과
+var result := {} # 영업 판(DiningFloor) 결과 {served, missed, sales, angry, hearts}
 var special := {} # {"name", "fish"}
 var special_fish := {} # 특별 손님에게 낼 생선 {"id", "size"}
 var special_price := 0
@@ -24,9 +24,7 @@ var rep_change := 0
 
 var _header: GameHeader
 var _dialogue: DialogueBox
-var _list_panel: PanelContainer
-var _list: VBoxContainer
-var _list_total: Label
+var _floor: DiningFloor # 보통 손님 영업 판 (앉아서 주문, 자동 조리, 들고 가서 서빙)
 var _cook_panel: PanelContainer
 var _cook_title: Label
 var _cook_step: PanelContainer
@@ -64,7 +62,9 @@ func _ready() -> void:
 	_header = GameHeader.new()
 	add_child(_header)
 
-	_build_list()
+	_floor = DiningFloor.new()
+	add_child(_floor)
+	_floor.finished.connect(_on_floor_finished)
 	_build_cook_panel()
 	_build_ledger()
 	_guest = GuestSD.new()
@@ -121,63 +121,37 @@ func _on_dialogue_finished() -> void:
 			_show_ledger()
 
 
-## 보통 손님: 한 명씩 줄에 차오른다
+## 보통 손님 영업: 손님이 앉아 주문하면 화로가 알아서 굽고, 주인공이 들고 가서 낸다 (DiningFloor)
+## 생선은 GameState.inventory에서 바로 빠진다 (특별 손님 몫은 미리 빼 둠)
 func _serve_regulars() -> void:
 	step = Step.REGULARS
-	result = DayFlow.serve_regulars(GameState.day, GameState.inventory)
-	# 쓴 생선을 아이스박스에서 뺀다 (뒤에서부터 지워야 순서가 안 꼬인다)
-	var used: Array = result.used.duplicate()
-	used.sort()
-	used.reverse()
-	for i in used:
-		GameState.inventory.remove_at(i)
-	GameState.earn(result.sales)
-	rep_change += result.served.size() * DayFlow.REP_SERVED + result.missed * DayFlow.REP_MISS
-	if result.missed > 0:
-		GameState.note("생선이 모자라 손님 %d명이 그냥 돌아갔다. 내일은 더 잡아 와야지." % result.missed, 2)
-	elif result.served.size() >= DayFlow.GUESTS_MAX:
-		GameState.note("손님 %d명이 다 생선구이를 먹고 갔다. 가게가 북적였다." % result.served.size(), 1)
-	_list_panel.show()
-	UiKit.rise_in(_list_panel)
+	_floor.start(GameState.day, GameState.inventory)
+
+
+func _on_floor_finished(r: Dictionary) -> void:
+	result = r
+	GameState.earn(int(r.sales))
+	rep_change += r.served.size() * DayFlow.REP_SERVED + int(r.missed) * DayFlow.REP_MISS + int(r.get("hearts", 0))
+	if int(r.get("angry", 0)) > 0:
+		GameState.note("손님 %d명이 기다리다 그냥 갔다. 다 구운 접시는 얼른 날라야지." % r.angry, 2)
+	elif int(r.missed) > 0:
+		GameState.note("생선이 모자라 손님 %d명이 그냥 돌아갔다. 내일은 더 잡아 와야지." % r.missed, 2)
+	elif r.served.size() >= DiningLogic.GUESTS_MIN:
+		GameState.note("손님 %d명이 다 생선구이를 먹고 갔다. 가게가 북적였다." % r.served.size(), 1)
+	_header.refresh()
 	var tw := create_tween()
-	tw.tween_interval(0.4)
-	for g in result.served:
-		tw.tween_callback(_add_guest_row.bind(g))
-		tw.tween_interval(0.55)
-	for i in result.missed:
-		tw.tween_callback(_add_missed_row)
-		tw.tween_interval(0.45)
-	tw.tween_callback(func():
-		_list_total.text = "보통 손님 %d명 · %s" % [result.served.size(), GameState.format_won(result.sales)]
-		_header.refresh())
 	tw.tween_interval(1.0)
+	tw.tween_property(_floor, "modulate:a", 0.0, 0.4)
+	tw.tween_callback(_floor.hide)
 	tw.tween_callback(_special_arrives)
-
-
-func _add_guest_row(g: Dictionary) -> void:
-	Sound.play_sfx("coin", 0.08, -6.0)
-	Haptics.play("tap")
-	var row := _row(g.guest, "%s구이 %dcm" % [FishDB.get_fish(g.fish).name, int(g.size)], "+" + GameState.format_won(g.price), UiKit.SEA)
-	_list.add_child(row)
-	UiKit.pop_in(row)
-
-
-func _add_missed_row() -> void:
-	Sound.play_sfx("bad", 0.0, -10.0)
-	var row := _row("돌아간 손님", "생선이 다 떨어졌어요", "", UiKit.INK_MUTED)
-	row.modulate.a = 0.7
-	_list.add_child(row)
-	UiKit.pop_in(row)
 
 
 func _special_arrives() -> void:
 	if special.is_empty() or special_fish.is_empty():
 		step = Step.SPECIAL_DONE
-		_list_panel.hide()
 		_show_ledger()
 		return
 	step = Step.SPECIAL_TALK
-	_list_panel.hide()
 	Sound.play_sfx("door")
 	_guest_enters()
 	var fname: String = FishDB.get_fish(special_fish.id).name
@@ -302,6 +276,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
+	if step == Step.REGULARS:
+		_header.set_minutes(_floor.clock_minutes())
 	if step != Step.COOK:
 		return
 	var before := cook.phase
@@ -361,27 +337,6 @@ func _go_sleep() -> void:
 
 
 # ─── 화면 구성 ──────────────────────────────────────
-
-func _build_list() -> void:
-	var holder := CenterContainer.new()
-	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	holder.offset_top = GameHeader.BOTTOM + 20
-	holder.offset_bottom = -300 # 대사창 자리
-	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(holder)
-	_list_panel = UiKit.paper_panel(28)
-	_list_panel.custom_minimum_size = Vector2(640, 0)
-	_list_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	holder.add_child(_list_panel)
-	var v := UiKit.vbox(UiKit.SPACE_MD)
-	_list_panel.add_child(v)
-	v.add_child(UiKit.text("오늘 저녁 손님", "h2", UiKit.INK))
-	_list = UiKit.vbox(UiKit.SPACE_SM)
-	v.add_child(_list)
-	_list_total = UiKit.text("", "title", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_RIGHT)
-	v.add_child(_list_total)
-	_list_panel.hide()
-
 
 func _build_cook_panel() -> void:
 	var holder := CenterContainer.new()
