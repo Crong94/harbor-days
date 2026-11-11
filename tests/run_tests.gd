@@ -44,6 +44,7 @@ func _init() -> void:
 	_test_walkers()
 	_test_kitchen()
 	_test_staff()
+	_test_seated()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -1673,3 +1674,22 @@ func _test_staff() -> void:
 	var gs = load("res://scripts/autoload/game_state.gd").new()
 	_eq(SaveGame.fields(gs).has("staff"), true, "알바는 저장됨")
 	gs.free()
+
+
+## 앉은 손님 그림: 앉은 시트가 있으면 앉고, 없으면 서 있는 그림
+func _test_seated() -> void:
+	_eq(GuestSD.has_seat("mansu", "back") and GuestSD.has_seat("mansu", "side"), true, "만수 앉은 그림 두 장")
+	_eq(GuestSD.has_seat("mansu", ""), false, "앉는 방향이 없으면 앉은 그림 아님")
+	var sd := GuestSD.new()
+	sd.guest_id = "mansu"
+	sd.seat = "side"
+	_eq(sd.seated(), true, "옆모습 앉기")
+	sd.guest_id = "없는사람"
+	_eq(sd.seated(), false, "그림 없으면 서 있는 그림으로")
+	sd.free()
+	_eq(GuestSD.SEAT_POSES.size(), 4, "앉은 자세 네 가지 (기다림, 먹는 중, 만족, 화남)")
+	var front := 0
+	for p in DiningLogic.SEATS:
+		if p.y > DiningLogic.FRONT_Y:
+			front += 1
+	_eq(front, 2, "앞 바 손님 두 자리 (뒷모습)")

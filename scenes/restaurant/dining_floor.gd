@@ -13,6 +13,7 @@ signal finished(result: Dictionary)
 ## 이름 없는 손님 그림이 오기 전 임시 얼굴 (사용자 결정 2026-11-11: 이름 없는 손님 SD를 먼저 요청)
 const TEMP_FACES := ["bokja", "junho", "gyeongja", "mansu", "sundeok"]
 const GUEST_H := 150.0
+const SEAT_LIFT := 40.0 # 앉은 그림 발끝을 자리점보다 이만큼 위에 (바 의자 높이, 그림 세션이 잰 값)
 const PLAYER_H := 210.0
 const DISH := 58.0
 const PAD_SIZE := 210.0 # 조이스틱 원판 지름
@@ -209,6 +210,10 @@ func _handle_events() -> void:
 				var sd := GuestSD.new()
 				sd.guest_id = _faces.get(g.name, TEMP_FACES[0])
 				sd.size = Vector2(GUEST_H * 0.75, GUEST_H)
+				# 앞 바 손님은 등, 양옆 손님은 옆모습 (왼쪽 바 손님은 오른쪽을, 오른쪽 바 손님은 왼쪽을 본다)
+				var seat_pos: Vector2 = DiningLogic.SEATS[g.seat]
+				sd.seat = "back" if seat_pos.y > DiningLogic.FRONT_Y else "side"
+				sd.flip = sd.seat == "side" and seat_pos.x > 0.5
 				add_child(sd)
 				move_child(sd, _draw_layer.get_index()) # 말풍선과 주인공 뒤
 				_guests[gi] = sd
@@ -225,7 +230,17 @@ func _handle_events() -> void:
 				Sound.play_sfx("coin", 0.08)
 				Haptics.play("catch" if e.heart else "tap")
 				if _guests.has(gi):
-					_guests[gi].set_pose("happy" if e.heart else "stand")
+					var sd2: GuestSD = _guests[gi]
+					if sd2.seated():
+						# 앉은 손님: 하트면 잠깐 활짝 웃고, 받으면 먹는다
+						sd2.set_pose("happy" if e.heart else "eat")
+						if e.heart:
+							sd2.create_tween().tween_interval(1.0)
+							get_tree().create_timer(1.0).timeout.connect(func():
+								if is_instance_valid(sd2):
+									sd2.set_pose("eat"))
+					else:
+						sd2.set_pose("happy" if e.heart else "stand")
 				_pop(_bubble_pos(gi) + Vector2(0, -50), "+" + GameState.format_won(e.price), UiKit.SUN, e.heart)
 				if e.side != "":
 					_pop(_bubble_pos(gi) + Vector2(0, -16), Sides.name_of(e.side) + " 곁들임", UiKit.LEAF, false)
@@ -275,6 +290,8 @@ func _place_guests() -> void:
 	for gi in _guests:
 		var sd: GuestSD = _guests[gi]
 		var feet := _seat_screen(gi)
+		if sd.seated():
+			feet.y -= SEAT_LIFT # 바 의자 위에 앉은 높이
 		sd.position = feet - Vector2(sd.size.x / 2.0, sd.size.y)
 
 
