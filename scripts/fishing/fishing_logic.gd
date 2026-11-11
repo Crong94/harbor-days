@@ -347,6 +347,14 @@ func habit() -> String:
 
 
 ## 물고기의 힘 (어종 힘 + 크기). 0~1.2
+## 이 고기에게 장비가 덜어 주는 장력. 보통은 장비 그대로(tension_mult).
+## 힘센 고기(감성돔)는 gear_help가 1보다 작아서 장비 덕을 덜 본다 → 좋은 장비가 있어야 잡힌다.
+## 1단계(tension_mult 1)는 어느 고기든 같다. 2026-11-11 사용자: 감성돔은 4~5단계에서 60% 정도
+func gear_tension() -> float:
+	var help := float(FishDB.get_fish(fish_id).get("gear_help", 1.0)) if fish_id != "" else 1.0
+	return 1.0 - (1.0 - tension_mult) * help
+
+
 func fish_strength() -> float:
 	var f := FishDB.get_fish(fish_id)
 	var k := inverse_lerp(f.get("min_cm", 10.0), f.get("max_cm", 30.0), fish_size)
@@ -365,7 +373,7 @@ func fish_pull() -> float:
 func _update_reel(dt: float, held: bool) -> void:
 	var s := fish_strength()
 	var easy := 0.7 if forgiving else 1.0
-	var tm := tension_mult * easy
+	var tm := gear_tension() * easy
 
 	# 물고기 움직임: 쉬다가 왼쪽이나 오른쪽으로 차고 나간다. 어종마다 버릇이 다르다 (habit)
 	var hb := habit()

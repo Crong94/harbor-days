@@ -68,7 +68,7 @@ const FISH := {
 	},
 	"gamseongdom": {
 		"name": "감성돔", "rarity": "legend",
-		"min_cm": 25.0, "max_cm": 52.0, "strength": 0.95, "price": 28000,
+		"min_cm": 25.0, "max_cm": 52.0, "strength": 0.95, "price": 28000, "gear_help": 0.46,
 		"weight": 0.22, "night": 0.3, "zone": [0.2, 0.8, 1.8],
 		"weather": {"cloudy": 1.4, "windy": 1.5},
 		"habit": "long", "catalog": "gamseongdom", "grill": "gamseongdom-gui",

@@ -39,6 +39,7 @@ func _init() -> void:
 	_test_guest_sd()
 	_test_dining()
 	_test_shop_decor()
+	_test_gear_help()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -1520,3 +1521,24 @@ func _test_shop_decor() -> void:
 	var gs = load("res://scripts/autoload/game_state.gd").new()
 	_eq(SaveGame.fields(gs).has("shop_decor") and SaveGame.fields(gs).has("owned_decor"), true, "가구는 저장됨")
 	gs.free()
+
+
+## 감성돔은 장비 덕을 덜 본다: 단계가 오를수록 장력이 덜 오르지만, 보통 고기보다 덜 준다
+func _test_gear_help() -> void:
+	var prev := 2.0
+	var mono := true
+	for tier in range(1, 11):
+		var l := FishingLogic.new()
+		GearDB.apply(l, "rod_%d" % tier, "reel_%d" % tier)
+		l.fish_id = "gamseongdom"
+		var g := l.gear_tension()
+		if g > prev:
+			mono = false
+		prev = g
+		if tier == 1:
+			_eq(g, l.tension_mult, "1단계는 감성돔도 장비 그대로")
+		if tier == 4:
+			_eq(g > l.tension_mult, true, "감성돔은 장비 덕을 덜 봄")
+			l.fish_id = "bolak"
+			_eq(l.gear_tension(), l.tension_mult, "보통 고기는 장비 그대로")
+	_eq(mono, true, "장비 단계가 오를수록 감성돔 장력도 덜 오름")

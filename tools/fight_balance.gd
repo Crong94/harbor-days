@@ -27,6 +27,14 @@ func _init() -> void:
 				else:
 					why[r.why] = int(why.get(r.why, 0)) + 1
 			print("  %-12s 성공 %3d%%  평균 %4.1f초  실패 %s" % [FishDB.get_fish(id).name, ok * 100 / TRIES, secs / maxf(ok, 1), why])
+	# 감성돔은 장비 10단계 전부 (낚싯대와 릴 같은 단계)
+	print("── 감성돔 장비 단계별")
+	for tier in range(1, 11):
+		var ok := 0
+		for i in TRIES:
+			if _fight("gamseongdom", ["rod_%d" % tier, "reel_%d" % tier], 1000 + i).ok:
+				ok += 1
+		print("  %2d단계  성공 %3d%%" % [tier, ok * 100 / TRIES])
 	quit()
 
 
@@ -39,7 +47,9 @@ func _fight(id: String, gear: Array, seed_value: int) -> Dictionary:
 	l.force_first_fish = id
 	l.catch_count = 0 # 첫 고기 고정을 써서 어종을 정한다
 	l.state = FishingLogic.State.BITE
-	l.bite_depth = 0.5
+	# 장비마다 PERFECT 폭이 달라 같은 순간에 눌러도 판정이 갈린다. 공정하게 늘 PERFECT 가운데에서 챈다
+	var z := l.perfect_zone()
+	l.bite_depth = (z.x + z.y) / 2.0
 	l._timer = 1.0
 	l.cast_power = 0.6
 	l.press()
