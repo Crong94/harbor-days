@@ -68,7 +68,7 @@
 ## 지금까지 상황 (환경: 코드, 집 노트북의 로컬 레포)
 - 레포: 노트북 main 2f86faa 뒤에 이어가기 문서 커밋 하나. GitHub Crong94/harbor-days(공개) main은 2868ed1. 그 뒤 커밋들은 노트북에만 있다. 이 노트북에는 git remote가 없어 push는 https://github.com/Crong94/harbor-days.git로 직접 한다(사용자가 원할 때만)
 - Godot 4.4.1: 노트북 사용자 폴더 아래 Tools/Godot. 콘솔 실행 파일 Godot_v4.4.1-stable_win64_console.exe
-- 테스트: `<Godot>_console.exe --headless --path . --script res://tests/run_tests.gd` → 862 통과, 0 실패
+- 테스트: `<Godot>_console.exe --headless --path . --script res://tests/run_tests.gd` → 927 통과, 0 실패
 - 화면 찍기: 임시 res://_shot/*.tscn(GameState를 정하고 장면을 instantiate)을 만들어 `<Godot>.exe --path . res://_shot/x.tscn --write-movie <스크래치>/x.png --fixed-fps 30 --quit-after 75 --resolution 720x1280 -- <인자>`. _shot/은 .gitignore. 노트북 화면이 낮아 720x1061로 찍힌다. 녹화 모드라 창이 느리게 뜨는 건 정상(사용자에게 그렇게 설명)
 - 줄다리기 난이도 재기: `<Godot>_console.exe --headless --path . --script res://tools/fight_balance.gd`
 - 먼저 읽을 것: CLAUDE.md, docs/줄다리기_UI_설계와_그림정리_2026-11-11.md(T2), docs/UI_디자인_시스템.md, docs/텃밭_설계.md, 기획서 docs/오늘의바다_시나리오_v3.md
@@ -100,13 +100,21 @@
 - 큰 파일(APK 90MB대, bundle 100MB대)은 원격으로 못 보낸다. 드라이브에 올리라고 안내
 - 셸이 샌드박스로 막히면(Godot 창 띄우기) 샌드박스를 끄고 실행. 다운로드 폴더의 파일 지우기는 자동 모드에서 막히니 옮긴다
 
+## 11-11 밤 개발 세션에서 한 것
+- T2 줄다리기(7e497ef): 아래 판·글자 삭제. 장력 = 낚싯대 휨(수면 쪽 꺾임 포함), 대 끝 빛(청록/빨강 깜빡임), 줄 처짐과 붉은 지그재그(scripts/fishing/fight_view.gd). 물 위에 힘 막대·남은 줄 m·물고기 가는 방향 갈매기표(버티면 연두). 누른 채 좌우 = 낚싯대가 그쪽으로 눕고 손가락 자취 점. 첫 줄다리기만 "누르고 좌우로". fight_balance 결과 바꾸기 전과 같음
+- 게이지 부품 시트 docs/ref/gauge/gauge_sheet_1.png는 쓰지 않기로(사용자)
+- 특별 손님 SD(GuestSD, scripts/ui/guest_sd.gd): sd_guest/<id>_react.png 세 칸(경계는 가장 빈 열)에서 서 있기·만족·아쉬움. 대화창 얼굴 자리에 서고 얼굴 그림은 끔
+- 저녁 영업 개편(사용자 요청, docs/식당_영업_개편_요청_2026-11-11.md): 보통 손님은 영업 판 DiningFloor(scenes/restaurant/dining_floor.gd) + 규칙 DiningLogic(scripts/restaurant/dining_logic.gd). 실제 4분, 손님 6~9명, 주문 → 화로 2개 자동 조리 → 완성 접시 누르면 손에 들림 → 콘솔 십자키(DPad, 손 떼면 반투명)로 통로를 걸어 손님 앞에 서면 서빙. 빨리 받으면 하트(1.15배, 평판 +1), 45초 넘으면 화나서 감. 특별 손님 한 접시만 예전처럼 간 맞추기·굽기(사용자 결정)
+- 배치는 그림 세션 새 구도 기준: 세로로 긴 식당, 위 주방, 양옆 세로 바 4석씩, 가운데 통로. 배경 그림이 오면 DiningLogic.SEATS, PASS, FLOOR_MIN/MAX 비율만 맞춘다
+- 나중: 알바를 뽑아 요리나 서빙을 맡김(DiningLogic.helper_serve 자리만 있음)
+- APK: build/android/oneului-bada-1111-<커밋>.apk (영업 개편까지). 드라이브에 올리라고 안내함
+
 ## 이번에 해 줬으면 하는 것
-1. 사용자에게 먼저 확인: 지금 노트북 줄다리기 아래 판(장력 게이지 + 끌기 줄)을 T2로 바꾸는 게 맞는지. 지도 방위(지도 위쪽이 동쪽 바다인지)
-2. T2 줄다리기 구현(T2 문서 3장). fishing_logic.gd 규칙과 숫자는 그대로, 화면만 바꾼다. 낚싯대 휨은 scripts/fishing/player_rig.gd의 bend/pitch. 끝나는 기준: 아래 판과 글자 없음, 장력이 낚싯대와 줄로 읽힘, 물 위에 물고기 방향 화살표와 남은 줄, fight_balance 성공률 그대로, 테스트 통과, 화면 찍어 보여 주기
-3. 대사 표정 마저 달기: scenes/fishing/fishing.gd의 박만수 대사 2줄, "은행 직원" 등. 순덕 할머니 집 동작 전환: 부탁이 요리 이야기(1, 2번)면 npc_sundeok_pot, 제사(3번)와 선물 장면은 npc_sundeok_photo(그림 세션이 넣으면, 없으면 npc_sundeok)
-4. 식당 곁들임: 텃밭 채소(CropDB bonus)와 달걀을 저녁 영업 접시에 붙이기. 테스트 추가
-5. 손님 SD 연결: 그림 세션이 assets/art/sd_guest/<id>_walk.png, _react.png를 넣으면 저녁 영업 손님(걷기 등장, 만족·아쉬움 반응)과 지도 걷기에 쓸 자리를 정해 연결
-6. APK 새로 뽑아 사용자가 폰에서 해 보게 하기(난이도, 한 달 고정비 80만 원 균형 확인). 커밋된 상태만 담으려고 임시 worktree에서 `--export-debug "Android"`
-7. 그다음 후보: 버스와 옆마을(요금, 배차 시간), 지도 방위 확정 후 낚시 배경과 맞추기
+1. 그림 세션이 식당 배경(세로 통로 구도), 이름 없는 손님 SD(앉은 옆모습 포함), 주인공 접시 든 걷기를 넣으면 DiningFloor에 연결: SEATS 비율 맞추기, TEMP_FACES를 이름 없는 손님으로, 주인공 그림 교체
+2. 사용자 폰 확인 결과 반영: 줄다리기 T2가 폰에서 읽히는지(위험이 약하면 가장자리 붉은 기운 더 진하게), 영업 4분 난이도(PATIENCE 45초, 화로 2개, 손님 수), 한 달 고정비 80만 원 균형
+3. 대사 표정 마저 달기: fishing.gd 박만수 대사 2줄, "은행 직원" 등. 순덕 집 동작 전환(npc_sundeok_pot, npc_sundeok_photo)
+4. 식당 곁들임: 텃밭 채소(CropDB bonus)와 달걀을 영업 접시에 붙이기
+5. 지도 걷기: sd_guest/<id>_walk.png로 주민이 지도 위를 걷게
+6. 그다음 후보: 알바 채용, 버스와 옆마을, 지도 방위 확정
 마지막: 테스트 통과와 화면 확인 → 내 파일만 커밋([skip ci]) → ./tools/backup.sh → 새 bundle을 드라이브 `오늘의바다_백업`에 올리라고 안내. GitHub push는 원할 때만. 이 문서(docs/HANDOFF.md)를 갱신한다
 ```
