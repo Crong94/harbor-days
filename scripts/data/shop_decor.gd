@@ -5,7 +5,7 @@ extends RefCounted
 ## 그림: assets/art/decor/<item id>.png (그림 세션이 종류별로 받는다). 그림이 없으면 아무것도 그리지 않는다.
 ## 놓은 것: GameState.shop_decor {슬롯 id: 물건 id}, 가진 것: GameState.owned_decor [물건 id]
 ## 비어 있는 슬롯은 그 종류의 기본 물건(값 0)을 쓴다. 의자는 편할수록 손님이 더 오래 기다려 준다(comfort초).
-## 자리 위치는 바닥 비율 (DiningLogic과 같은 좌표). 배경 그림이 정해지면 여기 숫자만 맞춘다.
+## 자리 위치는 식당 배경 그림 전체 비율, 아래 가운데 기준 (DiningLogic과 같은 좌표, 그림 세션이 잰 값).
 
 const ART_DIR := "decor/"
 
@@ -32,14 +32,14 @@ const DEFAULTS := {"chair": "chair_basic", "bar": "bar_none", "wall": "wall_none
 
 ## 바 위 장식, 벽 장식, 화분 자리 (의자 자리는 DiningLogic.SEATS를 그대로 따른다)
 const EXTRA_SLOTS := [
-	{"id": "bar_0", "kind": "bar", "pos": Vector2(0.31, 0.40)},
-	{"id": "bar_1", "kind": "bar", "pos": Vector2(0.69, 0.40)},
-	{"id": "bar_2", "kind": "bar", "pos": Vector2(0.31, 0.68)},
-	{"id": "bar_3", "kind": "bar", "pos": Vector2(0.69, 0.68)},
-	{"id": "wall_0", "kind": "wall", "pos": Vector2(0.06, 0.25)},
-	{"id": "wall_1", "kind": "wall", "pos": Vector2(0.94, 0.25)},
-	{"id": "plant_0", "kind": "plant", "pos": Vector2(0.06, 0.88)},
-	{"id": "plant_1", "kind": "plant", "pos": Vector2(0.94, 0.88)},
+	{"id": "bar_0", "kind": "bar", "pos": Vector2(0.29, 0.45)},
+	{"id": "bar_1", "kind": "bar", "pos": Vector2(0.25, 0.62)},
+	{"id": "bar_2", "kind": "bar", "pos": Vector2(0.71, 0.45)},
+	{"id": "bar_3", "kind": "bar", "pos": Vector2(0.75, 0.62)},
+	{"id": "wall_0", "kind": "wall", "pos": Vector2(0.11, 0.28)},
+	{"id": "wall_1", "kind": "wall", "pos": Vector2(0.89, 0.28)},
+	{"id": "plant_0", "kind": "plant", "pos": Vector2(0.06, 0.95)},
+	{"id": "plant_1", "kind": "plant", "pos": Vector2(0.94, 0.95)},
 ]
 
 

@@ -99,11 +99,15 @@ func _load_art(id: String) -> Texture2D:
 	return load(ArtSlot.art_path(id)) if ArtSlot.has_art(id) else null
 
 
-## 바닥 비율 → 화면 좌표. 위는 헤더 아래, 아래는 방향 버튼 위
+## 배경 그림 비율 → 화면 좌표
+## 좌표 기준 = 화면에 꽉 채워 깐 식당 배경 그림 자리 (cover: 비율 그대로 화면을 덮고 넘치는 쪽은 가운데 기준으로 잘림)
+const BG_SIZE := Vector2(941, 1671)
+
+
 func floor_rect() -> Rect2:
-	var top := GameHeader.BOTTOM + 30.0
-	var bottom := size.y - PAD_SIZE * 0.55 - 40.0 # 십자키는 반투명이라 바닥과 조금 겹쳐도 된다
-	return Rect2(0.0, top, size.x, bottom - top)
+	var k := maxf(size.x / BG_SIZE.x, size.y / BG_SIZE.y)
+	var s := BG_SIZE * k
+	return Rect2((size - s) / 2.0, s)
 
 
 func to_screen(p: Vector2) -> Vector2:
