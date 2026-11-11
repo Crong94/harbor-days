@@ -9,7 +9,7 @@ extends RefCounted
 ##   → 주인공이 완성 접시를 집어(take) 방향 버튼으로 걸어가 그 손님 곁에 닿으면 내려놓는다
 ##   → 손님은 EAT_TIME초 먹고 값을 내고 나간다. 빨리 받으면 하트(값 더), 너무 오래 기다리면 화나서 그냥 간다
 ## 생선이 떨어지면 들어온 손님은 그냥 돌아간다 (평판 깎임). 재료는 낚시로 잡은 생선뿐이다.
-## 좌표는 바닥 비율 (x 0 왼쪽 ~ 1 오른쪽, y 0 위 ~ 1 아래). 배경 그림이 오면 SEATS, PASS만 맞춘다.
+## 좌표는 바닥 비율 (x 0 왼쪽 ~ 1 오른쪽, y 0 위 ~ 1 아래). 배경 그림이 오면 SEATS, WALK, PASS 숫자만 맞춘다.
 ## 나중에 알바를 뽑으면 요리나 서빙을 맡긴다 (helper_serve: 완성 접시를 알아서 갖다준다).
 
 enum GuestState { SEATED, EATING, LEFT }
@@ -30,23 +30,28 @@ const EAT_TIME := 6.0
 const MOVE_SPEED := 0.55 # 주인공 걷는 속도 (바닥 비율/초)
 const REACH := 0.07 # 서빙 자리에 닿았다고 보는 거리
 
-## 배치 (2026-11-11 사용자, 두 번째): 바가 왼쪽, 아래, 오른쪽으로 이어진 U자(ㅂ자). 위쪽은 주방으로 열린다.
-## 바 안쪽 통로는 SD 하나 폭(화면 폭 약 1/4)으로 좁고, 바 바깥과 벽 사이가 손님 자리다.
-## 왼쪽 4석, 오른쪽 4석, 아래 바 밑 양끝 2석 (아래 가운데는 십자키 자리). 입구는 왼쪽 아래 구석.
-## 주인공은 U자 안쪽 통로에서 바 너머로 접시를 놓는다.
+## 배치 (2026-11-11 사용자, 세 번째 확정): 정면 단면 시점, 위아래 두 단.
+## 단마다 위에서부터 서빙 통로(주인공이 좌우로 걸음) → 가로 바 → 의자 4석(손님은 바를 보고 앉아 등이 보임).
+## 위 단 통로 위는 주방(선반, 화로, 완성 접시 내놓는 자리). 오른쪽 끝 계단으로 두 단을 오간다.
+## 맨 아래 가운데는 십자키 자리라 바닥만 있다.
+## 주인공은 통로와 계단 안에서만 걷는다(WALK). 서빙은 그 손님 바로 위 통로에서.
 const SEATS := [
-	Vector2(0.12, 0.34), Vector2(0.12, 0.47), Vector2(0.12, 0.60), Vector2(0.12, 0.73),
-	Vector2(0.88, 0.34), Vector2(0.88, 0.47), Vector2(0.88, 0.60), Vector2(0.88, 0.73),
-	Vector2(0.30, 0.95), Vector2(0.70, 0.95),
+	Vector2(0.14, 0.44), Vector2(0.32, 0.44), Vector2(0.50, 0.44), Vector2(0.68, 0.44),
+	Vector2(0.14, 0.84), Vector2(0.32, 0.84), Vector2(0.50, 0.84), Vector2(0.68, 0.84),
 ]
-const AISLE := Vector2(0.385, 0.615) # 안쪽 통로 x 범위
-const AISLE_BOTTOM := 0.8 # 안쪽 통로 아래 끝 (그 밑은 아래 바)
-## 완성 접시 내놓는 자리 (위 주방 가운데)
-const PASS := Vector2(0.5, 0.15)
-const START := Vector2(0.5, 0.3)
-## 걸어 다닐 수 있는 범위 (U자 안쪽 통로)
-const FLOOR_MIN := Vector2(AISLE.x, 0.22)
-const FLOOR_MAX := Vector2(AISLE.y, AISLE_BOTTOM)
+const UPPER_Y := 0.24 # 위 단 서빙 통로
+const LOWER_Y := 0.62 # 아래 단 서빙 통로
+const STAIR_X := 0.86 # 오른쪽 계단 가운데
+const TIER_SPLIT := 0.53 # 이 y보다 위면 위 단 (위 단 의자와 아래 단 통로 사이)
+## 걸을 수 있는 곳 [x0, y0, x1, y1]: 위 통로, 아래 통로, 오른쪽 계단
+const WALK := [
+	[0.06, UPPER_Y - 0.02, 0.92, UPPER_Y + 0.02],
+	[0.06, LOWER_Y - 0.02, 0.92, LOWER_Y + 0.02],
+	[STAIR_X - 0.06, UPPER_Y - 0.02, STAIR_X + 0.06, LOWER_Y + 0.02],
+]
+## 완성 접시 내놓는 자리 (주방 조리대, 위 통로 바로 위)
+const PASS := Vector2(0.4, 0.12)
+const START := Vector2(0.4, UPPER_Y)
 
 var time := 0.0
 var inventory: Array = [] # 아이스박스 생선 {id, size, ...}. 주문할 때 여기서 뺀다
@@ -117,10 +122,31 @@ func take(pass_index: int) -> bool:
 ## 그 자리 손님에게 접시를 놓을 때 주인공이 서는 곳 (손님 앞 통로, 바에 붙어서)
 static func serve_spot(seat: int) -> Vector2:
 	var s: Vector2 = SEATS[seat]
-	var x := AISLE.x if s.x < 0.5 else AISLE.y
-	if s.y > AISLE_BOTTOM:
-		return Vector2(x, AISLE_BOTTOM) # 아래 바 밑 손님은 통로 아래 모서리에서
-	return Vector2(x, s.y)
+	return Vector2(s.x, UPPER_Y if s.y < TIER_SPLIT else LOWER_Y)
+
+
+## 걸을 수 있는 자리인가
+static func walkable(p: Vector2) -> bool:
+	for r in WALK:
+		if walkable_in(r, p):
+			return true
+	return false
+
+
+static func walkable_in(r: Array, p: Vector2) -> bool:
+	return p.x >= r[0] - 0.0001 and p.x <= r[2] + 0.0001 and p.y >= r[1] - 0.0001 and p.y <= r[3] + 0.0001
+
+
+## 목표까지 가려면 지금 향할 곳. 다른 단이면 오른쪽 계단을 거친다 (알바와 자동 시험용)
+static func next_waypoint(from: Vector2, to: Vector2) -> Vector2:
+	var a := from.y < TIER_SPLIT
+	var b := to.y < TIER_SPLIT
+	var on_stair := absf(from.x - STAIR_X) < 0.02
+	if a == b and (absf(from.y - (UPPER_Y if a else LOWER_Y)) < 0.03):
+		return to
+	if not on_stair:
+		return Vector2(STAIR_X, from.y)
+	return Vector2(STAIR_X, UPPER_Y if b else LOWER_Y)
 
 
 func free_seats() -> Array:
@@ -257,7 +283,21 @@ func _leave_angry(gi: int) -> void:
 func _walk(dt: float) -> void:
 	if move == Vector2.ZERO:
 		return
-	player = (player + move.limit_length(1.0) * MOVE_SPEED * dt).clamp(FLOOR_MIN, FLOOR_MAX)
+	# 통로와 계단 안에서만. 막히면 가로나 세로 한쪽만이라도 움직인다 (벽을 타고 미끄러지게)
+	var step := move.limit_length(1.0) * MOVE_SPEED * dt
+	var want := player + step
+	if walkable(want):
+		player = want
+		return
+	# 막히면 지금 서 있는 칸 안으로 끝까지 붙인다 (가장 많이 나아가는 칸)
+	var best := player
+	for r in WALK:
+		if not walkable_in(r, player):
+			continue
+		var c := Vector2(clampf(want.x, r[0], r[2]), clampf(want.y, r[1], r[3]))
+		if c.distance_to(want) < best.distance_to(want):
+			best = c
+	player = best
 
 
 func _try_serve() -> void:
