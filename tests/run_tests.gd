@@ -38,6 +38,7 @@ func _init() -> void:
 	_test_fight_view()
 	_test_guest_sd()
 	_test_dining()
+	_test_shop_decor()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -1477,3 +1478,45 @@ func _test_dining() -> void:
 	_eq(DPad.dir_from(Vector2(90, 5), 100.0), Vector2.RIGHT, "오른쪽 팔은 오른쪽")
 	var dg := DPad.dir_from(Vector2(-60, 60), 100.0)
 	_eq(dg.x < 0.0 and dg.y > 0.0 and is_equal_approx(dg.length(), 1.0), true, "사이는 대각선 (길이 1)")
+
+
+## 식당 가구 슬롯: 상점에서 산 의자, 장식을 자리마다 갈아 끼운다 (ShopDecor)
+func _test_shop_decor() -> void:
+	var decor := {}
+	var owned := []
+	_eq(DiningLogic.SEATS.size(), 10, "손님 자리 10석 (왼쪽 4, 오른쪽 4, 아래 2)")
+	var chairs := ShopDecor.slots().filter(func(s): return s.kind == "chair").size()
+	_eq(chairs, 10, "의자 슬롯은 자리마다")
+	_eq(ShopDecor.item_in(decor, "chair_3"), "chair_basic", "안 놓으면 기본 의자")
+	_eq(ShopDecor.item_in(decor, "bar_0"), "bar_none", "바 위는 기본 빈 자리")
+	_eq(ShopDecor.art_of("bar_none"), "", "빈 자리는 그리지 않음")
+	_eq(ShopDecor.art_of("chair_wood"), "decor/chair_wood", "그림 경로")
+	_eq(ShopDecor.place(decor, owned, "chair_0", "chair_wood"), false, "안 산 의자는 못 놓음")
+	owned.append("chair_wood")
+	_eq(ShopDecor.place(decor, owned, "chair_0", "chair_wood"), true, "산 의자 놓기")
+	_eq(ShopDecor.place(decor, owned, "bar_0", "chair_wood"), false, "의자를 바 위에 놓을 순 없음")
+	_eq(ShopDecor.place(decor, owned, "nope", "chair_wood"), false, "없는 슬롯")
+	_eq(ShopDecor.place_all(decor, owned, "chair", "chair_wood"), 10, "의자 한 번에 바꾸기")
+	_eq(ShopDecor.place(decor, owned, "wall_0", "wall_none"), true, "기본 물건은 사지 않아도 놓음")
+	decor["bar_1"] = "chair_wood" # 망가진 저장값
+	_eq(ShopDecor.item_in(decor, "bar_1"), "bar_none", "종류가 틀린 값은 기본으로")
+	# 편한 의자는 손님이 더 오래 기다려 준다
+	var comfort := ShopDecor.seat_comfort(decor)
+	_eq(comfort[0], 5.0, "나무 의자 편안함")
+	var d := DiningLogic.new()
+	d.seat_bonus = comfort
+	_eq(d.patience_of(0), DiningLogic.PATIENCE + 5.0, "편한 의자 자리는 더 참음")
+	_eq(d.patience_of(99), DiningLogic.PATIENCE, "모르는 자리는 기본")
+	# 아래 바 밑 손님은 통로 아래 모서리에서 받는다
+	var sp := DiningLogic.serve_spot(8)
+	_eq(sp, Vector2(DiningLogic.AISLE.x, DiningLogic.AISLE_BOTTOM), "아래 왼쪽 손님 서빙 자리")
+	var ok := true
+	for i in DiningLogic.SEATS.size():
+		var q := DiningLogic.serve_spot(i)
+		if q.x < DiningLogic.FLOOR_MIN.x or q.x > DiningLogic.FLOOR_MAX.x or q.y < DiningLogic.FLOOR_MIN.y or q.y > DiningLogic.FLOOR_MAX.y:
+			ok = false
+	_eq(ok, true, "모든 서빙 자리가 통로 안")
+	# 저장된다
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	_eq(SaveGame.fields(gs).has("shop_decor") and SaveGame.fields(gs).has("owned_decor"), true, "가구는 저장됨")
+	gs.free()

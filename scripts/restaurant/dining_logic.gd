@@ -30,19 +30,23 @@ const EAT_TIME := 6.0
 const MOVE_SPEED := 0.55 # 주인공 걷는 속도 (바닥 비율/초)
 const REACH := 0.07 # 서빙 자리에 닿았다고 보는 거리
 
-## 배치 (2026-11-11 사용자): 세로로 긴 식당. 맨 위 주방, 양옆에 위아래로 긴 바 카운터, 가운데 통로, 맨 아래 입구.
-## 손님은 바 바깥(벽) 쪽 의자에 앉아 가운데를 본다. 한쪽 4석, 모두 8석. 주인공은 통로에서 바 너머로 접시를 놓는다.
+## 배치 (2026-11-11 사용자, 두 번째): 바가 왼쪽, 아래, 오른쪽으로 이어진 U자(ㅂ자). 위쪽은 주방으로 열린다.
+## 바 안쪽 통로는 SD 하나 폭(화면 폭 약 1/4)으로 좁고, 바 바깥과 벽 사이가 손님 자리다.
+## 왼쪽 4석, 오른쪽 4석, 아래 바 밑 양끝 2석 (아래 가운데는 십자키 자리). 입구는 왼쪽 아래 구석.
+## 주인공은 U자 안쪽 통로에서 바 너머로 접시를 놓는다.
 const SEATS := [
-	Vector2(0.13, 0.36), Vector2(0.13, 0.52), Vector2(0.13, 0.68), Vector2(0.13, 0.84),
-	Vector2(0.87, 0.36), Vector2(0.87, 0.52), Vector2(0.87, 0.68), Vector2(0.87, 0.84),
+	Vector2(0.12, 0.34), Vector2(0.12, 0.47), Vector2(0.12, 0.60), Vector2(0.12, 0.73),
+	Vector2(0.88, 0.34), Vector2(0.88, 0.47), Vector2(0.88, 0.60), Vector2(0.88, 0.73),
+	Vector2(0.30, 0.95), Vector2(0.70, 0.95),
 ]
-const AISLE_EDGE := 0.36 # 통로에서 바에 붙어 설 수 있는 x (왼쪽 바. 오른쪽은 1에서 뺀 값)
+const AISLE := Vector2(0.385, 0.615) # 안쪽 통로 x 범위
+const AISLE_BOTTOM := 0.8 # 안쪽 통로 아래 끝 (그 밑은 아래 바)
 ## 완성 접시 내놓는 자리 (위 주방 가운데)
-const PASS := Vector2(0.5, 0.16)
+const PASS := Vector2(0.5, 0.15)
 const START := Vector2(0.5, 0.3)
-## 걸어 다닐 수 있는 범위 (가운데 통로)
-const FLOOR_MIN := Vector2(0.36, 0.24)
-const FLOOR_MAX := Vector2(0.64, 0.92)
+## 걸어 다닐 수 있는 범위 (U자 안쪽 통로)
+const FLOOR_MIN := Vector2(AISLE.x, 0.22)
+const FLOOR_MAX := Vector2(AISLE.y, AISLE_BOTTOM)
 
 var time := 0.0
 var inventory: Array = [] # 아이스박스 생선 {id, size, ...}. 주문할 때 여기서 뺀다
@@ -55,6 +59,7 @@ var holding := -1 # 주인공 손에 든 접시 (guest index, -1이면 빈손)
 var player := START
 var move := Vector2.ZERO # 방향 버튼 (-1~1)
 var helper_serve := false # 알바: 완성 접시를 알아서 갖다준다 (나중에)
+var seat_bonus: Array = [] # 자리마다 더 참아 주는 시간 (초). 편한 의자 (ShopDecor.seat_comfort)
 
 var served: Array = [] # {guest, fish, size, price, heart}
 var missed := 0 # 생선이 없어 그냥 돌아간 손님
@@ -112,7 +117,10 @@ func take(pass_index: int) -> bool:
 ## 그 자리 손님에게 접시를 놓을 때 주인공이 서는 곳 (손님 앞 통로, 바에 붙어서)
 static func serve_spot(seat: int) -> Vector2:
 	var s: Vector2 = SEATS[seat]
-	return Vector2(AISLE_EDGE if s.x < 0.5 else 1.0 - AISLE_EDGE, s.y)
+	var x := AISLE.x if s.x < 0.5 else AISLE.y
+	if s.y > AISLE_BOTTOM:
+		return Vector2(x, AISLE_BOTTOM) # 아래 바 밑 손님은 통로 아래 모서리에서
+	return Vector2(x, s.y)
 
 
 func free_seats() -> Array:
@@ -141,6 +149,11 @@ func pick_fish() -> int:
 
 static func cook_time(size_cm: float) -> float:
 	return COOK_TIME + maxf(0.0, size_cm - 15.0) * COOK_PER_CM
+
+
+## 그 자리 손님이 참는 시간 (의자가 편하면 더 길다)
+func patience_of(seat: int) -> float:
+	return PATIENCE + (float(seat_bonus[seat]) if seat < seat_bonus.size() else 0.0)
 
 
 ## 받는 시점의 값. 빨리 받으면 하트 값, 아슬아슬하면 깎인 값
@@ -214,7 +227,7 @@ func _wait(dt: float) -> void:
 		match g.state:
 			GuestState.SEATED:
 				g.wait += dt
-				if g.wait >= PATIENCE:
+				if g.wait >= patience_of(g.seat):
 					_leave_angry(gi)
 			GuestState.EATING:
 				g.eat += dt

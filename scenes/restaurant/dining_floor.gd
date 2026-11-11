@@ -31,11 +31,15 @@ var _pops: Array = [] # {t, p, text, color, heart}
 var _t := 0.0
 var _done := false
 var _draw_layer: Control
+var _decor_layer: Control # 의자, 바 위 장식, 벽 장식, 화분 (손님 뒤)
+var _decor := [] # [{pos, tex, kind}]
 var _pad: DPad
 
 
 func start(day: int, inventory: Array) -> void:
 	logic.setup(day, inventory, DayFlow.GUESTS)
+	logic.seat_bonus = ShopDecor.seat_comfort(GameState.shop_decor)
+	_load_decor()
 	var names := {}
 	for s in logic.schedule:
 		names[s.name] = true
@@ -51,6 +55,11 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_player_tex = _load_art("sd/front_02")
 	_player_back = _load_art("sd/back_02")
+	_decor_layer = Control.new()
+	_decor_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_decor_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_decor_layer.draw.connect(_draw_decor)
+	add_child(_decor_layer)
 	_draw_layer = Control.new()
 	_draw_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_draw_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -58,6 +67,30 @@ func _ready() -> void:
 	add_child(_draw_layer)
 	_build_pad()
 	hide()
+
+
+## 상점에서 산 가구를 슬롯마다 불러 둔다 (그림이 없는 물건은 그리지 않는다)
+func _load_decor() -> void:
+	_decor.clear()
+	for sl in ShopDecor.slots():
+		var art := ShopDecor.art_of(ShopDecor.item_in(GameState.shop_decor, sl.id))
+		var tex := _load_art(art) if not art.is_empty() else null
+		if tex:
+			_decor.append({"pos": sl.pos, "tex": tex, "kind": sl.kind})
+	_decor_layer.queue_redraw()
+
+
+## 가구 그리기: 그림 아래 가운데를 자리에 맞춘다. 종류마다 화면 높이
+const DECOR_H := {"chair": 120.0, "bar": 70.0, "wall": 110.0, "plant": 130.0}
+
+
+func _draw_decor() -> void:
+	for d in _decor:
+		var tex: Texture2D = d.tex
+		var h: float = DECOR_H.get(d.kind, 100.0)
+		var w := h * tex.get_width() / float(tex.get_height())
+		var at := to_screen(d.pos)
+		_decor_layer.draw_texture_rect(tex, Rect2(at.x - w / 2.0, at.y - h, w, h), false)
 
 
 func _load_art(id: String) -> Texture2D:
@@ -140,6 +173,7 @@ func _process(delta: float) -> void:
 		p.t += delta
 	_pops = _pops.filter(func(p): return p.t < 1.4)
 	_place_guests()
+	_decor_layer.queue_redraw()
 	_draw_layer.queue_redraw()
 
 
@@ -264,7 +298,7 @@ func _draw_floor() -> void:
 		if g.state != DiningLogic.GuestState.SEATED:
 			continue
 		var p := _bubble_pos(gi)
-		var left: float = 1.0 - float(g.wait) / DiningLogic.PATIENCE
+		var left: float = 1.0 - float(g.wait) / logic.patience_of(g.seat)
 		var col := UiKit.LEAF if left > 0.5 else (UiKit.SUN if left > 0.2 else UiKit.DANGER)
 		var r := 34.0
 		if gi == logic.holding:
