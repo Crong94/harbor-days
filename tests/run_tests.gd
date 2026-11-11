@@ -45,6 +45,7 @@ func _init() -> void:
 	_test_kitchen()
 	_test_staff()
 	_test_seated()
+	_test_sundeok_art()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -1693,3 +1694,16 @@ func _test_seated() -> void:
 		if p.y > DiningLogic.FRONT_Y:
 			front += 1
 	_eq(front, 2, "앞 바 손님 두 자리 (뒷모습)")
+
+
+## 순덕 할머니 집 그림: 부탁에 맞는 동작
+func _test_sundeok_art() -> void:
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	var arts := []
+	for q in [0, 1, 2, 3]:
+		gs.sundeok_quest = q
+		arts.append(Coop.sundeok_art(gs))
+	_eq(arts, ["npc_sundeok_pot", "npc_sundeok_pot", "npc_sundeok_photo", "npc_sundeok"], "부탁마다 할머니 동작")
+	for a in arts:
+		_eq(ArtSlot.has_art(a), true, "%s 그림 있음" % a)
+	gs.free()

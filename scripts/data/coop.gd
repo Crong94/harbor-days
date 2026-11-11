@@ -64,6 +64,17 @@ const GIFT_LINES := [
 ]
 
 
+## 할머니 집에 서 있는 할머니 그림 (부탁에 맞는 동작). 저녁거리, 대파 부탁은 냄비 든 모습,
+## 제사상 볼락 부탁은 영감 사진을 든 모습, 그 밖에는 평소 모습
+static func sundeok_art(gs: Object) -> String:
+	var q: int = gs.sundeok_quest
+	if q < 2:
+		return "npc_sundeok_pot"
+	if q == 2:
+		return "npc_sundeok_photo"
+	return "npc_sundeok"
+
+
 ## 지금 받을 수 있는 부탁 번호. 다 들어줬거나 오늘 이미 하나 들어줬으면 -1
 static func current_quest(gs: Object) -> int:
 	if gs.sundeok_quest >= QUESTS.size():

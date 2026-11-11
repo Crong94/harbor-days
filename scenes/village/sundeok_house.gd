@@ -27,7 +27,7 @@ func _ready() -> void:
 		add_child(bg)
 	add_child(UiKit.shade([[0.0, 0.5], [0.2, 0.0], [0.7, 0.0], [1.0, 0.6]], Color("1a1410")))
 
-	var who := ArtSlot.make("npc_sundeok", "최순덕", Vector2(420, 560))
+	var who := ArtSlot.make(Coop.sundeok_art(GameState), "최순덕", Vector2(420, 560))
 	who.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	who.offset_left = -210
 	who.offset_right = 210
