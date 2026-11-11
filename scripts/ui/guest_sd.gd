@@ -13,6 +13,9 @@ const DIR := "res://assets/art/sd_guest/"
 const POSES := {"stand": 0, "happy": 1, "sad": 2}
 const SEAT_POSES := {"stand": 0, "eat": 1, "happy": 2, "sad": 3}
 const SEAT_H := 0.78
+## 앉은 시트는 다섯 명이 같은 기준으로 잘려 있어서 배율 하나로 줄인다 (서 있는 키 442px → 150px, 그림 세션)
+const SEAT_SCALE := 0.339
+const STAND_H := 150.0
 const CUT_SEARCH := 0.08 # 경계 찾는 범위 (그림 너비 대비)
 
 static var _cache := {} # id → {"tex": Texture2D, "cuts": [x0, x1, x2, x3]}
@@ -141,7 +144,7 @@ func _draw() -> void:
 	var x1: int = e.cuts[i + 1]
 	var src := Rect2(x0, 0, x1 - x0, tex.get_height())
 	# 칸 높이를 노드 높이에 맞추고 발을 아래 가운데에. 숨쉬기와 자세가 바뀔 때 통 튀기
-	var k := size.y * (SEAT_H if sit else 1.0) / src.size.y
+	var k := SEAT_SCALE * size.y / STAND_H if sit else size.y / src.size.y
 	var bounce := 1.0 + 0.08 * sin(_pop * PI) * (1.0 - _pop * 0.5)
 	var breathe := 1.0 + 0.012 * sin(_t * 2.4)
 	var dw := src.size.x * k

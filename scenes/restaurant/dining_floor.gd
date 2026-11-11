@@ -282,6 +282,8 @@ func _seat_screen(gi: int) -> Vector2:
 ## 주문 말풍선 자리: 손님 옆 통로 쪽 (세로 바라서 위아래 손님과 겹치지 않게)
 func _bubble_pos(gi: int) -> Vector2:
 	var seat: Vector2 = DiningLogic.SEATS[logic.guests[gi].seat]
+	if seat.y > DiningLogic.FRONT_Y:
+		return _seat_screen(gi) + Vector2(0, -GUEST_H - SEAT_LIFT + 10.0) # 앞 바 손님은 머리 위
 	var side := 1.0 if seat.x < 0.5 else -1.0
 	return _seat_screen(gi) + Vector2(side * (GUEST_H * 0.42 + 40.0), -GUEST_H * 0.55)
 
