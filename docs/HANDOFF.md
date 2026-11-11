@@ -68,7 +68,7 @@
 ## 지금까지 상황 (환경: 코드, 집 노트북의 로컬 레포)
 - 레포: 노트북 main 2f86faa 뒤에 이어가기 문서 커밋 하나. GitHub Crong94/harbor-days(공개) main은 2868ed1. 그 뒤 커밋들은 노트북에만 있다. 이 노트북에는 git remote가 없어 push는 https://github.com/Crong94/harbor-days.git로 직접 한다(사용자가 원할 때만)
 - Godot 4.4.1: 노트북 사용자 폴더 아래 Tools/Godot. 콘솔 실행 파일 Godot_v4.4.1-stable_win64_console.exe
-- 테스트: `<Godot>_console.exe --headless --path . --script res://tests/run_tests.gd` → 927 통과, 0 실패
+- 테스트: `<Godot>_console.exe --headless --path . --script res://tests/run_tests.gd` → 1008 통과, 0 실패
 - 화면 찍기: 임시 res://_shot/*.tscn(GameState를 정하고 장면을 instantiate)을 만들어 `<Godot>.exe --path . res://_shot/x.tscn --write-movie <스크래치>/x.png --fixed-fps 30 --quit-after 75 --resolution 720x1280 -- <인자>`. _shot/은 .gitignore. 노트북 화면이 낮아 720x1061로 찍힌다. 녹화 모드라 창이 느리게 뜨는 건 정상(사용자에게 그렇게 설명)
 - 줄다리기 난이도 재기: `<Godot>_console.exe --headless --path . --script res://tools/fight_balance.gd`
 - 먼저 읽을 것: CLAUDE.md, docs/줄다리기_UI_설계와_그림정리_2026-11-11.md(T2), docs/UI_디자인_시스템.md, docs/텃밭_설계.md, 기획서 docs/오늘의바다_시나리오_v3.md
@@ -109,12 +109,24 @@
 - 나중: 알바를 뽑아 요리나 서빙을 맡김(DiningLogic.helper_serve 자리만 있음)
 - APK: build/android/oneului-bada-1111-<커밋>.apk (영업 개편까지). 드라이브에 올리라고 안내함
 
+## 11-11 밤 ~ 11-12 새벽 개발 세션에서 더 한 것
+- 감성돔 난이도: 장비 덕을 덜 보게(gear_help 0.46). 자동 플레이 1단계 13%, 2단계 32%, 4단계 59%, 5단계 67%, 10단계 87%. 다른 어종 그대로
+- 낚싯대·릴 그림 밉맵 켬 (고단계 대 점박이 깨짐 해결). 그림은 그대로 씀
+- 식당 배치 확정: U자 바(왼쪽, 앞, 오른쪽), 정면 약 25도 시점, 배경 bg_shop_inside_night/day(941x1671). 좌표는 배경 전체 비율 (DiningLogic.SEATS 등, 그림 세션이 잰 값). 입구 문지방 (0.96, 0.47)은 아직 안 씀
+- 이동은 투명 아날로그 조이스틱(scripts/ui/joystick.gd, 사용자 선택. 그림 시안 docs/ref/ui/joystick_A, B는 안 씀)
+- 가구 슬롯 ShopDecor(의자 10, 바 위 4, 벽 2, 화분 2, 그림 assets/art/decor/<id>.png 오면 자동 표시). 상점 화면은 가구 그림 온 뒤에 (사용자)
+- 곁들임 Sides: 접시마다 텃밭 채소나 달걀 하나 자동, 순덕 부탁 몫 대파는 남김
+- 요리는 주인공이 주방 앞(통로 맨 위)에 있을 때만 익음 (사용자). 알바 StaffDB: 여울(서빙, 2만), 세라(주방, 1만5천), 한 번 뽑으면 계속, 장부의 알바 관리 창. 그림은 여울 레포(docs/ref/인물/여울_레포에 표정 77장, SD, 마을 사람 12명 받아 둠)
+- 앉은 손님: sd_guest/<id>_seat_back/side.png 4칸(기다림, 먹는 중, 만족, 화남). 만수, 순덕 있음, 나머지는 그림 세션이 받는 중
+- 지도 위 주민 걷기 Walkers(준호, 경자, 복자, 만수, 순덕), 누르면 한마디
+- 대사 표정 마저(만수), 순덕 집 동작 그림 전환(냄비, 사진)
+- APK: build/android/oneului-bada-1112-5838af9.apk (드라이브에 올리라고 안내)
+
 ## 이번에 해 줬으면 하는 것
-1. 그림 세션이 식당 배경(세로 통로 구도), 이름 없는 손님 SD(앉은 옆모습 포함), 주인공 접시 든 걷기를 넣으면 DiningFloor에 연결: SEATS 비율 맞추기, TEMP_FACES를 이름 없는 손님으로, 주인공 그림 교체
-2. 사용자 폰 확인 결과 반영: 줄다리기 T2가 폰에서 읽히는지(위험이 약하면 가장자리 붉은 기운 더 진하게), 영업 4분 난이도(PATIENCE 45초, 화로 2개, 손님 수), 한 달 고정비 80만 원 균형
-3. 대사 표정 마저 달기: fishing.gd 박만수 대사 2줄, "은행 직원" 등. 순덕 집 동작 전환(npc_sundeok_pot, npc_sundeok_photo)
-4. 식당 곁들임: 텃밭 채소(CropDB bonus)와 달걀을 영업 접시에 붙이기
-5. 지도 걷기: sd_guest/<id>_walk.png로 주민이 지도 위를 걷게
-6. 그다음 후보: 알바 채용, 버스와 옆마을, 지도 방위 확정
+1. 사용자 폰 확인 결과 반영: 줄다리기 T2, 감성돔 난이도, 영업 4분(주방 오가기, PATIENCE 45초), 알바 일당, 한 달 고정비 80만 원 균형
+2. 가구 그림이 오면 가구 상점 화면 (낚시방 안 또는 따로, 사용자에게 묻기)
+3. 손님이 입구(0.96, 0.47)로 들어와 자리까지 걷기, 이름 없는 손님 SD(여울 레포 마을 사람 12명을 쓸지 사용자에게 묻기)
+4. 알바 SD를 우리 화풍으로 다시 받을지 (여울 그림은 음영이 진함)
+5. 그다음 후보: 버스와 옆마을, 지도 방위 확정
 마지막: 테스트 통과와 화면 확인 → 내 파일만 커밋([skip ci]) → ./tools/backup.sh → 새 bundle을 드라이브 `오늘의바다_백업`에 올리라고 안내. GitHub push는 원할 때만. 이 문서(docs/HANDOFF.md)를 갱신한다
 ```
