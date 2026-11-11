@@ -56,6 +56,8 @@ var _hum_timer := 4.0
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# 낚싯대 그림은 2000px 넘는 큰 그림을 4~5배 줄여 그린다. 밉맵 없이 줄이면 무늬가 점박이로 깨진다 (blank, butt 그림은 밉맵을 켜서 가져온다)
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_frames.resize(FRAME_COUNT + 1)
 	for i in range(1, FRAME_COUNT + 1):
 		var id := FRAME_ART % i
