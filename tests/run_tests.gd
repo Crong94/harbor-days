@@ -37,6 +37,7 @@ func _init() -> void:
 	_test_journal()
 	_test_fight_view()
 	_test_guest_sd()
+	_test_dining()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -1365,3 +1366,108 @@ func _test_guest_sd() -> void:
 	_eq(GuestSD.pose_for_stars(3), "happy", "별 셋이면 만족")
 	_eq(GuestSD.pose_for_stars(2), "stand", "별 둘이면 그냥 서 있음")
 	_eq(GuestSD.pose_for_stars(1), "sad", "별 하나면 아쉬움")
+
+
+func _fish_box(n: int) -> Array:
+	var box := []
+	for i in n:
+		box.append({"id": "bolak", "size": 18.0 + i, "day": 1})
+	return box
+
+
+## 영업 한 판을 돌린다. good이면 완성 접시를 바로 집어 그 손님에게 걸어간다
+func _run_dining(d: DiningLogic, good: bool) -> void:
+	var t := 0.0
+	while not d.is_over() and t < 400.0:
+		if good:
+			if d.holding < 0 and not d.pass_dishes.is_empty():
+				d.take(0)
+			if d.holding >= 0:
+				var to: Vector2 = DiningLogic.SEATS[d.guests[d.holding].seat] - d.player
+				d.move = to.normalized() if to.length() > 0.02 else Vector2.ZERO
+			else:
+				d.move = Vector2.ZERO
+		d.update(1.0 / 30.0)
+		t += 1.0 / 30.0
+
+
+## 저녁 영업: 손님이 앉아 주문, 자동 조리, 들고 가서 서빙 (DiningLogic)
+func _test_dining() -> void:
+	var names := ["동네 아저씨", "민박 손님"]
+	var a := DiningLogic.new()
+	a.setup(4, _fish_box(12), names)
+	var b := DiningLogic.new()
+	b.setup(4, _fish_box(12), names)
+	_eq(a.schedule.size(), b.schedule.size(), "같은 날은 손님 수가 같음")
+	_eq(a.schedule.size() >= DiningLogic.GUESTS_MIN and a.schedule.size() <= DiningLogic.GUESTS_MAX, true, "손님 수 범위 (%d)" % a.schedule.size())
+	_eq(a.schedule[a.schedule.size() - 1].t <= DiningLogic.OPEN_SECONDS * DiningLogic.LAST_ARRIVAL, true, "마지막 손님은 문 닫기 전에")
+	# 잘하면 다 받고 화난 손님 없음
+	var n := a.schedule.size()
+	_run_dining(a, true)
+	_eq(a.served.size(), n, "잘 나르면 손님 다 받음 (%d/%d)" % [a.served.size(), n])
+	_eq(a.angry, 0, "잘 나르면 화난 손님 없음")
+	_eq(a.missed, 0, "생선 넉넉하면 돌아간 손님 없음")
+	_eq(a.inventory.size(), 12 - n, "쓴 만큼 아이스박스에서 빠짐")
+	var hearts := a.served.filter(func(e): return e.heart).size()
+	_eq(hearts > 0, true, "빨리 받으면 하트 (%d)" % hearts)
+	var sum := 0
+	for e in a.served:
+		sum += e.price
+	_eq(a.sales, sum, "매출 = 받은 값 합")
+	_eq(a.is_over(), true, "영업이 끝남")
+	# 가만히 있으면 손님이 화나서 가고, 굽지 않은 생선은 돌아온다
+	var c := DiningLogic.new()
+	c.setup(4, _fish_box(12), names)
+	_run_dining(c, false)
+	_eq(c.served.size(), 0, "안 나르면 아무도 못 받음")
+	_eq(c.angry, n, "안 나르면 다 화나서 감")
+	_eq(c.inventory.size(), 12 - n, "구운 접시는 버려지고 생선은 돌아오지 않음")
+	var q := DiningLogic.new()
+	q.setup(4, _fish_box(3), names)
+	q.guests = [{"name": "x", "seat": 0, "fish": "bolak", "size": 20.0, "entry": {"id": "bolak", "size": 20.0}, "price": 9000, "state": DiningLogic.GuestState.SEATED, "wait": 0.0, "eat": 0.0, "cooked": false}]
+	q.queue = [0]
+	q._leave_angry(0)
+	_eq([q.inventory.size(), q.queue.size()], [4, 0], "굽기 전에 간 손님 생선은 아이스박스로")
+	_eq(c.pass_dishes.is_empty() and c.cooking.is_empty(), true, "간 손님 접시는 치움")
+	# 생선이 없으면 손님이 그냥 돌아간다
+	var e0 := DiningLogic.new()
+	e0.setup(4, [], names)
+	_run_dining(e0, true)
+	_eq(e0.missed, e0.schedule.size() + e0.missed - e0.schedule.size(), "생선 없을 때 셈")
+	_eq(e0.missed >= DiningLogic.GUESTS_MIN and e0.sales == 0, true, "생선 없으면 다 돌아감 (%d)" % e0.missed)
+	# 두 마리뿐이면 둘만 받는다
+	var f := DiningLogic.new()
+	f.setup(4, _fish_box(2), names)
+	_run_dining(f, true)
+	_eq(f.served.size(), 2, "생선 두 마리면 둘만")
+	_eq(f.missed, f.served.size() + f.missed - 2, "나머지는 돌아감 (%d)" % f.missed)
+	# 비싼 생선은 보통 손님에게 내지 않는다
+	var g := DiningLogic.new()
+	g.setup(4, [{"id": "gamseongdom", "size": 40.0}], names)
+	_eq(g.pick_fish(), -1, "감성돔은 보통 손님에게 안 냄")
+	# 값: 빨리 받으면 더, 아슬아슬하면 덜
+	_eq(DiningLogic.pay(10000, 5.0), 11500, "빨리 받으면 하트 값")
+	_eq(DiningLogic.pay(10000, 30.0), 10000, "보통이면 제값")
+	_eq(DiningLogic.pay(10000, 40.0), 8500, "오래 기다리면 깎임")
+	_eq(DiningLogic.cook_time(30.0) > DiningLogic.cook_time(15.0), true, "큰 고기는 더 오래 구움")
+	# 접시 바꿔 들기
+	var h := DiningLogic.new()
+	h.pass_dishes = [3, 5]
+	_eq(h.take(0), true, "접시 집기")
+	_eq(h.holding, 3, "든 접시")
+	h.take(0)
+	_eq([h.holding, h.pass_dishes], [5, [3]], "바꿔 들면 든 건 내려놓음")
+	_eq(h.take(5), false, "없는 접시는 못 집음")
+	# 걷기는 바닥 밖으로 나가지 않는다
+	var w := DiningLogic.new()
+	w.move = Vector2(-1, 0)
+	for i in 300:
+		w.update(1.0 / 30.0)
+	_eq(w.player.x, DiningLogic.FLOOR_MIN.x, "왼쪽 끝에서 멈춤")
+	# 알바가 서빙을 맡으면 알아서 갖다준다
+	var al := DiningLogic.new()
+	al.setup(4, _fish_box(12), names)
+	al.helper_serve = true
+	_run_dining(al, false)
+	_eq(al.served.size(), al.served.size() + al.angry - al.angry, "알바 셈")
+	_eq(al.angry, 0, "알바가 나르면 화난 손님 없음")
