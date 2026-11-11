@@ -65,6 +65,9 @@ var served: Array = [] # {guest, fish, size, price, heart}
 var missed := 0 # 생선이 없어 그냥 돌아간 손님
 var angry := 0 # 너무 기다려서 그냥 간 손님
 var sales := 0
+var pantry := {} # 곁들임 보관 (GameState.produce). 접시 낼 때 하나씩 붙는다 (Sides)
+var reserve := {} # 곁들이지 말고 남겨 둘 것 (순덕 할머니 부탁)
+var side_sales := 0 # 곁들임으로 더 받은 돈 (sales에 포함)
 var events: Array = [] # 화면 연출용 한 번짜리 알림 {type, guest} (화면이 꺼내 쓴다)
 
 
@@ -276,9 +279,13 @@ func _serve(gi: int) -> void:
 	var g: Dictionary = guests[gi]
 	var price := pay(g.price, g.wait)
 	var heart: bool = g.wait <= PATIENCE * QUICK
+	var side := Sides.take(pantry, reserve)
+	var extra := Sides.bonus(side)
+	price += extra
+	side_sales += extra
 	g.state = GuestState.EATING
 	g.paid = price
 	sales += price
-	served.append({"guest": g.name, "fish": g.fish, "size": g.size, "price": price, "heart": heart})
-	events.append({"type": "served", "guest": gi, "heart": heart, "price": price})
+	served.append({"guest": g.name, "fish": g.fish, "size": g.size, "price": price, "heart": heart, "side": side})
+	events.append({"type": "served", "guest": gi, "heart": heart, "price": price, "side": side})
 	holding = -1

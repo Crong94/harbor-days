@@ -39,6 +39,8 @@ var _pad: DPad
 func start(day: int, inventory: Array) -> void:
 	logic.setup(day, inventory, DayFlow.GUESTS)
 	logic.seat_bonus = ShopDecor.seat_comfort(GameState.shop_decor)
+	logic.pantry = GameState.produce # 곁들임은 GameState에서 바로 빠진다
+	logic.reserve = Sides.reserve_for(GameState)
 	_load_decor()
 	var names := {}
 	for s in logic.schedule:
@@ -168,7 +170,7 @@ func _process(delta: float) -> void:
 		if logic.is_over():
 			_done = true
 			_pad.hide()
-			finished.emit({"served": logic.served, "missed": logic.missed + logic.angry, "sales": logic.sales, "angry": logic.angry, "hearts": logic.served.filter(func(e): return e.heart).size()})
+			finished.emit({"served": logic.served, "missed": logic.missed + logic.angry, "sales": logic.sales, "side_sales": logic.side_sales, "sides": logic.served.filter(func(e): return e.side != "").size(), "angry": logic.angry, "hearts": logic.served.filter(func(e): return e.heart).size()})
 	for p in _pops:
 		p.t += delta
 	_pops = _pops.filter(func(p): return p.t < 1.4)
@@ -210,6 +212,8 @@ func _handle_events() -> void:
 				if _guests.has(gi):
 					_guests[gi].set_pose("happy" if e.heart else "stand")
 				_pop(_bubble_pos(gi) + Vector2(0, -50), "+" + GameState.format_won(e.price), UiKit.SUN, e.heart)
+				if e.side != "":
+					_pop(_bubble_pos(gi) + Vector2(0, -16), Sides.name_of(e.side) + " 곁들임", UiKit.LEAF, false)
 			"angry":
 				var gi: int = e.guest
 				Sound.play_sfx("bad", 0.0, -6.0)

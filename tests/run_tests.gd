@@ -40,6 +40,7 @@ func _init() -> void:
 	_test_dining()
 	_test_shop_decor()
 	_test_gear_help()
+	_test_sides()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -1542,3 +1543,37 @@ func _test_gear_help() -> void:
 			l.fish_id = "bolak"
 			_eq(l.gear_tension(), l.tension_mult, "보통 고기는 장비 그대로")
 	_eq(mono, true, "장비 단계가 오를수록 감성돔 장력도 덜 오름")
+
+
+## 식당 곁들임: 텃밭 채소와 달걀이 접시 값을 올린다. 부탁 몫은 남긴다 (Sides)
+func _test_sides() -> void:
+	_eq(Sides.bonus("egg"), Sides.EGG_BONUS, "달걀 곁들임 값")
+	_eq(Sides.bonus("baechu"), int(CropDB.crop("baechu").bonus), "채소 곁들임 값은 CropDB")
+	_eq(Sides.bonus("없는것"), 0, "모르는 것은 0")
+	var pantry := {"daepa": 3, "egg": 2, "baechu": 0}
+	_eq(Sides.pick(pantry, {}), "egg", "값 큰 것부터 (달걀 700 > 대파 500)")
+	_eq(Sides.take(pantry, {}), "egg", "꺼내기")
+	_eq(pantry.egg, 1, "하나 줄어듦")
+	var only_daepa := {"daepa": 2}
+	_eq(Sides.pick(only_daepa, {"daepa": 2}), "", "부탁 몫 대파 2단은 남김")
+	_eq(Sides.pick({"daepa": 3}, {"daepa": 2}), "daepa", "남는 대파는 곁들임")
+	_eq(Sides.take({}, {}), "", "없으면 빈 문자열")
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.sundeok_quest = 1 # 둘째 부탁: 대파 2단
+	_eq(Sides.reserve_for(gs), {"daepa": 2}, "대파 부탁이면 남겨 둠")
+	gs.sundeok_quest = 3
+	_eq(Sides.reserve_for(gs), {}, "부탁을 다 들어주면 남길 것 없음")
+	gs.free()
+	# 영업: 곁들임이 있으면 값이 오르고 보관에서 빠진다
+	var a := DiningLogic.new()
+	a.setup(4, _fish_box(12), ["손님"])
+	a.pantry = {"egg": 2}
+	_run_dining(a, true)
+	var with_side := a.served.filter(func(e): return e.side == "egg").size()
+	_eq(with_side, 2, "달걀 두 개는 두 접시에")
+	_eq(a.pantry.egg, 0, "달걀 다 씀")
+	_eq(a.side_sales, Sides.EGG_BONUS * 2, "곁들임 매출")
+	var b := DiningLogic.new()
+	b.setup(4, _fish_box(12), ["손님"])
+	_run_dining(b, true)
+	_eq(a.sales - b.sales, Sides.EGG_BONUS * 2, "곁들임만큼 매출이 더 많음")

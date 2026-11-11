@@ -20,6 +20,7 @@ var result := {} # 영업 판(DiningFloor) 결과 {served, missed, sales, angry,
 var special := {} # {"name", "fish"}
 var special_fish := {} # 특별 손님에게 낼 생선 {"id", "size"}
 var special_price := 0
+var special_side := "" # 특별 손님 접시에 붙인 곁들임
 var rep_change := 0
 
 var _header: GameHeader
@@ -213,6 +214,8 @@ func _special_served() -> void:
 	_cook_hint.text = {3: "완벽해요", 2: "괜찮아요", 1: "아쉬워요"}.get(st, "")
 	UiKit.pop_in(_cook_panel)
 	special_price = DayFlow.special_price(special_fish.id, special_fish.size, st)
+	special_side = Sides.take(GameState.produce, Sides.reserve_for(GameState))
+	special_price += Sides.bonus(special_side)
 	GameState.earn(special_price)
 	var who := Orders.call_name(special.name)
 	if st >= 3:
@@ -306,7 +309,11 @@ func _show_ledger() -> void:
 	var served: int = result.get("served", []).size()
 	_ledger_rows.add_child(_row("보통 손님", "%d명" % served, "+" + GameState.format_won(int(result.get("sales", 0))), UiKit.SEA))
 	if special_price > 0:
-		_ledger_rows.add_child(_row(special.name, "직접 구운 한 접시", "+" + GameState.format_won(special_price), UiKit.SEA))
+		var note := "직접 구운 한 접시" + ((" + " + Sides.name_of(special_side)) if special_side != "" else "")
+		_ledger_rows.add_child(_row(special.name, note, "+" + GameState.format_won(special_price), UiKit.SEA))
+	var sides := int(result.get("sides", 0))
+	if sides > 0:
+		_ledger_rows.add_child(_row("곁들임", "보통 손님 %d접시 (위 매출에 포함)" % sides, "+" + GameState.format_won(int(result.get("side_sales", 0))), UiKit.LEAF))
 	if int(result.get("missed", 0)) > 0:
 		_ledger_rows.add_child(_row("돌아간 손님", "%d명" % result.missed, "", UiKit.INK_MUTED))
 	_ledger_rows.add_child(_row("지출", "미끼, 장비", ("-" if GameState.spent_today > 0 else "") + GameState.format_won(GameState.spent_today), UiKit.DANGER))
