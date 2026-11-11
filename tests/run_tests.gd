@@ -1474,12 +1474,12 @@ func _test_dining() -> void:
 	_run_dining(al, false)
 	_eq(al.served.size(), al.served.size() + al.angry - al.angry, "알바 셈")
 	_eq(al.angry, 0, "알바가 나르면 화난 손님 없음")
-	# 십자키: 가운데는 방향 없음, 팔 쪽은 그 방향, 사이는 대각선
-	_eq(DPad.dir_from(Vector2(3, 2), 100.0), Vector2.ZERO, "십자키 가운데는 멈춤")
-	_eq(DPad.dir_from(Vector2(0, -80), 100.0), Vector2.UP, "위 팔은 위")
-	_eq(DPad.dir_from(Vector2(90, 5), 100.0), Vector2.RIGHT, "오른쪽 팔은 오른쪽")
-	var dg := DPad.dir_from(Vector2(-60, 60), 100.0)
-	_eq(dg.x < 0.0 and dg.y > 0.0 and is_equal_approx(dg.length(), 1.0), true, "사이는 대각선 (길이 1)")
+	# 조이스틱: 가운데는 멈춤, 미는 쪽으로, 원판 끝까지 밀면 세기 1
+	_eq(Joystick.dir_from(Vector2(3, 2), 100.0), Vector2.ZERO, "조이스틱 가운데는 멈춤")
+	_eq(Joystick.dir_from(Vector2(0, -100), 100.0), Vector2.UP, "끝까지 위로 밀면 위로 세기 1")
+	_eq(Joystick.dir_from(Vector2(300, 0), 100.0), Vector2.RIGHT, "원판 밖이어도 세기 1까지")
+	var half := Joystick.dir_from(Vector2(-50, 0), 100.0)
+	_eq(half.x < 0.0 and half.length() < 1.0 and half.length() > 0.3, true, "반만 밀면 반쯤 (%.2f)" % half.length())
 
 
 ## 식당 가구 슬롯: 상점에서 산 의자, 장식을 자리마다 갈아 끼운다 (ShopDecor)

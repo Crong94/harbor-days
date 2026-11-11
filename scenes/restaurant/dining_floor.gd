@@ -1,7 +1,7 @@
 class_name DiningFloor
 extends Control
 ## 저녁 영업 판 (규칙은 DiningLogic). 식당 정면 단면 배경 위에 손님이 앉고, 주인공이 접시를 들고 걷는다.
-##   완성 접시(내놓는 자리)를 누르면 주인공 손에 들린다 → 십자키(또는 방향키)로 그 손님 곁까지 걸어가면 내려놓는다
+##   완성 접시(내놓는 자리)를 누르면 주인공 손에 들린다 → 조이스틱(또는 방향키)으로 그 손님 곁까지 걸어가면 내려놓는다
 ##   손님 머리 위: 주문한 요리 그림과 기다림 고리(초록 → 노랑 → 빨강)
 ## 배치 (2026-11-11 사용자): 세로로 긴 식당. 위 주방, 양옆 세로 바 카운터에 손님이 벽 쪽에 앉아 가운데를 보고, 주인공은 가운데 통로를 오간다
 ## 그림: 배경 bg_shop_inside_night (그림 세션이 받는 중), 손님 SD sd_guest/<id>_react.png, 요리 dish/<recipe>.png
@@ -15,7 +15,7 @@ const TEMP_FACES := ["bokja", "junho", "gyeongja", "mansu", "sundeok"]
 const GUEST_H := 150.0
 const PLAYER_H := 210.0
 const DISH := 58.0
-const PAD_SIZE := 230.0 # 십자키 크기
+const PAD_SIZE := 210.0 # 조이스틱 원판 지름
 
 var logic := DiningLogic.new()
 var _guests := {} # guest index → GuestSD
@@ -33,7 +33,7 @@ var _done := false
 var _draw_layer: Control
 var _decor_layer: Control # 의자, 바 위 장식, 벽 장식, 화분 (손님 뒤)
 var _decor := [] # [{pos, tex, kind}]
-var _pad: DPad
+var _pad: Joystick
 
 
 func start(day: int, inventory: Array) -> void:
@@ -117,9 +117,9 @@ func to_screen(p: Vector2) -> Vector2:
 
 # ─── 십자키 ─────────────────────────────────────────
 
-## 콘솔 십자키 하나 (아래 가운데). 손 떼면 거의 투명해진다 (DPad)
+## 투명 조이스틱 하나 (아래 가운데). 손 떼면 옅어진다 (Joystick)
 func _build_pad() -> void:
-	var d := DPad.new()
+	var d := Joystick.new()
 	d.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	d.size = Vector2(PAD_SIZE, PAD_SIZE)
 	d.position = Vector2(-PAD_SIZE / 2.0, -PAD_SIZE - 30.0)

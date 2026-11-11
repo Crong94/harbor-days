@@ -35,17 +35,17 @@ const REACH := 0.07 # 서빙 자리에 닿았다고 보는 거리
 ## 안쪽 통로는 SD 하나 폭. 손님은 바 바깥에 왼쪽 4, 오른쪽 4, 앞 바 앞 양끝 2 (10석). 앞 바 손님은 등이, 양옆 손님은 옆모습이 보인다.
 ## 좌표는 배경 그림 전체에 대한 비율, 발끝 기준 (그림 세션이 잰 값).
 const SEATS := [
-	Vector2(0.13, 0.44), Vector2(0.13, 0.53), Vector2(0.13, 0.62), Vector2(0.13, 0.71),
-	Vector2(0.87, 0.44), Vector2(0.87, 0.53), Vector2(0.87, 0.62), Vector2(0.87, 0.71),
-	Vector2(0.30, 0.86), Vector2(0.70, 0.86),
+	Vector2(0.13, 0.48), Vector2(0.13, 0.57), Vector2(0.13, 0.66), Vector2(0.13, 0.75),
+	Vector2(0.87, 0.48), Vector2(0.87, 0.57), Vector2(0.87, 0.66), Vector2(0.87, 0.75),
+	Vector2(0.30, 0.89), Vector2(0.70, 0.89),
 ]
 const AISLE := Vector2(0.39, 0.61) # 안쪽 통로 x 범위 (양옆 바 안쪽 가장자리)
-const AISLE_BOTTOM := 0.66 # 안쪽 통로 아래 끝 (그 밑은 앞 바)
+const AISLE_BOTTOM := 0.69 # 안쪽 통로 아래 끝 (그 밑은 앞 바)
 ## 완성 접시 내놓는 자리 (주방 카운터 윗면, 가운데 트인 출구)
-const PASS := Vector2(0.5, 0.33)
-const START := Vector2(0.5, 0.42)
+const PASS := Vector2(0.51, 0.37)
+const START := Vector2(0.5, 0.46)
 ## 걸어 다닐 수 있는 범위 (U자 안쪽 통로, 주방 출구부터 앞 바 안쪽까지)
-const FLOOR_MIN := Vector2(AISLE.x, 0.36)
+const FLOOR_MIN := Vector2(AISLE.x, 0.40)
 const FLOOR_MAX := Vector2(AISLE.y, AISLE_BOTTOM)
 
 var time := 0.0
