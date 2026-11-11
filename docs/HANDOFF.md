@@ -89,7 +89,7 @@
 - 밧줄·조개 장식 게이지 부품은 "유치하다"로 탈락(docs/ref/gauge/gauge_sheet_1.png는 쓰지 않는 쪽)
 - 대사의 표정과 동작은 맥락에 맞춘다(사용자 요청). 없으면 그림 세션에 요청한다
 - 공개 레포라 비밀번호, 토큰, 개인 메일, 집 위치, PC 사용자 폴더 경로, ChatGPT 링크를 파일과 커밋에 넣지 않는다. 커밋 작성자 Songok Kim <thddhr14@gmail.com>
-- GitHub Actions는 두지 않는다. 커밋 메시지 끝에 [skip ci]
+- GitHub Actions는 APK 릴리즈 하나만(.github/workflows/release-apk.yml, 손으로 Run workflow, 시험판). 그 밖의 Actions는 두지 않는다. 커밋 메시지 끝에 [skip ci]
 
 ## 사용자 선호
 - 찍은 화면을 먼저 보여 주고 설명은 짧게(폰에서 본다)

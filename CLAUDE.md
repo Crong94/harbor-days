@@ -23,7 +23,7 @@
 - 두 기기에서 동시에 작업하지 않는다. 한쪽에서 bundle을 올린 뒤 다른 쪽에서 받는다
 - 커밋 작성자는 레포 로컬 설정 `Songok Kim <thddhr14@gmail.com>`만 쓴다
 - 공개 레포라서 비밀번호, 토큰, 개인 메일, 집 위치, PC 사용자 폴더 경로 같은 개인 정보는 파일과 커밋 메시지에 넣지 않는다
-- push할 때 로그인 창이 뜨면 사용자가 Crong94로 직접 로그인한다. GitHub Actions는 두지 않는다 (넣으려면 먼저 묻는다)
+- push할 때 로그인 창이 뜨면 사용자가 Crong94로 직접 로그인한다. GitHub Actions는 APK 릴리즈 하나만 둔다(`.github/workflows/release-apk.yml`, 2026-11-12 사용자 요청). 손으로만 돌리고(Actions 탭 Run workflow) 시험판 릴리즈로 올린다. 다른 Actions를 넣으려면 먼저 묻는다
 - GitHub의 `old-landscape` 브랜치는 회사 PC에서 잠깐 갈라졌던 가로 1280x720 버전이다. 합치지 않는다. 거기서 가져온 것은 확장 지도 시안(`docs/ref/map_village_확장_v3.jpg`)뿐이다
 
 ## 명령
