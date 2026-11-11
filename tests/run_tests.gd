@@ -45,6 +45,7 @@ func _init() -> void:
 	_test_kitchen()
 	_test_staff()
 	_test_seated()
+	_test_decor_shop()
 	_test_sundeok_art()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
@@ -1707,3 +1708,21 @@ func _test_sundeok_art() -> void:
 	for a in arts:
 		_eq(ArtSlot.has_art(a), true, "%s 그림 있음" % a)
 	gs.free()
+
+
+## 가게 꾸미기: 사기, 종류 전체 놓기, 그림
+func _test_decor_shop() -> void:
+	var owned := []
+	var decor := {}
+	_eq(ShopDecor.buy(owned, "chair_wood", 10000), -1, "돈 모자라면 못 삼")
+	_eq(ShopDecor.buy(owned, "chair_wood", 50000), 30000, "나무 의자 3만")
+	_eq(ShopDecor.buy(owned, "chair_wood", 50000), -1, "이미 있으면 또 안 삼")
+	_eq(ShopDecor.buy(owned, "chair_basic", 50000), -1, "기본 물건은 안 삼")
+	ShopDecor.place_all(decor, owned, "chair", "chair_wood")
+	_eq(ShopDecor.kind_item(decor, "chair"), "chair_wood", "의자 한 번에 바뀜")
+	_eq(ShopDecor.kind_item(decor, "wall"), "wall_none", "벽은 그대로 빈 벽")
+	_eq(ShopDecor.items_of("chair"), ["chair_basic", "chair_wood", "chair_cushion"], "의자 값 싼 순")
+	for id in ShopDecor.ITEMS:
+		var art := ShopDecor.art_of(id)
+		if not art.is_empty():
+			_eq(ArtSlot.has_art(art), true, "%s 그림" % id)

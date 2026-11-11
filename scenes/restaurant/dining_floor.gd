@@ -104,6 +104,8 @@ func _draw_decor() -> void:
 		var h: float = DECOR_H.get(d.kind, 100.0)
 		var w := h * tex.get_width() / float(tex.get_height())
 		var at := to_screen(d.pos)
+		if d.kind == "wall":
+			at.y += h / 2.0 # 벽 장식은 가운데가 자리점
 		_decor_layer.draw_texture_rect(tex, Rect2(at.x - w / 2.0, at.y - h, w, h), false)
 
 

@@ -24,6 +24,10 @@ var special_side := "" # 특별 손님 접시에 붙인 곁들임
 var wage_paid := 0 # 오늘 알바 일당
 var _staff_panel: Control
 var _staff_list: VBoxContainer
+var _decor_panel: Control
+var _decor_list: VBoxContainer
+var _decor_money: Label
+const DECOR_KIND_NAMES := {"chair": "바 의자 (편할수록 손님이 오래 기다려요)", "bar": "바 위 소품", "wall": "벽 장식", "plant": "화분"}
 var rep_change := 0
 
 var _header: GameHeader
@@ -441,11 +445,19 @@ func _build_ledger() -> void:
 	_night_btn.pressed.connect(_go_night_fishing)
 	row.add_child(_night_btn)
 	v.add_child(row)
+	var row2 := UiKit.hbox(UiKit.SPACE_MD)
 	var staff_btn := UiKit.action("알바 관리", "mint", true)
+	staff_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	staff_btn.pressed.connect(_open_staff)
-	v.add_child(staff_btn)
+	row2.add_child(staff_btn)
+	var decor_btn := UiKit.action("가게 꾸미기", "mint", true)
+	decor_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	decor_btn.pressed.connect(_open_decor)
+	row2.add_child(decor_btn)
+	v.add_child(row2)
 	_ledger.hide()
 	_build_staff_panel()
+	_build_decor_panel()
 
 
 ## 알바 관리 창: 알바마다 맡는 일, 일당, 뽑기·그만두게 하기. 한 번 뽑으면 다음 영업부터 매일 나온다
@@ -506,6 +518,95 @@ func _toggle_staff(id: String) -> void:
 		StaffDB.hire(GameState.staff, id)
 	Sound.play_sfx("tap")
 	_open_staff()
+
+
+## 가게 꾸미기 창: 종류마다 물건을 사고, 고른 물건으로 그 종류 자리를 한 번에 바꾼다 (ShopDecor)
+func _build_decor_panel() -> void:
+	_decor_panel = Control.new()
+	_decor_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_decor_panel)
+	_decor_panel.add_child(UiKit.scrim(0.6))
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_decor_panel.add_child(center)
+	var panel := UiKit.paper_panel(28)
+	panel.custom_minimum_size = Vector2(660, 0)
+	center.add_child(panel)
+	var v := UiKit.vbox(UiKit.SPACE_MD)
+	panel.add_child(v)
+	v.add_child(UiKit.text("가게 꾸미기", "h1", UiKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+	_decor_money = UiKit.text("", "label", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(_decor_money)
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 820)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(scroll)
+	_decor_list = UiKit.vbox(UiKit.SPACE_SM)
+	_decor_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_decor_list)
+	var close := UiKit.action("닫기", "secondary")
+	close.pressed.connect(func(): _decor_panel.hide())
+	v.add_child(close)
+	_decor_panel.hide()
+
+
+func _open_decor() -> void:
+	for c in _decor_list.get_children():
+		c.queue_free()
+	_decor_money.text = "가진 돈 " + GameState.format_won(GameState.money)
+	for kind in ShopDecor.KINDS:
+		_decor_list.add_child(UiKit.text(DECOR_KIND_NAMES[kind], "title", UiKit.INK))
+		var now := ShopDecor.kind_item(GameState.shop_decor, kind)
+		for id in ShopDecor.items_of(kind):
+			var it := ShopDecor.item(id)
+			var row := UiKit.hbox(UiKit.SPACE_MD)
+			var pic := TextureRect.new()
+			pic.custom_minimum_size = Vector2(76, 76)
+			pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			var art := ShopDecor.art_of(id)
+			if not art.is_empty() and ArtSlot.has_art(art):
+				pic.texture = load(ArtSlot.art_path(art))
+			row.add_child(pic)
+			var info := UiKit.vbox(2)
+			info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			info.add_child(UiKit.text(it.name, "label", UiKit.INK))
+			var note := "기본" if int(it.price) == 0 else GameState.format_won(int(it.price))
+			if float(it.get("comfort", 0.0)) > 0.0:
+				note += " · 손님이 %d초 더 기다려요" % int(it.comfort)
+			info.add_child(UiKit.text(note, "caption", UiKit.INK_SOFT))
+			row.add_child(info)
+			var b: Button
+			if id == now:
+				b = UiKit.action("놓여 있음", "secondary", true)
+				b.disabled = true
+			elif ShopDecor.owns(GameState.owned_decor, id):
+				b = UiKit.action("놓기", "primary", true)
+				b.pressed.connect(_place_decor.bind(kind, id))
+			else:
+				b = UiKit.action("사기", "primary", true)
+				b.disabled = GameState.money < int(it.price)
+				b.pressed.connect(_buy_decor.bind(kind, id))
+			row.add_child(b)
+			_decor_list.add_child(row)
+	if not _decor_panel.visible:
+		_decor_panel.show()
+		UiKit.fade_in(_decor_panel, 0.2)
+
+
+## 사면 바로 그 종류 자리에 놓는다
+func _buy_decor(kind: String, id: String) -> void:
+	var cost := ShopDecor.buy(GameState.owned_decor, id, GameState.money)
+	if cost < 0:
+		return
+	GameState.spend(cost)
+	_place_decor(kind, id)
+
+
+func _place_decor(kind: String, id: String) -> void:
+	ShopDecor.place_all(GameState.shop_decor, GameState.owned_decor, kind, id)
+	Sound.play_sfx("tap")
+	_open_decor()
 
 
 ## 한 줄: 이름, 설명, 금액

@@ -5,7 +5,8 @@ extends RefCounted
 ## 그림: assets/art/decor/<item id>.png (그림 세션이 종류별로 받는다). 그림이 없으면 아무것도 그리지 않는다.
 ## 놓은 것: GameState.shop_decor {슬롯 id: 물건 id}, 가진 것: GameState.owned_decor [물건 id]
 ## 비어 있는 슬롯은 그 종류의 기본 물건(값 0)을 쓴다. 의자는 편할수록 손님이 더 오래 기다려 준다(comfort초).
-## 자리 위치는 식당 배경 그림 전체 비율, 아래 가운데 기준 (DiningLogic과 같은 좌표, 그림 세션이 잰 값).
+## 자리 위치는 식당 배경 그림 전체 비율, 아래 가운데 기준 (벽 장식만 가운데 기준). DiningLogic과 같은 좌표, 그림 세션이 잰 값.
+## 사고 놓기: 식당 장부의 "가게 꾸미기". 한 종류는 한 번에 같은 물건으로 바꾼다 (place_all).
 
 const ART_DIR := "decor/"
 
@@ -37,7 +38,7 @@ const EXTRA_SLOTS := [
 	{"id": "bar_2", "kind": "bar", "pos": Vector2(0.69, 0.48)},
 	{"id": "bar_3", "kind": "bar", "pos": Vector2(0.75, 0.64)},
 	{"id": "wall_0", "kind": "wall", "pos": Vector2(0.07, 0.45)},
-	{"id": "wall_1", "kind": "wall", "pos": Vector2(0.93, 0.30)},
+	{"id": "wall_1", "kind": "wall", "pos": Vector2(0.93, 0.20)}, # 입구 문 위 포렴을 피해 문 앞 나무벽 (그림 세션)
 	{"id": "plant_0", "kind": "plant", "pos": Vector2(0.06, 0.95)},
 	{"id": "plant_1", "kind": "plant", "pos": Vector2(0.94, 0.95)},
 ]
@@ -94,6 +95,33 @@ static func place_all(decor: Dictionary, owned: Array, kind: String, item_id: St
 		if s.kind == kind and place(decor, owned, s.id, item_id):
 			n += 1
 	return n
+
+
+## 사기: 아직 없고 돈이 되면 owned에 넣고 값을 돌려준다. 못 사면 -1
+static func buy(owned: Array, item_id: String, money: int) -> int:
+	var it := item(item_id)
+	if it.is_empty() or owns(owned, item_id) or money < int(it.price):
+		return -1
+	owned.append(item_id)
+	return int(it.price)
+
+
+## 그 종류에 지금 놓인 물건 (첫 슬롯 기준. 놓을 때 종류 전체를 같이 바꾸므로 같다)
+static func kind_item(decor: Dictionary, kind: String) -> String:
+	for s in slots():
+		if s.kind == kind:
+			return item_in(decor, s.id)
+	return DEFAULTS.get(kind, "")
+
+
+## 종류별 물건 id (값 싼 순)
+static func items_of(kind: String) -> Array:
+	var out := []
+	for id in ITEMS:
+		if ITEMS[id].kind == kind:
+			out.append(id)
+	out.sort_custom(func(a, b): return int(ITEMS[a].price) < int(ITEMS[b].price))
+	return out
 
 
 ## 그림 id (없으면 빈 문자열: 기본 "none" 물건은 그리지 않는다)
