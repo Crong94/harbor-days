@@ -66,9 +66,9 @@
 - 애매하거나 모호한 부분이 있다면 질문을 통해 해결하고 넘어간다.
 
 ## 지금까지 상황 (환경: 코드, 집 노트북의 로컬 레포)
-- 레포: 노트북 main 2f86faa 뒤에 이어가기 문서 커밋 하나. GitHub Crong94/harbor-days(공개) main은 2868ed1. 그 뒤 커밋들은 노트북에만 있다. 이 노트북에는 git remote가 없어 push는 https://github.com/Crong94/harbor-days.git로 직접 한다(사용자가 원할 때만)
+- 레포: 11-12 세션 끝에 노트북 main을 GitHub Crong94/harbor-days(공개) main에 push했다. 이 노트북에는 git remote가 없어 push는 https://github.com/Crong94/harbor-days.git로 직접 한다(사용자가 원할 때만)
 - Godot 4.4.1: 노트북 사용자 폴더 아래 Tools/Godot. 콘솔 실행 파일 Godot_v4.4.1-stable_win64_console.exe
-- 테스트: `<Godot>_console.exe --headless --path . --script res://tests/run_tests.gd` → 1008 통과, 0 실패
+- 테스트: `<Godot>_console.exe --headless --path . --script res://tests/run_tests.gd` → 1023 통과, 0 실패
 - 화면 찍기: 임시 res://_shot/*.tscn(GameState를 정하고 장면을 instantiate)을 만들어 `<Godot>.exe --path . res://_shot/x.tscn --write-movie <스크래치>/x.png --fixed-fps 30 --quit-after 75 --resolution 720x1280 -- <인자>`. _shot/은 .gitignore. 노트북 화면이 낮아 720x1061로 찍힌다. 녹화 모드라 창이 느리게 뜨는 건 정상(사용자에게 그렇게 설명)
 - 줄다리기 난이도 재기: `<Godot>_console.exe --headless --path . --script res://tools/fight_balance.gd`
 - 먼저 읽을 것: CLAUDE.md, docs/줄다리기_UI_설계와_그림정리_2026-11-11.md(T2), docs/UI_디자인_시스템.md, docs/텃밭_설계.md, 기획서 docs/오늘의바다_시나리오_v3.md
@@ -117,14 +117,16 @@
 - 가구 슬롯 ShopDecor(의자 10, 바 위 4, 벽 2, 화분 2, 그림 assets/art/decor/<id>.png 오면 자동 표시). 상점 화면은 가구 그림 온 뒤에 (사용자)
 - 곁들임 Sides: 접시마다 텃밭 채소나 달걀 하나 자동, 순덕 부탁 몫 대파는 남김
 - 요리는 주인공이 주방 앞(통로 맨 위)에 있을 때만 익음 (사용자). 알바 StaffDB: 여울(서빙, 2만), 세라(주방, 1만5천), 한 번 뽑으면 계속, 장부의 알바 관리 창. 그림은 여울 레포(docs/ref/인물/여울_레포에 표정 77장, SD, 마을 사람 12명 받아 둠)
-- 앉은 손님: sd_guest/<id>_seat_back/side.png 4칸(기다림, 먹는 중, 만족, 화남). 만수, 순덕 있음, 나머지는 그림 세션이 받는 중
+- 앉은 손님: sd_guest/<id>_seat_back/side.png 4칸(기다림, 먹는 중, 만족, 화남). 다섯 명(만수, 순덕, 복자, 준호, 경자) 모두 있음. 다섯 장이 같은 기준으로 잘려 있어 배율 하나(GuestSD.SEAT_SCALE 0.339)로 줄인다. 발은 자리점보다 40px 위(SEAT_LIFT, 바 의자 높이). 앞 바 손님 말풍선은 머리 위
 - 지도 위 주민 걷기 Walkers(준호, 경자, 복자, 만수, 순덕), 누르면 한마디
 - 대사 표정 마저(만수), 순덕 집 동작 그림 전환(냄비, 사진)
-- APK: build/android/oneului-bada-1112-5838af9.apk (드라이브에 올리라고 안내)
+- 가구 그림 여덟 가지(assets/art/decor) 표시. 높이 의자 120, 바 위 70, 벽 110, 화분 130px. 벽 장식만 가운데 기준, 오른쪽 벽 자리는 입구 포렴을 피해 (0.93, 0.20). 의자는 손님 아래에 그린다
+- 가게 꾸미기 창(service.gd _open_decor): 장부 화면 "알바 관리" 옆 버튼. 종류마다 값 싼 순, 사면 바로 놓이고 그 종류 자리가 한 번에 바뀜(ShopDecor.buy, kind_item, items_of, place_all). 창 위치는 묻지 않고 장부에 붙였다. 낚시방이나 따로 가구점으로 옮길지는 사용자 답을 기다림
+- APK: build/android/oneului-bada-1112-<마지막 커밋>.apk (가구, 앉은 손님 다섯 명까지. 드라이브에 올리라고 안내)
 
 ## 이번에 해 줬으면 하는 것
 1. 사용자 폰 확인 결과 반영: 줄다리기 T2, 감성돔 난이도, 영업 4분(주방 오가기, PATIENCE 45초), 알바 일당, 한 달 고정비 80만 원 균형
-2. 가구 그림이 오면 가구 상점 화면 (낚시방 안 또는 따로, 사용자에게 묻기)
+2. 가게 꾸미기 창을 장부에 둘지, 낚시방이나 따로 가구점으로 옮길지 (사용자 답 기다림)
 3. 손님이 입구(0.96, 0.47)로 들어와 자리까지 걷기, 이름 없는 손님 SD(여울 레포 마을 사람 12명을 쓸지 사용자에게 묻기)
 4. 알바 SD를 우리 화풍으로 다시 받을지 (여울 그림은 음영이 진함)
 5. 그다음 후보: 버스와 옆마을, 지도 방위 확정
