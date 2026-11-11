@@ -18,12 +18,12 @@ const QUESTS := [
 		"title": "저녁거리 생선",
 		"need": {"kind": "fish", "id": "", "count": 1},
 		"ask": [
-			{"speaker": "순덕", "text": "아이고 {player|이/가} 왔구먼. 마침 잘 왔네."},
+			{"speaker": "순덕", "face": "smile", "text": "아이고 {player|이/가} 왔구먼. 마침 잘 왔네."},
 			{"speaker": "순덕", "text": "오늘 저녁 끓일 생선이 하나도 없어. 아무 거나 한 마리만 갖다 줄 수 있겄어?"},
 		],
 		"thanks": [
-			{"speaker": "순덕", "text": "어이구 실하다. 이걸로 맑은탕 끓이면 되겄네."},
-			{"speaker": "순덕", "text": "고마워. 내일 또 놀러 와."},
+			{"speaker": "순덕", "face": "smile", "text": "어이구 실하다. 이걸로 맑은탕 끓이면 되겄네."},
+			{"speaker": "순덕", "face": "smile", "text": "고마워. 내일 또 놀러 와."},
 		],
 	},
 	{
@@ -34,19 +34,19 @@ const QUESTS := [
 			{"speaker": "순덕", "text": "집 옆 텃밭에 대파 좀 심어서 두 단만 갖다 줄 수 있겄어?"},
 		],
 		"thanks": [
-			{"speaker": "순덕", "text": "직접 키운 거여? 향이 좋네."},
-			{"speaker": "순덕", "text": "그 텃밭이 원래 우리 영감이 일구던 데여. 다시 파릇해지니 보기 좋구먼."},
+			{"speaker": "순덕", "face": "smile", "text": "직접 키운 거여? 향이 좋네."},
+			{"speaker": "순덕", "face": "sad", "text": "그 텃밭이 원래 우리 영감이 일구던 데여. 다시 파릇해지니 보기 좋구먼."},
 		],
 	},
 	{
 		"title": "제사상에 올릴 볼락",
 		"need": {"kind": "fish", "id": "bolak", "count": 2},
 		"ask": [
-			{"speaker": "순덕", "text": "모레가 우리 영감 제사여."},
-			{"speaker": "순덕", "text": "그 양반이 볼락구이를 그렇게 좋아했어. 볼락 두 마리만 구해 줄 수 있겄어?"},
+			{"speaker": "순덕", "face": "sad", "text": "모레가 우리 영감 제사여."},
+			{"speaker": "순덕", "face": "sad", "text": "그 양반이 볼락구이를 그렇게 좋아했어. 볼락 두 마리만 구해 줄 수 있겄어?"},
 		],
 		"thanks": [
-			{"speaker": "순덕", "text": "이렇게 큰 걸로 잡아 왔어? 영감이 보면 좋아하겄다."},
+			{"speaker": "순덕", "face": "smile", "text": "이렇게 큰 걸로 잡아 왔어? 영감이 보면 좋아하겄다."},
 		],
 	},
 ]
@@ -55,12 +55,12 @@ const QUESTS := [
 const GIFT_LINES := [
 	{"speaker": "순덕", "text": "가만 있어 봐. 줄 게 있어."},
 	{"speaker": "", "text": "할머니가 마루 밑에서 종이 상자를 꺼낸다. 안에서 삐약삐약 소리가 난다."},
-	{"speaker": "{player}", "text": "병아리네요?"},
+	{"speaker": "{player}", "face": "smile", "text": "병아리네요?"},
 	{"speaker": "순덕", "text": "옆 동네 사돈이 줬는디 나는 이제 키울 기운이 없어."},
 	{"speaker": "순덕", "text": "텃밭 밑에 빈 닭장 있지? 그것도 영감이 지은 거여. 좀 손보면 쓸 만할 거구먼."},
 	{"speaker": "", "text": "둘이서 녹슨 철망을 갈고 지붕에 새 판자를 덧댔다."},
 	{"speaker": "순덕", "text": "모이는 한 포대 줄 테니까 떨어지면 경자네서 시켜. 모이 준 날은 꼭 알을 낳아."},
-	{"speaker": "순덕", "text": "{player|아/야}. 이 마을에 와 줘서 고마워."},
+	{"speaker": "순덕", "face": "smile", "text": "{player|아/야}. 이 마을에 와 줘서 고마워."},
 ]
 
 

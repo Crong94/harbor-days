@@ -38,6 +38,7 @@ func _ready() -> void:
 	_build_top_bar()
 	_build_card()
 	_dialogue = DialogueBox.new()
+	_dialogue.on_stage = ["sundeok"] # 할머니가 이미 크게 서 있다. 주인공 얼굴은 나온다
 	add_child(_dialogue)
 	_dialogue.finished.connect(_on_dialogue_finished)
 	Sound.play_bgm("town")
@@ -97,7 +98,7 @@ func _greeting() -> Array:
 	if q >= 0:
 		return Coop.QUESTS[q].ask
 	if GameState.has_flag("coop_open"):
-		return [{"speaker": "순덕", "text": "닭들은 잘 크고 있어? 알 낳으면 하나 갖다 줘."}]
+		return [{"speaker": "순덕", "face": "smile", "text": "닭들은 잘 크고 있어? 알 낳으면 하나 갖다 줘."}]
 	return [{"speaker": "순덕", "text": "오늘은 됐어. 내일 또 와. 할 얘기 있으면 할게."}]
 
 

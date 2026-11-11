@@ -76,6 +76,7 @@ func _ready() -> void:
 	_build_ledger()
 
 	_dialogue = DialogueBox.new()
+	_dialogue.on_stage = ["sundeok"] # 할머니가 화면에 크게 서 있다
 	add_child(_dialogue)
 	_dialogue.finished.connect(_on_dialogue_finished)
 
@@ -213,13 +214,13 @@ func _guest_arrives() -> void:
 		{"speaker": "", "text": "그때 문에 단 종이 울렸다. 지팡이를 짚은 할머니가 들어왔다."},
 		{"speaker": "할머니", "text": "불이 켜져 있길래. 여기 문 연 거 몇 년 만이여."},
 		{"speaker": "{player}", "text": "아, 어서 오세요. 오늘은 볼락구이 하나밖에 없는데요."},
-		{"speaker": "할머니", "text": "그거면 됐어. 밥이나 한 그릇 줘."},
+		{"speaker": "할머니", "face": "smile", "text": "그거면 됐어. 밥이나 한 그릇 줘."},
 		{"speaker": "", "text": "할머니는 천천히 볼락 살을 발라 밥 위에 얹었다."},
-		{"speaker": "최순덕", "text": (taste.get(cook.seasoning, "") + " " + cooked.get(cook.cooking, "")).strip_edges()},
-		{"speaker": "최순덕", "text": "따뜻한 밥 먹으니 좋구먼." if cook.stars() >= 3 else "그래도 따뜻한 밥 먹으니 좋구먼."},
+		{"speaker": "최순덕", "face": "smile" if cook.stars() >= 3 else "sad", "text": (taste.get(cook.seasoning, "") + " " + cooked.get(cook.cooking, "")).strip_edges()},
+		{"speaker": "최순덕", "face": "smile", "text": "따뜻한 밥 먹으니 좋구먼." if cook.stars() >= 3 else "그래도 따뜻한 밥 먹으니 좋구먼."},
 		{"speaker": "", "text": "첫 매출 %s." % GameState.format_won(FIRST_SALE)},
 		{"speaker": "", "text": "순덕은 계산을 마치고 나가다 간판을 올려다봤다."},
-		{"speaker": "최순덕", "text": "{shop|이/가}라... 이름 좋네. 오래 가라고."},
+		{"speaker": "최순덕", "face": "smile", "text": "{shop|이/가}라... 이름 좋네. 오래 가라고."},
 	]
 	GameState.earn(FIRST_SALE)
 	GameState.note("순덕 할머니가 첫 손님으로 왔다. 이 정도면 해볼 만하겠는데?", 9)
