@@ -17,13 +17,14 @@ enum GuestState { SEATED, EATING, LEFT }
 
 const OPEN_SECONDS := 240.0 # 실제 약 4분 (사용자 결정)
 const LAST_ARRIVAL := 0.8 # 영업 시간의 이 비율까지만 손님이 들어온다
-const GUESTS_MIN := 6
-const GUESTS_MAX := 9
-const COOK_TIME := 9.0 # 한 접시 굽는 시간 (초). 큰 고기는 조금 더
+const GUESTS_MIN := 11 # 2026-11-12 사용자: 6~9명은 너무 한가함
+const GUESTS_MAX := 15
+const GROUP_MAX := 3 # 손님은 1~3명씩 몰려 들어온다 (저녁 붐빔)
+const COOK_TIME := 8.0 # 한 접시 굽는 시간 (초). 큰 고기는 조금 더
 const COOK_PER_CM := 0.15
 const STOVES := 2 # 동시에 굽는 화로 수
 const PASS_MAX := 4 # 내놓는 자리에 놓을 수 있는 접시 수
-const PATIENCE := 45.0 # 주문하고 받을 때까지 참는 시간 (초)
+const PATIENCE := 40.0 # 주문하고 받을 때까지 참는 시간 (초)
 const QUICK := 0.5 # 참는 시간의 이 비율 안에 받으면 하트
 const QUICK_BONUS := 1.15 # 하트 손님 값 배수
 const SLOW_CUT := 0.85 # 참을성이 바닥나기 직전(마지막 20%)에 받으면 값 배수
@@ -86,10 +87,18 @@ func setup(day: int, inv: Array, names: Array) -> void:
 	var n := rng.randi_range(GUESTS_MIN, GUESTS_MAX)
 	schedule.clear()
 	var last := OPEN_SECONDS * LAST_ARRIVAL
-	for i in n:
-		# 고르게 흩되 조금씩 흔든다. 첫 손님은 문 열자마자
-		var t := 2.0 + (last - 2.0) * i / maxf(1.0, n - 1.0) + rng.randf_range(-4.0, 4.0)
-		schedule.append({"t": clampf(t, 1.0, last), "name": names[rng.randi() % names.size()] if not names.is_empty() else "손님"})
+	# 1~3명씩 무리 지어 온다. 무리는 고르게 흩되 조금씩 흔들고, 한 무리는 1초 남짓 간격으로 들어온다
+	var groups: Array = []
+	var left := n
+	while left > 0:
+		var g := mini(left, rng.randi_range(1, GROUP_MAX))
+		groups.append(g)
+		left -= g
+	for gi in groups.size():
+		var t0 := 2.0 + (last - 6.0) * gi / maxf(1.0, groups.size() - 1.0) + rng.randf_range(-4.0, 4.0)
+		for k in int(groups[gi]):
+			var t := t0 + k * rng.randf_range(0.8, 1.6)
+			schedule.append({"t": clampf(t, 1.0, last), "name": names[rng.randi() % names.size()] if not names.is_empty() else "손님"})
 	schedule.sort_custom(func(a, b): return a.t < b.t)
 
 
