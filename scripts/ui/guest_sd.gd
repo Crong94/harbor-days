@@ -19,6 +19,15 @@ const SEAT_SCALE := 0.339
 const STAND_H := 150.0
 const CUT_SEARCH := 0.08 # 경계 찾는 범위 (그림 너비 대비)
 
+## 이름 없는 손님 그림 (11-12 그림 세션). 손님 이름 → 그림 id. 모르는 이름은 다섯 중 하나
+const GUEST_FACES := {
+	"퇴근한 회사원": "guest_office", "고깃배 선장": "guest_fisher", "등산객": "guest_tourist",
+	"민박 손님": "guest_tourist", "물질 마친 해녀": "guest_haenyeo", "학교 마친 학생": "guest_student", "낚시꾼": "guest_fisher",
+}
+const NAMELESS := ["guest_office", "guest_fisher", "guest_tourist", "guest_haenyeo", "guest_student"]
+## 그림이 없을 때 대신 앉는 주민
+const TEMP_FACES := ["bokja", "junho", "gyeongja", "mansu", "sundeok"]
+
 static var _cache := {} # id → {"tex": Texture2D, "cuts": [x0, x1, x2, x3]}
 
 var guest_id := ""
@@ -194,3 +203,20 @@ func _draw() -> void:
 		draw_set_transform(Vector2(size.x, 0), 0.0, Vector2(-1, 1))
 	draw_texture_rect_region(tex, Rect2(size.x / 2.0 - dw / 2.0, size.y - dh, dw, dh), src)
 	draw_set_transform_matrix(Transform2D.IDENTITY)
+
+
+## 손님 이름 → 그림 id. 이름 없는 손님 그림이 있으면 그것, 없으면 주민 그림으로 대신
+static func face_for(name: String, i := 0) -> String:
+	var id: String = GUEST_FACES.get(name, NAMELESS[absi(hash(name) + i) % NAMELESS.size()])
+	if GuestSD.has_sheet(id):
+		return id
+	return TEMP_FACES[absi(hash(name) + i) % TEMP_FACES.size()]
+
+
+## 걷는 방향 → 걷기 시트 칸 (앞 0·1, 뒤 2·3, 옆 4~7). 왼쪽으로 걸으면 그리는 쪽에서 뒤집는다
+static func walk_cell(dir: Vector2, t: float) -> int:
+	if absf(dir.x) >= absf(dir.y):
+		return 4 + int(t * WALK_FPS) % 4
+	if dir.y < 0.0:
+		return 2 + int(t * WALK_FPS * 0.5) % 2
+	return int(t * WALK_FPS * 0.5) % 2

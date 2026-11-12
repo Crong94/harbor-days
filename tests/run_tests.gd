@@ -1471,6 +1471,15 @@ func _test_dining() -> void:
 	for g in a.guests:
 		sides["L" if DiningLogic.SEATS[g.seat].x < 0.5 else "R"] = true
 	_eq(sides.size(), 2, "손님이 양쪽 바에 고루 앉음")
+	# 이름 없는 손님 그림: 이름마다 정해진 그림, 모르는 이름도 다섯 중 하나
+	_eq(GuestSD.face_for("물질 마친 해녀"), "guest_haenyeo" if GuestSD.has_sheet("guest_haenyeo") else GuestSD.face_for("물질 마친 해녀"), "해녀 손님 그림")
+	for gname in DayFlow.GUESTS:
+		_eq(GuestSD.has_sheet(GuestSD.face_for(gname)), true, "%s 그림 있음" % gname)
+	_eq(GuestSD.has_sheet(GuestSD.face_for("처음 보는 사람")), true, "모르는 이름도 그림 있음")
+	# 걷기 칸: 옆 4~7, 위로 뒤 2·3, 아래로 앞 0·1
+	_eq(GuestSD.walk_cell(Vector2.RIGHT, 0.0) >= 4, true, "옆으로 걸으면 옆모습 칸")
+	_eq(GuestSD.walk_cell(Vector2.UP, 0.0) in [2, 3], true, "위로 걸으면 뒷모습 칸")
+	_eq(GuestSD.walk_cell(Vector2.DOWN, 0.0) in [0, 1], true, "아래로 걸으면 앞모습 칸")
 	# 가만히 있으면 손님이 화나서 가고, 굽지 않은 생선은 돌아온다
 	var c := DiningLogic.new()
 	c.setup(4, _fish_box(12), names)

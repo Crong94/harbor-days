@@ -12,11 +12,15 @@ const LIST := {
 	"yeoul": {"name": "여울", "role": "serve", "wage": 20000,
 		"desc": "요리사 앞치마가 잘 어울리는 알바생. 완성된 접시를 손님에게 날라 줘요.",
 		"art": "staff/yeoul_stand", "walk": ["staff/yeoul_walk_1", "staff/yeoul_walk_2"], "serve_art": "staff/yeoul_serve",
-		"portrait": "staff/yeoul_portrait"},
+		"portrait": "staff/yeoul_portrait",
+		# 우리 SD 화풍 (11-12 그림 세션): 걷기 8칸(빈 쟁반), 반응 3칸(대기, 쟁반 내밀기, 인사)
+		"sd_walk": "staff/yeoul_sd_walk", "sd_react": "staff/yeoul_sd_react"},
 	"sera": {"name": "세라", "role": "kitchen", "wage": 15000,
 		"desc": "빨간 고글을 쓴 씩씩한 알바생. 사장이 홀에 있어도 화로를 지켜요.",
 		"art": "staff/sera_stand", "walk": [], "serve_art": "staff/sera_point",
-		"portrait": "staff/sera_portrait"},
+		"portrait": "staff/sera_portrait",
+		# 우리 SD 화풍: 조리 4칸(대기, 팬 흔들기 둘, 접시 들어 올리기). 세라는 주방에만 있다
+		"sd_cook": "staff/sera_sd_cook"},
 }
 
 

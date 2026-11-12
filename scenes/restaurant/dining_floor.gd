@@ -5,13 +5,13 @@ extends Control
 ##   손님 머리 위: 주문한 요리 그림과 기다림 고리(초록 → 노랑 → 빨강)
 ## 배치 (2026-11-11 사용자): 세로로 긴 식당. 위 주방, 양옆 세로 바 카운터에 손님이 벽 쪽에 앉아 가운데를 보고, 주인공은 가운데 통로를 오간다
 ## 그림: 배경 bg_shop_inside_night (그림 세션이 받는 중), 손님 SD sd_guest/<id>_react.png, 요리 dish/<recipe>.png
-## 이름 없는 손님 SD가 오기 전까지는 주민 SD가 대신 앉는다 (TEMP_FACES).
+## 손님 그림은 GuestSD.face_for (이름 없는 손님 SD, 그림이 없으면 주민 SD).
 ## 끝나면 finished(결과)를 보낸다. 결과 모양은 예전 DayFlow.serve_regulars와 같다 (장부가 그대로 쓴다).
 
 signal finished(result: Dictionary)
 
-## 이름 없는 손님 그림이 오기 전 임시 얼굴 (사용자 결정 2026-11-11: 이름 없는 손님 SD를 먼저 요청)
-const TEMP_FACES := ["bokja", "junho", "gyeongja", "mansu", "sundeok"]
+## 걷기 시트는 칸 위 여백이 커서 이만큼 키워 그린다 (GuestSD.WALK_SCALE과 같은 값)
+const SHEET_WALK_SCALE := 1.2
 const GUEST_H := 150.0
 const SEAT_LIFT := 40.0 # 앉은 그림 발끝을 자리점보다 이만큼 위에 (바 의자 높이, 그림 세션이 잰 값)
 const PLAYER_H := 210.0
@@ -50,7 +50,8 @@ func start(day: int, inventory: Array) -> void:
 		var walk := []
 		for a in st.get("walk", []):
 			walk.append(_load_art(a))
-		_staff_tex[role] = {"stand": _load_art(st.get("art", "")), "walk": walk}
+		_staff_tex[role] = {"stand": _load_art(st.get("art", "")), "walk": walk,
+			"sd_walk": st.get("sd_walk", ""), "sd_react": st.get("sd_react", ""), "sd_cook": st.get("sd_cook", "")}
 	logic.pantry = GameState.produce # 곁들임은 GameState에서 바로 빠진다
 	logic.reserve = Sides.reserve_for(GameState)
 	_load_decor()
@@ -59,9 +60,10 @@ func start(day: int, inventory: Array) -> void:
 		names[s.name] = true
 	var i := 0
 	for n in names:
-		_faces[n] = TEMP_FACES[(hash(n) + i) % TEMP_FACES.size()]
+		_faces[n] = GuestSD.face_for(n, i)
 		i += 1
 	show()
+
 
 
 func _ready() -> void:
@@ -211,7 +213,7 @@ func _handle_events() -> void:
 				var gi: int = e.guest
 				var g: Dictionary = logic.guests[gi]
 				var sd := GuestSD.new()
-				sd.guest_id = _faces.get(g.name, TEMP_FACES[0])
+				sd.guest_id = _faces.get(g.name, GuestSD.TEMP_FACES[0])
 				sd.size = Vector2(GUEST_H * 0.75, GUEST_H)
 				sd.walk = "side"
 				sd.flip = true
@@ -381,7 +383,14 @@ func _draw_floor() -> void:
 	# 주인공 (앞모습, 위로 걸을 땐 뒷모습). 든 접시는 머리 위에
 	var pp := to_screen(logic.player)
 	var tex := _player_back if _player_up and _player_back else _player_tex
-	if tex:
+	var sheet := "sd/serve_walk" if logic.holding >= 0 else "sd/walk"
+	if _has_sheet(sheet):
+		# 걷기 시트 (빈손, 접시 들고). 서 있을 때는 앞(위로 가던 중이면 뒤) 첫 칸
+		var cell := 2 if _player_up else 0
+		if logic.move != Vector2.ZERO:
+			cell = GuestSD.walk_cell(logic.move, _t)
+		_draw_cell(ci, sheet, 8, cell, pp, PLAYER_H * SHEET_WALK_SCALE, cell >= 4 and _player_face_left)
+	elif tex:
 		var h := PLAYER_H
 		var w := h * tex.get_width() / float(tex.get_height())
 		var step := absf(sin(_t * 12.0)) * 6.0 if logic.move != Vector2.ZERO else 0.0
@@ -415,8 +424,17 @@ func _draw_floor() -> void:
 ## 알바: 주방 알바는 화로 옆에 서 있고, 서빙 알바는 접시를 들고 주방에서 손님 앞까지 걸어간다
 func _draw_staff(ci: Control) -> void:
 	if _staff_tex.has("kitchen"):
-		_draw_sprite(ci, _staff_tex.kitchen.stand, to_screen(DiningLogic.PASS) + Vector2(-120.0, 6.0), false)
-	if _staff_tex.has("serve"):
+		var kp := to_screen(DiningLogic.PASS) + Vector2(-120.0, 6.0)
+		var cook: String = _staff_tex.kitchen.sd_cook
+		if cook != "" and _has_sheet(cook):
+			# 굽는 중이면 팬을 흔들고(두 칸 번갈아), 아니면 뒤집개 들고 대기
+			var cell := (1 + int(_t * 4.0) % 2) if logic.cooking_now() and not logic.cooking.is_empty() else 0
+			_draw_cell(ci, cook, 4, cell, kp, STAFF_H, false)
+		else:
+			_draw_sprite(ci, _staff_tex.kitchen.stand, kp, false)
+	if _staff_tex.has("serve") and _staff_tex.serve.sd_walk != "" and _has_sheet(_staff_tex.serve.sd_walk):
+		_draw_serve_helper_sd(ci)
+	elif _staff_tex.has("serve"):
 		var home := to_screen(Vector2(DiningLogic.AISLE.y, DiningLogic.FLOOR_MIN.y))
 		var at := home
 		var walk: Array = _staff_tex.serve.walk
@@ -434,6 +452,67 @@ func _draw_staff(ci: Control) -> void:
 			var hp := at + Vector2(0, -STAFF_H - 8.0)
 			ci.draw_circle(hp, DISH * 0.45, Color(UiKit.PAPER, 0.95))
 			_dish(ci, logic.helper_dish, hp, DISH * 0.8, 1.0)
+
+
+## 서빙 알바 (우리 SD): 주방 옆에서 대기 → 걸어가서 쟁반 내밀기
+func _draw_serve_helper_sd(ci: Control) -> void:
+	var st: Dictionary = _staff_tex.serve
+	var home := to_screen(Vector2(DiningLogic.AISLE.y, DiningLogic.FLOOR_MIN.y))
+	var at := home
+	if logic.helper_dish >= 0 and logic.helper_dish < logic.guests.size():
+		var goal := to_screen(DiningLogic.serve_spot(logic.guests[logic.helper_dish].seat))
+		var k := 1.0 - clampf(logic.helper_left / DiningLogic.HELPER_TRIP, 0.0, 1.0)
+		at = home.lerp(goal, minf(1.0, k * 1.6)) # 가서 잠깐 서 있다가 낸다
+		if k < 0.62:
+			var d := goal - home
+			var cell := GuestSD.walk_cell(d, _t)
+			_draw_cell(ci, st.sd_walk, 8, cell, at, STAFF_H * SHEET_WALK_SCALE, cell >= 4 and d.x < 0.0)
+		else:
+			_draw_cell(ci, st.sd_react, 3, 1, at, STAFF_H, false)
+		var hp := at + Vector2(0, -STAFF_H - 8.0)
+		ci.draw_circle(hp, DISH * 0.45, Color(UiKit.PAPER, 0.95))
+		_dish(ci, logic.helper_dish, hp, DISH * 0.8, 1.0)
+	else:
+		_draw_cell(ci, st.sd_react, 3, 0, at, STAFF_H, false)
+
+
+## 한 줄 시트 (assets/art/<path>.png, n칸). 칸 경계는 가장 빈 열에서 찾는다 (GuestSD.find_cuts_n)
+static var _sheet_cache := {}
+
+
+static func _has_sheet(path: String) -> bool:
+	return ResourceLoader.exists("res://assets/art/%s.png" % path)
+
+
+static func _sheet(path: String, n: int) -> Dictionary:
+	var key := "%s/%d" % [path, n]
+	if _sheet_cache.has(key):
+		return _sheet_cache[key]
+	var tex: Texture2D = load("res://assets/art/%s.png" % path)
+	var img := tex.get_image()
+	if img.is_compressed():
+		img.decompress()
+	var cols := PackedFloat32Array()
+	cols.resize(img.get_width())
+	for x in img.get_width():
+		var s := 0.0
+		for y in range(0, img.get_height(), 6):
+			s += img.get_pixel(x, y).a
+		cols[x] = s
+	var e := {"tex": tex, "cuts": GuestSD.find_cuts_n(cols, n)}
+	_sheet_cache[key] = e
+	return e
+
+
+## 시트의 한 칸을 발이 feet에 오게 그린다. 칸 전체 높이를 cell_h로
+func _draw_cell(ci: Control, path: String, n: int, i: int, feet: Vector2, cell_h: float, flip: bool) -> void:
+	var e := _sheet(path, n)
+	var tex: Texture2D = e.tex
+	var src := Rect2(e.cuts[i], 0, e.cuts[i + 1] - e.cuts[i], tex.get_height())
+	var w := cell_h * src.size.x / src.size.y
+	ci.draw_set_transform(feet, 0.0, Vector2(-1.0 if flip else 1.0, 1.0))
+	ci.draw_texture_rect_region(tex, Rect2(-w / 2.0, -cell_h, w, cell_h), src)
+	ci.draw_set_transform_matrix(Transform2D.IDENTITY)
 
 
 func _draw_sprite(ci: Control, tex: Texture2D, feet: Vector2, flip: bool) -> void:
