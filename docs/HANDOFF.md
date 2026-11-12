@@ -1,4 +1,4 @@
-# 이어가기 (2026-11-11 밤, 브랜치 main, 커밋 2f86faa 기준)
+# 이어가기 (2026-11-13 새벽, 브랜치 main. 세션 B는 11-12 밤 개발 세션까지 반영)
 
 두 세션으로 나눠 이어 간다. 세션마다 맞는 코드 블록을 새 대화 첫 메시지로 붙여 넣는다.
 
@@ -71,9 +71,10 @@
 ## 지금까지 상황 (환경: 코드, 집 노트북의 로컬 레포)
 - 레포: 11-12 세션 끝에 노트북 main을 GitHub Crong94/harbor-days(공개) main에 push했다. 이 노트북에는 git remote가 없어 push는 https://github.com/Crong94/harbor-days.git로 직접 한다(사용자가 원할 때만)
 - Godot 4.4.1: 노트북 사용자 폴더 아래 Tools/Godot. 콘솔 실행 파일 Godot_v4.4.1-stable_win64_console.exe
-- 테스트: `<Godot>_console.exe --headless --path . --script res://tests/run_tests.gd` → 1023 통과, 0 실패
+- 테스트: `<Godot>_console.exe --headless --path . --script res://tests/run_tests.gd` → 1066 통과, 0 실패
 - 화면 찍기: 임시 res://_shot/*.tscn(GameState를 정하고 장면을 instantiate)을 만들어 `<Godot>.exe --path . res://_shot/x.tscn --write-movie <스크래치>/x.png --fixed-fps 30 --quit-after 75 --resolution 720x1280 -- <인자>`. _shot/은 .gitignore. 노트북 화면이 낮아 720x1061로 찍힌다. 녹화 모드라 창이 느리게 뜨는 건 정상(사용자에게 그렇게 설명)
 - 줄다리기 난이도 재기: `<Godot>_console.exe --headless --path . --script res://tools/fight_balance.gd`
+- 동영상 확인(사용자 선호, 11-12): 움직이는 화면은 PNG 대신 동영상으로 보여 준다. `<Godot>.exe --path . res://_shot/<장면>.tscn --write-movie _shot/<이름>.avi --fixed-fps 30 --quit-after <프레임> --resolution 360x640` (MJPEG AVI. 720x1280이면 18초에 약 60MB, 360x640이면 90초에 약 200MB). _shot/ 장면에서 사람처럼 자동 조작한다(줄다리기 fight_auto, 영업 dining_auto). ffmpeg가 없어 장면 확인은 AVI의 JPEG 프레임을 python으로 잘라 본다. _shot/은 .gitignore이고 내보내기에서도 뺐다
 - 먼저 읽을 것: CLAUDE.md, docs/줄다리기_UI_설계와_그림정리_2026-11-11.md(T2), docs/UI_디자인_시스템.md, docs/텃밭_설계.md, 기획서 docs/오늘의바다_시나리오_v3.md
 - 11-10~11-11에 들어간 것 (모두 main)
   - 저장과 이어하기(scripts/data/save_game.gd, 지도에 올 때마다 자동 저장), 달력과 고정비(calendar.gd, loan.gd: 매달 1일 대출 55만, 월세 20만, 공과금), 아이스박스 10칸과 신선도, 수산시장(scenes/market), 하루 서랍(day_drawer), 장부 일지, 도감 자세히, 봄 첫 주 이야기(scripts/data/story.gd), 여울 수첩 모양 UI, 낚시 견제 손익과 어종 버릇, 난이도 낮춤
@@ -129,11 +130,24 @@
 - GitHub Actions APK 릴리즈(.github/workflows/release-apk.yml): 손으로 Run workflow하면 Godot 4.4.1로 테스트, 빌드 후 시험판 릴리즈. 첫 릴리즈 v0.3-1111-560811c. 서명은 실행마다 새 디버그 키라 노트북 APK 위에 덮어 깔리지 않는다. 노트북 키로 맞추려면 사용자가 Secrets(ANDROID_DEBUG_KEYSTORE_B64, _PASS)에 직접 넣는다
 - 그림 세션이 ChatGPT 링크가 든 커밋을 push해서, 링크를 빼고 고친 커밋으로 main을 강제로 덮어썼다(사용자 허락). ChatGPT 링크는 파일과 커밋에 넣지 않는다
 
+## 11-12 밤 개발 세션에서 한 것 (82a9814 ~ a37b29b)
+- 폰 확인 결과(사용자): 줄다리기는 장력 게이지가 있어야 하고 대 끝 색, 줄 떨림은 별로. 감성돔 너무 쉬움. 영업 너무 한가함. 돈 균형은 아직 한 달 못 가 봄
+- 줄다리기: 실제 파이팅 조사(docs/찌낚시_동작_조사.md 4장). 오른쪽 세로 장력 게이지(캐스팅 거리 게이지 자리, 아래부터 느슨/알맞음/드랙/위험, FightView.gauge_zones). 드랙: 위험 구간이면 릴이 줄을 내줌(FishingLogic.DRAG_PAYOUT, drag_slip, "드르륵"). 대 끝 빛, 붉은 줄, 줄 지그재그, 위험 시 대 떨림과 화면 흔들림 뺌. 휨과 처짐은 남김
+- 감성돔: 힘 1.05, gear_help 0.6, 어종 끈기 stamina 2.0(체력 깎이는 속도를 나눔). 단계별 1:2% 2:21% 3:39% 5:52% 7:69% 10:86%, 싸움 약 12초
+- 영업 짧고 몰아치기(사용자 선택): 아이스박스가 10칸이라 손님을 늘려도 한가했다. 손님 8~11명이 1~3명씩 무리 지어 처음 약 1분 20초에 오고(LAST_ARRIVAL 0.55, OPEN_SECONDS 150), 다 받으면 바로 마감(is_over). 참는 시간 40초, 굽기 8초. 자동 서빙 기준 한 판 약 90초, 빈 가게 시간 1~12초
+- 손님이 입구(DiningLogic.ENTRANCE 0.96, 0.47)로 들어와 벽 쪽 길(오른쪽 벽 → 맨 아래 → 왼쪽 벽, entry_path)로 걸어 자리에 앉은 뒤 주문(GuestState.WALKING). 빈자리는 날짜 rng로 고루
+- 새 그림 연결: 이름 없는 손님 다섯 종(GuestSD.face_for, 손님 이름도 회사원·선장·등산객·민박·해녀·학생·낚시꾼으로 바꿈), 알바 여울 우리 SD(걷기, 쟁반 내밀기, 대기), 세라 조리 4칸(굽는 중이면 팬 흔들기), 주인공 걷기와 쟁반 걷기(sd/walk, sd/serve_walk). 그림이 없으면 주민 SD와 옛 알바 그림으로 대신
+- 걷기 시트를 _draw에서 직접 load하면 흰 네모로 그려졌다. MapWalker._sheet처럼 get_image로 칸 경계를 찾는 캐시를 거치면 정상(GuestSD._draw_walk, DiningFloor._sheet)
+- 가게 꾸미기 창은 장부에 그대로(사용자 결정)
+- 내보내기에서 _shot/과 오늘의바다_작업/ 뺌(export_presets.cfg). 오늘의바다_작업/에 .gdignore를 넣었다(git 밖 폴더라 커밋 안 됨. 다른 기기에서는 다시 넣는다). 빼기 전 APK가 375MB였다
+- APK: build/android/oneului-bada-1112-f670133.apk (147MB, 영업 몰아치기까지). 사용자가 드라이브에 올림. 손님 걷기와 새 그림 연결은 아직 APK에 없음
+
 ## 이번에 해 줬으면 하는 것
-1. 사용자 폰 확인 결과 반영: 줄다리기 T2, 감성돔 난이도, 영업 4분(주방 오가기, PATIENCE 45초), 알바 일당, 한 달 고정비 80만 원 균형
-2. (끝남) 가게 꾸미기 창은 장부에 그대로 (11-12 사용자 결정)
-3. 손님이 입구(0.96, 0.47)로 들어와 자리까지 걷기, 이름 없는 손님 SD(여울 레포 마을 사람 12명을 쓸지 사용자에게 묻기)
-4. 알바 SD를 우리 화풍으로 다시 받을지 (여울 그림은 음영이 진함)
-5. 그다음 후보: 버스와 옆마을, 지도 방위 확정
+1. 새 APK로 폰 확인: 장력 게이지와 드랙, 감성돔 난이도, 90초 영업, 손님 걷기, 새 손님과 알바 그림
+2. 한 달 돈 균형(알바 일당, 고정비 80만 원). 영업이 90초로 짧아져 하루 매출이 바뀌었는지 함께 본다
+3. 줄다리기에서 "길게 차고 나가요!" 같은 버릇 안내 글이 물 위 남은 줄 숫자와 겹친다
+4. 접시를 머리 위 대신 쟁반 위에 얹을지 (여울, 주인공 쟁반 걷기 그림. 칸마다 쟁반 위치가 달라 맞춰야 함)
+5. 김해솔 SD(sd_guest/haesol_*, 그림 세션 11-12)를 어디에 쓸지: 특별 손님, 지도 걷기
+6. 그다음 후보: 버스와 옆마을, 지도 방위 확정
 마지막: 테스트 통과와 화면 확인 → 내 파일만 커밋([skip ci]) → ./tools/backup.sh → 새 bundle을 드라이브 `오늘의바다_백업`에 올리라고 안내. GitHub push는 원할 때만. 이 문서(docs/HANDOFF.md)를 갱신한다
 ```
