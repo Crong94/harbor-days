@@ -1451,6 +1451,7 @@ func _test_dining() -> void:
 		sum += e.price
 	_eq(a.sales, sum, "매출 = 받은 값 합")
 	_eq(a.is_over(), true, "영업이 끝남")
+	_eq(a.time < DiningLogic.OPEN_SECONDS, true, "손님을 다 받으면 문 닫기 전에 끝남 (%.0f초)" % a.time)
 	# 가만히 있으면 손님이 화나서 가고, 굽지 않은 생선은 돌아온다
 	var c := DiningLogic.new()
 	c.setup(4, _fish_box(12), names)

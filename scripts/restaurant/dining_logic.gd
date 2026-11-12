@@ -15,10 +15,10 @@ extends RefCounted
 
 enum GuestState { SEATED, EATING, LEFT }
 
-const OPEN_SECONDS := 240.0 # 실제 약 4분 (사용자 결정)
-const LAST_ARRIVAL := 0.8 # 영업 시간의 이 비율까지만 손님이 들어온다
-const GUESTS_MIN := 11 # 2026-11-12 사용자: 6~9명은 너무 한가함
-const GUESTS_MAX := 15
+const OPEN_SECONDS := 150.0 # 문 닫는 시각 (초). 2026-11-12 사용자: 짧고 몰아치게. 손님을 다 받으면 그 전에 끝난다
+const LAST_ARRIVAL := 0.55 # 영업 시간의 이 비율까지만 손님이 들어온다 (처음 1분 20초쯤에 몰린다)
+const GUESTS_MIN := 8 # 아이스박스가 10칸이라 손님도 그 언저리. 짧은 시간에 몰려서 바쁘다
+const GUESTS_MAX := 11
 const GROUP_MAX := 3 # 손님은 1~3명씩 몰려 들어온다 (저녁 붐빔)
 const COOK_TIME := 8.0 # 한 접시 굽는 시간 (초). 큰 고기는 조금 더
 const COOK_PER_CM := 0.15
@@ -103,7 +103,8 @@ func setup(day: int, inv: Array, names: Array) -> void:
 
 
 func is_over() -> bool:
-	return time >= OPEN_SECONDS and _active_count() == 0
+	# 문 닫을 시각이 지났거나, 올 손님이 다 와서 다 받았으면 끝 (짧고 몰아치기)
+	return (time >= OPEN_SECONDS or schedule.is_empty()) and _active_count() == 0
 
 
 ## 문 닫을 때까지 남은 시간 (초)
