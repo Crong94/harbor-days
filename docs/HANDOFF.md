@@ -135,7 +135,7 @@
 2. 가게 꾸미기 창을 장부에 둘지, 낚시방이나 따로 가구점으로 옮길지 (사용자 답 기다림)
 3. 손님이 입구(0.96, 0.47)로 들어와 자리까지 걷기, 이름 없는 손님 SD(여울 레포 마을 사람 12명을 쓸지 사용자에게 묻기)
 4. 알바 SD 새 그림 연결(11-12 그림 세션이 받음. docs/ref는 git에 안 올라가니 드라이브 오늘의바다_백업/art_inbox/2026-11-12/에서 받는다: staff_yeoul_react, staff_yeoul_walk, staff_sera_cook, bg_shop_openkitchen_day, _night): 여울은 react 3칸(대기, 서빙, 인사)과 walk 8칸, 세라는 cook 4칸(대기, 팬 1, 팬 2 반복, 접시). 요리 그림은 머리 위가 아니라 쟁반 위(서빙 칸 인물 기준 가로 50%, 세로 약 58%)에 얹는다. 사용자가 오픈키친을 확정하면 배경 교체: 세라는 화로 뒤(발끝 y 약 0.41)에 그리고 카운터 부분(x 0.235~0.43 / 0.57~0.765, y 0.378~0.432)을 배경에서 잘라 다시 덮는다
-5. 식당을 빈 바탕 + 칸(슬롯) 방식으로 바꾸기 (사용자 11-12, 설계 `docs/식당_꾸미기_슬롯_설계.md`): 칸 41개, 테이블 폭 70%, SD 1.3배, 처음은 낡은 물품만 있고 꾸미기 칸은 비움. 상점에서 산 물건은 가게 꾸미기 창에서 칸마다 고른다(ShopDecor.KINDS에 table, hood, stove, tool, shelf, cabinet, lamp, string_light, sign, wall_kitchen, wall_hall, floor 추가). 그림은 드라이브 art_inbox/2026-11-12의 item_*.png, 빈 바탕 bg_shop_openkitchen_*_empty2.png
+5. 식당을 빈 바탕 + 칸(슬롯) 방식으로 바꾸기 (사용자 11-12, 설계 `docs/식당_꾸미기_슬롯_설계.md`): 칸 41개, 테이블 폭 70%, SD 1.3배, 처음은 낡은 물품만 있고 꾸미기 칸은 비움. 상점에서 산 물건은 가게 꾸미기 창에서 칸마다 고른다(ShopDecor.KINDS에 table, hood, stove, tool, shelf, cabinet, lamp, string_light, sign, wall_kitchen, wall_hall, floor 추가). 그림은 드라이브 art_inbox/2026-11-12의 item_*.png, 빈 바탕 bg_shop_openkitchen_*_empty3.png(4차 배치: 뒷벽 선반 2줄, 앞으로 내놓은 조리대 둘, 바 165px 아래)
 6. 그다음 후보: 버스와 옆마을, 지도 방위 확정
 마지막: 테스트 통과와 화면 확인 → 내 파일만 커밋([skip ci]) → ./tools/backup.sh → 새 bundle을 드라이브 `오늘의바다_백업`에 올리라고 안내. GitHub push는 원할 때만. 이 문서(docs/HANDOFF.md)를 갱신한다
 ```
