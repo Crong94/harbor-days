@@ -146,6 +146,7 @@ var _splashes: Array = []
 var _reel_sound := 0.0
 var _was_nibble := false
 var _shake := 0.0
+var _gauge_t := 0.0 # 장력 게이지 바늘 (부드럽게 따라감)
 var _hitstop := 0.0
 var _was_exhausted := false
 var _last_run := 0
@@ -420,7 +421,6 @@ func _process(delta: float) -> void:
 	_shake = maxf(0.0, _shake - delta * 2.5)
 	var fight_shake := 0.0
 	if logic.state == FishingLogic.State.REELING and _hitstop <= 0.0:
-		fight_shake = maxf(0.0, logic.tension - 0.8) * 12.0
 		if logic.run_dir != 0 and not logic.countering:
 			fight_shake += logic.fish_pull() * 1.6 # 물고기가 차고 나갈 때 화면도 끌려간다
 	var amp := (_shake * 14.0 + fight_shake) if GameState.screen_shake_on else 0.0
@@ -1383,9 +1383,6 @@ func _place_player() -> void:
 		var k := logic.fish_pull() * (1.0 if logic.run_dir != 0 and not logic.countering else 0.45)
 		quiver = k * 0.09 * sin(_t * 23.0) + k * 0.05 * sin(_t * 9.0)
 		pitch += k * 2.5 * sin(_t * 17.0)
-		# 위험: 대 끝이 덜덜 떤다
-		if FishingLogic.tension_level(logic.tension) == 2:
-			quiver += 0.07 * sin(_t * 47.0) + 0.04 * sin(_t * 31.0)
 	elif logic.state == FishingLogic.State.BITE:
 		quiver = 0.05 * sin(_t * 20.0) * (1.0 - logic.bite_depth * 0.5)
 	_player.pitch = lerpf(_player.pitch, pitch, follow)
@@ -1393,14 +1390,11 @@ func _place_player() -> void:
 	_bend_base = lerpf(_bend_base, bend, 0.3)
 	_player.bend = clampf(_bend_base + quiver, 0.0, 1.0)
 	_player.pose = pose
-	# 누른 채 좌우로 끌면 낚싯대가 그쪽으로 눕는다. 대 끝 빛은 장력 (청록 알맞음, 빨강 위험은 깜빡임)
+	# 누른 채 좌우로 끌면 낚싯대가 그쪽으로 눕는다. 장력은 오른쪽 게이지로 읽는다 (대 끝 색은 2026-11-12 뺐다)
 	var fighting := logic.state == FishingLogic.State.REELING
 	var roll := ROLL_BASE + (_steer() * ROLL_STEER if fighting else 0.0)
 	_player.roll = lerpf(_player.roll, roll, 0.2)
-	var glow := FightView.tip_glow(logic.tension) if fighting and _hook_flash <= 0.0 else Color(0, 0, 0, 0)
-	if fighting and FishingLogic.tension_level(logic.tension) == 2:
-		glow.a *= 0.7 + 0.3 * sin(_t * 26.0)
-	_player.tip_glow = glow
+	_player.tip_glow = Color(0, 0, 0, 0)
 	_player.bend_toward = _float_pos() if logic.state in [FishingLogic.State.WAITING, FishingLogic.State.BITE, FishingLogic.State.REELING] else Vector2.ZERO
 
 
@@ -1581,19 +1575,15 @@ func _draw_line_layer(ci: Control) -> void:
 			sag = 2.0 # 견제: 뒷줄을 잡아 팽팽하게
 		var col := Color(1, 1, 1, 0.75)
 		var width := 1.6
-		var buzz := 0.0
 		if s == FishingLogic.State.REELING:
-			# 느슨하면 처지고, 팽팽할수록 빨개지고 굵어지며, 위험하면 지그재그로 떤다
-			col = Color(1, 1, 1, 0.85).lerp(FightView.RED, FightView.line_red(logic.tension))
-			width = 1.6 + logic.tension * 1.8
-			if FishingLogic.tension_level(logic.tension) == 2:
-				buzz = (4.0 + 4.0 * logic.break_progress()) * (1.0 if fmod(_t * 22.0, 1.0) < 0.5 else -1.0)
+			# 느슨하면 처지고 팽팽하면 곧게 선다. 색과 떨림은 없다 (장력은 게이지로)
+			col = Color(1, 1, 1, 0.85)
+			width = 1.8
 		var pts := PackedVector2Array()
 		for i in 25:
 			var k := i / 24.0
 			var p := tip.lerp(fp, k)
 			p.y += sin(k * PI) * sag
-			p.x += sin(k * PI) * buzz * (1.0 if i % 2 == 0 else -1.0)
 			pts.append(p)
 		ci.draw_polyline(pts, col, width, true)
 		if s == FishingLogic.State.REELING:
@@ -1671,6 +1661,7 @@ func _draw_hud() -> void:
 	if s == FishingLogic.State.CHARGING:
 		_draw_cast_gauge()
 	if s == FishingLogic.State.REELING:
+		_draw_tension_gauge()
 		# 손가락이 지나간 자취: 작은 점이 남았다가 사라진다
 		for tr in _trail:
 			var tk: float = 1.0 - tr.t / TRAIL_TIME
@@ -1695,6 +1686,47 @@ func _draw_danger_edge() -> void:
 	var alphas := [0.35, 0.5, 0.8]
 	for i in 3:
 		_hud_draw.draw_style_box(UiKit.box(Color.TRANSPARENT, 0, Color(UiKit.DANGER, a * float(alphas[i])), int(widths[i]), 0), full)
+
+
+## 오른쪽 세로 장력 게이지 (캐스팅 거리 게이지와 같은 자리). 아래부터 느슨, 알맞음, 드랙, 위험.
+## 드랙 구간에 들면 릴이 줄을 내주고(남은 줄이 늘어남), 위험 끝까지 차서 버티면 줄이 끊긴다.
+## 바늘은 흔들지 않고 부드럽게 따라간다 (2026-11-12 사용자: 떨림은 별로)
+func _draw_tension_gauge() -> void:
+	var r := Rect2(size.x - 84, 420, 44, 470)
+	_hud_draw.draw_style_box(UiKit.box(Color("1d1830"), 22, UiKit.OUTLINE, UiKit.OUTLINE_W, 0), r)
+	var inner := r.grow(-5)
+	var y_of := func(v: float) -> float: return inner.end.y - inner.size.y * clampf(v, 0.0, 1.0)
+	var cols := {"slack": Color(UiKit.SKY, 0.35), "good": Color(UiKit.LEAF, 0.8), "drag": Color(UiKit.SUN, 0.85), "danger": Color(UiKit.CORAL, 0.9)}
+	var lo := 0.0
+	for z in FightView.gauge_zones():
+		var hi: float = z[0]
+		var y0: float = y_of.call(hi)
+		var y1: float = y_of.call(lo)
+		_hud_draw.draw_rect(Rect2(inner.position.x, y0, inner.size.x, y1 - y0), cols[z[1]])
+		lo = hi
+	# 끊어지기까지: 위험 구간 위에서 아래로 어둡게 차오른다
+	var bp := logic.break_progress()
+	if bp > 0.0:
+		var d0: float = y_of.call(1.0)
+		var d1: float = y_of.call(FishingLogic.TENSION_DANGER)
+		_hud_draw.draw_rect(Rect2(inner.position.x, d0, inner.size.x, (d1 - d0) * bp), Color(UiKit.OUTLINE, 0.6))
+	# 지금 장력 바늘
+	_gauge_t = lerpf(_gauge_t, logic.tension, 0.35)
+	var cy: float = y_of.call(_gauge_t)
+	var zone := FightView.gauge_zone(_gauge_t)
+	var knob_col: Color = {"slack": UiKit.SKY, "good": UiKit.LEAF, "drag": UiKit.SUN, "danger": UiKit.CORAL}[zone]
+	_hud_draw.draw_style_box(UiKit.chunky(knob_col, 9, 0, 2), Rect2(r.position.x - 10, cy - 9, r.size.x + 20, 18))
+	var font := UiKit.font("cute")
+	var label := "장력"
+	_hud_draw.draw_string_outline(font, Vector2(r.position.x - 6, r.position.y - 14), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, 8, UiKit.OUTLINE)
+	_hud_draw.draw_string(font, Vector2(r.position.x - 6, r.position.y - 14), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, UiKit.FOAM)
+	# 드랙이 줄을 내주는 중: 게이지 아래에 짧게 알린다
+	if logic.drag_slip:
+		var t := "드르륵"
+		var tw := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
+		var tp := Vector2(r.position.x + r.size.x / 2.0 - tw / 2.0, r.end.y + 30.0)
+		_hud_draw.draw_string_outline(font, tp, t, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 8, UiKit.OUTLINE)
+		_hud_draw.draw_string(font, tp, t, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, UiKit.SUN)
 
 
 ## 오른쪽 세로 거리 게이지: 아래가 발밑, 위가 가장 먼 물. 포인트 구간이 반짝인다

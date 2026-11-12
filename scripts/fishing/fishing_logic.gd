@@ -72,6 +72,7 @@ const EXHAUSTED_TENSION := 0.4
 ## 장력 단계 (화면 색, 깜빡임, 진동에 쓴다)
 const TENSION_WARN := 0.62
 const TENSION_DANGER := 0.85
+const DRAG_PAYOUT := 0.05 # 드랙: 장력이 위험 구간에 들면 릴이 줄을 내준다 (1초에 늘어나는 거리). 실제 릴처럼 줄이 끊기기 전에 미끄러진다
 const STREAK_HOT := 3 # 연속 PERFECT 몇 번부터 물 오름
 
 var state := State.READY
@@ -80,6 +81,7 @@ var cast_power := 0.0 # 실제로 날아간 거리 0~1
 var progress := 0.0 # 캐스팅 진행도 0~1
 var nibble := 0.0 # 찌가 톡 잠기는 정도 0~1
 var tension := 0.0
+var drag_slip := false # 드랙이 줄을 내주는 중 (화면 게이지에 알린다)
 var distance := 0.0 # 물고기와의 거리 0(발밑)~1(찌 위치)
 var fish_id := ""
 var fish_size := 0.0
@@ -319,6 +321,7 @@ func _hook() -> void:
 		_rest_time = 0.15 # 우럭: 물자마자 바위로 파고든다
 	_over_time = 0.0
 	_slack_time = 0.0
+	drag_slip = false
 	state = State.REELING
 
 
@@ -440,6 +443,10 @@ func _update_reel(dt: float, held: bool) -> void:
 			tension += _run_power * TENSION_RUN_FREE * dt * tm
 			distance += 0.07 * dt # 손을 떼면 줄이 풀려 나간다
 	tension = clampf(tension, 0.0, 1.0)
+	# 드랙: 위험 구간에서는 릴이 줄을 조금씩 내준다. 고기는 멀어지지만 줄은 바로 끊기지 않는다
+	drag_slip = tension >= TENSION_DANGER and not exhausted
+	if drag_slip:
+		distance += DRAG_PAYOUT * dt
 
 	# 물고기 체력
 	var drain := 0.0
@@ -449,6 +456,8 @@ func _update_reel(dt: float, held: bool) -> void:
 		drain += HP_COUNTER / (0.5 + s)
 	if not held and run_dir == 0:
 		drain -= 0.02
+	# 끈질긴 고기(감성돔)는 쉽게 지치지 않는다: 체력 깎이는 속도를 stamina로 나눈다 (2026-11-12 사용자: 감성돔 너무 쉬움)
+	drain /= float(FishDB.get_fish(fish_id).get("stamina", 1.0))
 	fish_hp = clampf(fish_hp - drain * dt, 0.0, 1.0)
 	if fish_hp <= 0.0 and not exhausted:
 		exhausted = true

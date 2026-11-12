@@ -1331,18 +1331,35 @@ func _test_fight_view() -> void:
 	_eq(FightView.rod_bend(danger) >= 0.68, true, "위험하면 크게 꺾임")
 	_eq(FightView.rod_bend(1.0), 1.0, "끝까지 당기면 최대 휨")
 	_eq(FightView.rod_bend(1.7), 1.0, "범위를 넘어도 최대 휨")
-	# 대 끝 빛: 느슨하면 없음, 알맞으면 청록, 위험하면 빨강
-	_eq(FightView.tip_glow(slack * 0.5).a, 0.0, "느슨하면 대 끝 빛 없음")
-	var mid := FightView.tip_glow(0.5)
-	_eq(mid.a > 0.3 and mid.g > mid.r, true, "알맞으면 청록빛")
-	var hot := FightView.tip_glow(danger + 0.05)
-	_eq(hot.a == 1.0 and hot.r > hot.g, true, "위험하면 빨갛게")
-	# 줄: 느슨할 때만 처지고, 위험 앞에서 붉어진다
+	# 장력 게이지 구간: 아래부터 느슨, 알맞음, 드랙, 위험 (대 끝 빛과 붉은 줄은 2026-11-12 뺐다)
+	_eq(FightView.gauge_zone(slack * 0.5), "slack", "느슨 구간")
+	_eq(FightView.gauge_zone(0.4), "good", "알맞음 구간")
+	_eq(FightView.gauge_zone(FishingLogic.TENSION_WARN + 0.01), "drag", "드랙 구간")
+	_eq(FightView.gauge_zone(danger + 0.01), "danger", "위험 구간")
+	_eq(FightView.gauge_zone(1.0), "danger", "끝까지 차면 위험")
+	_eq(FightView.gauge_zones().size(), 4, "게이지는 네 구간")
+	# 줄: 느슨할 때만 처진다
 	_eq(FightView.line_sag(0.0), FightView.SAG_MAX, "장력 없으면 줄이 가장 처짐")
 	_eq(FightView.line_sag(slack), 0.0, "알맞음부터 줄이 곧음")
 	_eq(FightView.line_sag(0.9), 0.0, "위험해도 줄은 곧음")
-	_eq(FightView.line_red(0.5), 0.0, "알맞을 때 줄은 흰색")
-	_eq(FightView.line_red(danger), 1.0, "위험하면 줄이 다 붉음")
+	# 드랙: 위험 구간에서는 릴이 줄을 내줘 물고기가 멀어진다
+	var dl := FishingLogic.new()
+	dl.rng.seed = 7
+	dl.force_first_fish = "bolak"
+	dl.state = FishingLogic.State.BITE
+	dl.bite_depth = 0.5
+	dl._timer = 1.0
+	dl.press()
+	dl.run_dir = 0
+	dl._rest_time = 99.0
+	dl.distance = 0.5
+	dl.tension = 0.95
+	dl.update(0.1, false)
+	_eq(dl.drag_slip, true, "위험 구간이면 드랙이 줄을 내줌")
+	_eq(dl.distance > 0.5, true, "드랙이 미끄러지면 물고기가 멀어짐 (%.3f)" % dl.distance)
+	dl.tension = 0.4
+	dl.update(0.1, false)
+	_eq(dl.drag_slip, false, "알맞으면 드랙 멈춤")
 	# 남은 줄 숫자
 	_eq(FightView.line_meters(1.0, 1.0), 30, "가장 멀리 던지면 30m")
 	_eq(FightView.line_meters(0.5, 0.6), 9, "절반 감으면 9m")
@@ -1408,9 +1425,9 @@ func _run_dining(d: DiningLogic, good: bool) -> void:
 func _test_dining() -> void:
 	var names := ["동네 아저씨", "민박 손님"]
 	var a := DiningLogic.new()
-	a.setup(4, _fish_box(12), names)
+	a.setup(4, _fish_box(DiningLogic.GUESTS_MAX + 1), names)
 	var b := DiningLogic.new()
-	b.setup(4, _fish_box(12), names)
+	b.setup(4, _fish_box(DiningLogic.GUESTS_MAX + 1), names)
 	_eq(a.schedule.size(), b.schedule.size(), "같은 날은 손님 수가 같음")
 	_eq(a.schedule.size() >= DiningLogic.GUESTS_MIN and a.schedule.size() <= DiningLogic.GUESTS_MAX, true, "손님 수 범위 (%d)" % a.schedule.size())
 	_eq(a.schedule[a.schedule.size() - 1].t <= DiningLogic.OPEN_SECONDS * DiningLogic.LAST_ARRIVAL, true, "마지막 손님은 문 닫기 전에")
@@ -1420,7 +1437,13 @@ func _test_dining() -> void:
 	_eq(a.served.size(), n, "잘 나르면 손님 다 받음 (%d/%d)" % [a.served.size(), n])
 	_eq(a.angry, 0, "잘 나르면 화난 손님 없음")
 	_eq(a.missed, 0, "생선 넉넉하면 돌아간 손님 없음")
-	_eq(a.inventory.size(), 12 - n, "쓴 만큼 아이스박스에서 빠짐")
+	_eq(a.inventory.size(), DiningLogic.GUESTS_MAX + 1 - n, "쓴 만큼 아이스박스에서 빠짐")
+	# 손님은 무리 지어 온다: 2초 안에 잇달아 들어오는 손님이 있다
+	var bunched := 0
+	for i in range(1, b.schedule.size()):
+		if b.schedule[i].t - b.schedule[i - 1].t < 2.0:
+			bunched += 1
+	_eq(bunched > 0, true, "손님이 무리 지어 옴 (%d)" % bunched)
 	var hearts := a.served.filter(func(e): return e.heart).size()
 	_eq(hearts > 0, true, "빨리 받으면 하트 (%d)" % hearts)
 	var sum := 0
