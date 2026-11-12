@@ -2,7 +2,8 @@ class_name GuestSD
 extends Control
 ## 손님 SD 한 명. 반응 시트(assets/art/sd_guest/<id>_react.png, 3:2 한 줄 세 칸)에서 한 칸을 골라 그린다.
 ##   0 서 있기(주문 기다림)  1 만족  2 아쉬움
-## 걷기 시트(<id>_walk.png, 8칸)는 지도 걷기에 쓸 자리 (아직 안 씀).
+## 걷기 시트(<id>_walk.png, 같은 폭 8칸): 1·2 앞, 3·4 뒤, 5~8 오른쪽 옆 한 걸음. walk에 "front", "back", "side"를 주면 걷는 그림
+## (식당 입구에서 자리까지). 왼쪽으로 걸을 때는 flip.
 ## 시트마다 그림이 칸 경계에서 맞닿기도 해서, 1/3과 2/3 근처에서 가장 빈 열을 찾아 자른다.
 ## 그림이 없는 사람은 아무것도 그리지 않는다. 발이 이 노드 아래 가운데에 오게 맞춘다.
 ## 앉은 자세 (seat = "back" 앞 바 뒷모습, "side" 옆모습, 오른쪽을 봄. flip이면 왼쪽을 봄):
@@ -24,6 +25,9 @@ var guest_id := ""
 var pose := "stand"
 var seat := "" # "", "back", "side"
 var flip := false
+var walk := "" # "", "front", "back", "side": 걷는 중이면 걷기 시트에서 그린다
+const WALK_FPS := 7.0
+const WALK_SCALE := 1.2
 var _t := 0.0
 var _pop := 1.0 # 자세가 바뀔 때 살짝 튀는 연출 (0에서 1로)
 
@@ -133,7 +137,44 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
+static func walk_path(id: String) -> String:
+	return DIR + id + "_walk.png"
+
+
+static func has_walk(id: String) -> bool:
+	return id != "" and ResourceLoader.exists(walk_path(id))
+
+
+## 걷기 칸: 앞 0·1, 뒤 2·3, 옆 4~7
+static func walk_frame(dir: String, t: float) -> int:
+	match dir:
+		"front":
+			return int(t * WALK_FPS * 0.5) % 2
+		"back":
+			return 2 + int(t * WALK_FPS * 0.5) % 2
+	return 4 + int(t * WALK_FPS) % 4
+
+
+func _draw_walk() -> void:
+	# 지도 걷기(MapWalker)와 같은 시트 캐시를 쓴다 (칸 경계도 가장 빈 열에서 찾음)
+	var e := MapWalker._sheet(guest_id)
+	var tex: Texture2D = e.tex
+	var f := walk_frame(walk, _t)
+	var src := Rect2(e.cuts[f], 0, e.cuts[f + 1] - e.cuts[f], tex.get_height())
+	# 걷기 시트는 칸 위 여백이 커서 서 있는 그림과 키를 맞추려고 조금 키운다
+	var k := size.y / src.size.y * WALK_SCALE
+	var dw := src.size.x * k
+	var dh := src.size.y * k
+	if flip:
+		draw_set_transform(Vector2(size.x, 0), 0.0, Vector2(-1, 1))
+	draw_texture_rect_region(tex, Rect2(size.x / 2.0 - dw / 2.0, size.y - dh, dw, dh), src)
+	draw_set_transform_matrix(Transform2D.IDENTITY)
+
+
 func _draw() -> void:
+	if walk != "" and has_walk(guest_id):
+		_draw_walk()
+		return
 	var sit := seated()
 	if not sit and not has_sheet(guest_id):
 		return

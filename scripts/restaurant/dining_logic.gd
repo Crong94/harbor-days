@@ -13,7 +13,7 @@ extends RefCounted
 ## 요리 (2026-11-11 사용자): 주방 알바가 없으면 주인공이 주방 앞(통로 맨 위)에 서 있는 동안만 화로가 익는다.
 ## 알바 (한 번 뽑으면 계속, StaffDB): 주방 알바는 혼자 굽고(helper_kitchen), 서빙 알바는 완성 접시를 알아서 나른다(helper_serve).
 
-enum GuestState { SEATED, EATING, LEFT }
+enum GuestState { SEATED, EATING, LEFT, WALKING } # WALKING: 문에서 자리까지 걷는 중 (도착하면 주문)
 
 const OPEN_SECONDS := 150.0 # 문 닫는 시각 (초). 2026-11-12 사용자: 짧고 몰아치게. 손님을 다 받으면 그 전에 끝난다
 const LAST_ARRIVAL := 0.55 # 영업 시간의 이 비율까지만 손님이 들어온다 (처음 1분 20초쯤에 몰린다)
@@ -52,6 +52,12 @@ const START := Vector2(0.5, 0.46)
 ## 걸어 다닐 수 있는 범위 (U자 안쪽 통로, 주방 출구부터 앞 바 안쪽까지)
 const FLOOR_MIN := Vector2(AISLE.x, 0.40)
 const FLOOR_MAX := Vector2(AISLE.y, AISLE_BOTTOM)
+## 손님 입구 (오른쪽 벽 문지방). 손님은 벽 쪽 길로 돌아 자리까지 걷는다: 오른쪽 벽 → 맨 아래 → 왼쪽 벽
+const ENTRANCE := Vector2(0.96, 0.47)
+const LANE_RIGHT := 0.94
+const LANE_LEFT := 0.06
+const LANE_BOTTOM := 0.91
+const GUEST_SPEED := 0.5 # 손님 걷는 속도 (바닥 비율/초)
 
 var time := 0.0
 var inventory: Array = [] # 아이스박스 생선 {id, size, ...}. 주문할 때 여기서 뺀다
@@ -76,6 +82,7 @@ var sales := 0
 var pantry := {} # 곁들임 보관 (GameState.produce). 접시 낼 때 하나씩 붙는다 (Sides)
 var reserve := {} # 곁들이지 말고 남겨 둘 것 (순덕 할머니 부탁)
 var side_sales := 0 # 곁들임으로 더 받은 돈 (sales에 포함)
+var _rng := RandomNumberGenerator.new() # 빈자리 고르기 (날짜로 정해짐)
 var events: Array = [] # 화면 연출용 한 번짜리 알림 {type, guest} (화면이 꺼내 쓴다)
 
 
@@ -84,6 +91,7 @@ func setup(day: int, inv: Array, names: Array) -> void:
 	inventory = inv
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("영업-%d" % day)
+	_rng.seed = hash("자리-%d" % day)
 	var n := rng.randi_range(GUESTS_MIN, GUESTS_MAX)
 	schedule.clear()
 	var last := OPEN_SECONDS * LAST_ARRIVAL
@@ -119,6 +127,7 @@ func update(dt: float) -> void:
 	_last_dt = dt
 	time += dt
 	_arrive()
+	_walk_guests(dt)
 	_cook(dt)
 	_wait(dt)
 	_walk(dt)
@@ -216,15 +225,58 @@ func _arrive() -> void:
 			continue
 		var e: Dictionary = inventory[fi]
 		inventory.remove_at(fi)
+		# 빈자리 중 아무 데나 (한쪽에 몰리지 않게). 문에서 걸어 들어가 앉으면 주문한다
+		var seat: int = seats[_rng.randi() % seats.size()]
 		var g := {
-			"name": s.name, "seat": seats[0], "fish": e.id, "size": e.size, "entry": e,
-			"price": DayFlow.dish_price(e.id, e.size), "state": GuestState.SEATED,
+			"name": s.name, "seat": seat, "fish": e.id, "size": e.size, "entry": e,
+			"price": DayFlow.dish_price(e.id, e.size), "state": GuestState.WALKING,
 			"wait": 0.0, "eat": 0.0, "cooked": false,
+			"pos": ENTRANCE, "path": entry_path(seat), "dir": Vector2.LEFT,
 		}
 		guests.append(g)
-		var gi := guests.size() - 1
-		queue.append(gi)
-		events.append({"type": "order", "guest": gi})
+		events.append({"type": "arrive", "guest": guests.size() - 1})
+
+
+## 문에서 그 자리까지 걷는 길 (지나갈 점들). 오른쪽 바는 오른쪽 벽 길로 바로,
+## 앞 바는 맨 아래 길까지, 왼쪽 바는 맨 아래를 지나 왼쪽 벽 길로 올라간다
+static func entry_path(seat: int) -> Array:
+	var s: Vector2 = SEATS[seat]
+	var path := [Vector2(LANE_RIGHT, ENTRANCE.y)]
+	if s.y > FRONT_Y:
+		path.append(Vector2(LANE_RIGHT, LANE_BOTTOM))
+		path.append(Vector2(s.x, LANE_BOTTOM))
+	elif s.x > 0.5:
+		path.append(Vector2(LANE_RIGHT, s.y))
+	else:
+		path.append(Vector2(LANE_RIGHT, LANE_BOTTOM))
+		path.append(Vector2(LANE_LEFT, LANE_BOTTOM))
+		path.append(Vector2(LANE_LEFT, s.y))
+	path.append(s)
+	return path
+
+
+## 걷는 손님을 한 걸음씩. 자리에 닿으면 앉아서 주문한다
+func _walk_guests(dt: float) -> void:
+	for gi in guests.size():
+		var g: Dictionary = guests[gi]
+		if g.state != GuestState.WALKING:
+			continue
+		var step := GUEST_SPEED * dt
+		while step > 0.0 and not g.path.is_empty():
+			var to: Vector2 = g.path[0]
+			var d: Vector2 = to - g.pos
+			if d.length() <= step:
+				g.pos = to
+				step -= d.length()
+				g.path.pop_front()
+			else:
+				g.dir = d.normalized()
+				g.pos += g.dir * step
+				step = 0.0
+		if g.path.is_empty():
+			g.state = GuestState.SEATED
+			queue.append(gi)
+			events.append({"type": "order", "guest": gi})
 
 
 ## 주인공이 주방 앞에 서 있는가

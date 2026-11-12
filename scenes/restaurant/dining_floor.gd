@@ -205,23 +205,32 @@ func clock_minutes() -> float:
 func _handle_events() -> void:
 	for e in logic.events:
 		match e.type:
-			"order":
+			"arrive":
+				# 문으로 들어와 자리까지 걷는다 (걷는 그림은 _place_guests가 방향에 맞춰 고른다)
 				Sound.play_sfx("door", 0.05, -6.0)
 				var gi: int = e.guest
 				var g: Dictionary = logic.guests[gi]
 				var sd := GuestSD.new()
 				sd.guest_id = _faces.get(g.name, TEMP_FACES[0])
 				sd.size = Vector2(GUEST_H * 0.75, GUEST_H)
-				# 앞 바 손님은 등, 양옆 손님은 옆모습 (왼쪽 바 손님은 오른쪽을, 오른쪽 바 손님은 왼쪽을 본다)
-				var seat_pos: Vector2 = DiningLogic.SEATS[g.seat]
-				sd.seat = "back" if seat_pos.y > DiningLogic.FRONT_Y else "side"
-				sd.flip = sd.seat == "side" and seat_pos.x > 0.5
+				sd.walk = "side"
+				sd.flip = true
 				add_child(sd)
 				move_child(sd, _draw_layer.get_index()) # 말풍선과 주인공 뒤
 				_guests[gi] = sd
 				UiKit.fade_in(sd, 0.3)
 				var art := Catalog.dish_art(FishDB.get_fish(g.fish).get("grill", "bollak-gui"))
 				_dish_tex[gi] = _load_art(art)
+			"order":
+				# 자리에 앉았다. 앞 바 손님은 등, 양옆 손님은 옆모습 (왼쪽 바 손님은 오른쪽을, 오른쪽 바 손님은 왼쪽을 본다)
+				var gi: int = e.guest
+				if _guests.has(gi):
+					var sd: GuestSD = _guests[gi]
+					var seat_pos: Vector2 = DiningLogic.SEATS[logic.guests[gi].seat]
+					sd.walk = ""
+					sd.seat = "back" if seat_pos.y > DiningLogic.FRONT_Y else "side"
+					sd.flip = sd.seat == "side" and seat_pos.x > 0.5
+					sd.set_pose("stand")
 			"ready":
 				Sound.play_sfx("tick", 0.05)
 			"take":
@@ -293,6 +302,19 @@ func _bubble_pos(gi: int) -> Vector2:
 func _place_guests() -> void:
 	for gi in _guests:
 		var sd: GuestSD = _guests[gi]
+		var g: Dictionary = logic.guests[gi]
+		if g.state == DiningLogic.GuestState.WALKING:
+			# 걷는 방향으로 그림을 고른다: 위로 걸으면 뒷모습, 아래로 앞모습, 옆으로 옆모습
+			var dir: Vector2 = g.dir
+			if absf(dir.x) >= absf(dir.y):
+				sd.walk = "side"
+				sd.flip = dir.x < 0.0
+			else:
+				sd.walk = "back" if dir.y < 0.0 else "front"
+				sd.flip = false
+			var wf := to_screen(g.pos)
+			sd.position = wf - Vector2(sd.size.x / 2.0, sd.size.y)
+			continue
 		var feet := _seat_screen(gi)
 		if sd.seated():
 			feet.y -= SEAT_LIFT # 바 의자 위에 앉은 높이

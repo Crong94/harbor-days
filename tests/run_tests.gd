@@ -1452,6 +1452,25 @@ func _test_dining() -> void:
 	_eq(a.sales, sum, "매출 = 받은 값 합")
 	_eq(a.is_over(), true, "영업이 끝남")
 	_eq(a.time < DiningLogic.OPEN_SECONDS, true, "손님을 다 받으면 문 닫기 전에 끝남 (%.0f초)" % a.time)
+	# 손님은 문에서 걸어 들어와 자리에 닿아야 주문한다
+	for i in DiningLogic.SEATS.size():
+		var path := DiningLogic.entry_path(i)
+		_eq(path[path.size() - 1], DiningLogic.SEATS[i], "%d번 자리까지 가는 길 끝은 자리" % i)
+		_eq(is_equal_approx(path[0].x, DiningLogic.LANE_RIGHT), true, "%d번 길은 오른쪽 벽 길에서 시작" % i)
+	var wk := DiningLogic.new()
+	wk.setup(4, _fish_box(12), names)
+	wk.update(wk.schedule[0].t + 0.01)
+	_eq(wk.guests[0].state, DiningLogic.GuestState.WALKING, "들어온 손님은 먼저 걷는다")
+	_eq(wk.queue.is_empty(), true, "걷는 동안은 주문 없음")
+	for k in 300:
+		wk.update(1.0 / 30.0)
+	_eq(wk.guests[0].state, DiningLogic.GuestState.SEATED, "10초 안에 자리에 앉음")
+	_eq(wk.guests[0].pos, DiningLogic.SEATS[wk.guests[0].seat], "앉은 자리에 서 있음")
+	# 빈자리를 고루 쓴다 (왼쪽 바부터 채우지 않는다)
+	var sides := {}
+	for g in a.guests:
+		sides["L" if DiningLogic.SEATS[g.seat].x < 0.5 else "R"] = true
+	_eq(sides.size(), 2, "손님이 양쪽 바에 고루 앉음")
 	# 가만히 있으면 손님이 화나서 가고, 굽지 않은 생선은 돌아온다
 	var c := DiningLogic.new()
 	c.setup(4, _fish_box(12), names)
