@@ -22,7 +22,7 @@
 - 먼저 읽을 것: CLAUDE.md(그림 규칙), docs/그림_요청_목록.md(식당 영업 개편용 표, 마을 배경 표), docs/줄다리기_UI_설계와_그림정리_2026-11-11.md(1-1장 손님 SD 양식), 기획서 docs/오늘의바다_시나리오_v3.md(인물 설정)
 - ChatGPT 프로젝트 "오늘의바다"(링크는 공개 레포라 적지 않는다. 사용자에게 받는다). 쓰던 대화: "식당 내부 시안 비교"(식당 배경, 가구), "착석 시트 제작"(앉은 손님). 착석 대화에 소품을 요청하면 사람이 섞여 나오니 사람 외 그림은 다른 대화에서
 - 11-11~12 그림 세션에서 넣은 것: npc_sundeok_photo.png, 손님 SD 다섯 명(mansu, sundeok, bokja, junho, gyeongja)의 걷기·반응(assets/art/sd_guest/<id>_walk.png, _react.png)과 앉은 자세(_seat_back.png 뒷모습 4칸, _seat_side.png 오른쪽 옆모습 4칸: 기다림, 먹는 중, 만족, 화남. 서 있는 키 442px로 맞춰 게임은 배율 0.339 하나), 식당 내부 확정본 bg_shop_inside_night/day.png(정면 U자 바, 오른쪽 벽 입구, 왼쪽 창 바다), 2호점 보관용 bg_shop2_inside_*.png, 가구 여덟 가지 assets/art/decor/(chair_basic, chair_wood, chair_cushion, bar_flower, bar_lamp, wall_menu, wall_fish, plant_pot). 모두 게임에 반영됨
-- 받았지만 아직 안 넣은 것: 김해솔 세 표정(docs/ref/인물/haesol/haesol_3표정_1차_투명.png, 사용자 검토 전), 이름 없는 손님 관광객 걷기 1차(docs/ref/sd/보통손님/), 수산시장 1~3안·항구 1~3안(docs/ref/배경/, 3안 추천, 사용자 확정 전)
+- 11-12 밤 그림 세션(92d6325)에서 확정해 넣은 것: 김해솔 세 표정과 SD(걷기, 반응, 앉은 자세), 이름 없는 손님 다섯(관광객, 낚시꾼, 학생, 회사원, 해녀), 알바 SD(여울 걷기·반응, 세라 조리), 주인공 식당 걷기(sd/walk, sd/serve_walk), 수산시장·항구 3안. 김해솔 SD 말고는 개발 세션이 영업 판에 연결했다. 아래 "이번에 해 줬으면 하는 것" 2~6은 끝났고, 다음 그림 작업은 docs/그림_요청_목록.md에서 고른다
 - 마을 배경은 반드시 지도 해당 부분을 잘라 첨부한다(docs/ref/배경/지도조각/). 사용자 지적 11-11
 - 식당에 쓸 그림은 SD를 게임 크기로 배경에 올린 확인 그림을 함께 첨부하면 크기가 맞게 나온다
 
