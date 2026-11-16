@@ -103,6 +103,11 @@ func _run(pname: String, slots: Array, staff: Dictionary, v: Dictionary) -> void
 			ok.sort_custom(func(a, b): return FishDB.value_of(a.id, a.size) > FishDB.value_of(b.id, b.size))
 			sub = ok.slice(0, cap)
 			rest = inv.filter(func(e): return not sub.has(e))
+		tot["inv_n"] = int(tot.get("inv_n", 0)) + inv.size()
+		tot["inv_pricey"] = int(tot.get("inv_pricey", 0)) + inv.filter(func(e): return DayFlow.too_pricey(e.id, e.size)).size()
+		var dd := DiningLogic.new()
+		dd.setup(day, [], DayFlow.GUESTS)
+		tot["sched"] = int(tot.get("sched", 0)) + dd.schedule.size()
 		var d := DiningLogic.new()
 		d.helper_serve = true
 		d.helper_kitchen = true
@@ -125,6 +130,7 @@ func _run(pname: String, slots: Array, staff: Dictionary, v: Dictionary) -> void
 	print("── %s, 알바 %s" % [pname, ", ".join(PackedStringArray(staff.values())) if not staff.is_empty() else "없음"])
 	print("  하루 평균: 잡음 %.1f마리, 손님 %.1f명 받음(못 받음 %.1f, 화남 %.1f)" % [float(tot.caught) / days, float(tot.guests) / days, float(tot.missed) / days, float(tot.angry) / days])
 	print("  하루 평균 수입: 영업 %d, 특별 %d, 주문 %d → %d원 / 일당 %d원" % [tot.dine / days, tot.special / days, tot.order / days, (tot.dine + tot.special + tot.order) / days, tot.wage / days])
+	print("  저녁 아이스박스 평균 %.1f마리 (그중 보통 손님에게 못 내는 비싼 고기 %.1f), 온 손님 %.1f명" % [float(tot.get("inv_n", 0)) / days, float(tot.get("inv_pricey", 0)) / days, float(tot.get("sched", 0)) / days])
 	for m in month_end:
 		print("  %s 끝 통장: %s" % [m[0], m[1]])
 	print("  두 달 고정비 낸 돈 %d, 밀린 돈 %d, 5월 1일 뒤 통장 %d" % [tot.bills, arrears, money])

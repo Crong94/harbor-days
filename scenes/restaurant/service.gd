@@ -149,6 +149,8 @@ func _on_floor_finished(r: Dictionary) -> void:
 		GameState.note("손님 %d명이 기다리다 그냥 갔다. 다 구운 접시는 얼른 날라야지." % r.angry, 2)
 	elif int(r.missed) > 0:
 		GameState.note("생선이 모자라 손님 %d명이 그냥 돌아갔다. 내일은 더 잡아 와야지." % r.missed, 2)
+	elif int(r.get("sold_out", 0)) > 0:
+		GameState.note("생선이 다 팔려서 일찍 문을 닫았다. 손님 %d명은 못 받았다. 내일은 더 잡아 와야지." % r.sold_out, 2)
 	elif r.served.size() >= DiningLogic.GUESTS_MIN:
 		GameState.note("손님 %d명이 다 생선구이를 먹고 갔다. 가게가 북적였다." % r.served.size(), 1)
 	_header.refresh()
@@ -338,6 +340,8 @@ func _show_ledger() -> void:
 		_ledger_rows.add_child(_row("곁들임", "보통 손님 %d접시 (위 매출에 포함)" % sides, "+" + GameState.format_won(int(result.get("side_sales", 0))), UiKit.LEAF))
 	if int(result.get("missed", 0)) > 0:
 		_ledger_rows.add_child(_row("돌아간 손님", "%d명" % result.missed, "", UiKit.INK_MUTED))
+	if int(result.get("sold_out", 0)) > 0:
+		_ledger_rows.add_child(_row("재료 소진", "일찍 닫음, 못 받은 손님 %d명" % result.sold_out, "", UiKit.INK_MUTED))
 	if wage_paid > 0:
 		var names := []
 		for id in GameState.staff.values():

@@ -1496,18 +1496,21 @@ func _test_dining() -> void:
 	q._leave_angry(0)
 	_eq([q.inventory.size(), q.queue.size()], [4, 0], "굽기 전에 간 손님 생선은 아이스박스로")
 	_eq(c.pass_dishes.is_empty() and c.cooking.is_empty(), true, "간 손님 접시는 치움")
-	# 생선이 없으면 손님이 그냥 돌아간다
+	# 생선이 없으면 재료 소진으로 문을 닫는다 (평판 깎이는 돌아간 손님 없음)
 	var e0 := DiningLogic.new()
 	e0.setup(4, [], names)
+	var e0_n := e0.schedule.size()
 	_run_dining(e0, true)
-	_eq(e0.missed, e0.schedule.size() + e0.missed - e0.schedule.size(), "생선 없을 때 셈")
-	_eq(e0.missed >= DiningLogic.GUESTS_MIN and e0.sales == 0, true, "생선 없으면 다 돌아감 (%d)" % e0.missed)
-	# 두 마리뿐이면 둘만 받는다
+	_eq([e0.sold_out, e0.missed, e0.sales], [true, 0, 0], "생선 없으면 바로 재료 소진")
+	_eq(e0.turned_away, e0_n, "못 받은 손님 수 (%d)" % e0_n)
+	_eq(e0.is_over(), true, "재료 소진이면 영업 끝")
+	# 두 마리뿐이면 둘만 받고 닫는다
 	var f := DiningLogic.new()
 	f.setup(4, _fish_box(2), names)
+	var f_n := f.schedule.size()
 	_run_dining(f, true)
 	_eq(f.served.size(), 2, "생선 두 마리면 둘만")
-	_eq(f.missed, f.served.size() + f.missed - 2, "나머지는 돌아감 (%d)" % f.missed)
+	_eq([f.missed, f.turned_away, f.sold_out], [0, f_n - 2, true], "나머지는 재료 소진으로 못 받음")
 	# 비싼 생선은 보통 손님에게 내지 않는다
 	var g := DiningLogic.new()
 	g.setup(4, [{"id": "gamseongdom", "size": 40.0}], names)

@@ -8,7 +8,9 @@ extends RefCounted
 ##   → 주문은 바로 화로에 올라가 COOK_TIME초 뒤 완성되어 내놓는 자리(pass)에 놓인다
 ##   → 주인공이 완성 접시를 집어(take) 방향 버튼으로 걸어가 그 손님 곁에 닿으면 내려놓는다
 ##   → 손님은 EAT_TIME초 먹고 값을 내고 나간다. 빨리 받으면 하트(값 더), 너무 오래 기다리면 화나서 그냥 간다
-## 생선이 떨어지면 들어온 손님은 그냥 돌아간다 (평판 깎임). 재료는 낚시로 잡은 생선뿐이다.
+## 생선이 떨어지면 "재료 소진"으로 문을 닫는다 (2026-11-16). 남은 손님은 오지 않고 평판도 깎이지 않는다.
+##   예전에는 손님이 하나씩 들어와 돌아가며 평판이 2씩 깎였는데, 아이스박스가 10칸이라 날마다 3명쯤 그랬다.
+## 재료는 낚시로 잡은 생선뿐이다.
 ## 좌표는 바닥 비율 (x 0 왼쪽 ~ 1 오른쪽, y 0 위 ~ 1 아래). 배경 그림이 오면 SEATS, PASS만 맞춘다.
 ## 요리 (2026-11-11 사용자): 주방 알바가 없으면 주인공이 주방 앞(통로 맨 위)에 서 있는 동안만 화로가 익는다.
 ## 알바 (한 번 뽑으면 계속, StaffDB): 주방 알바는 혼자 굽고(helper_kitchen), 서빙 알바는 완성 접시를 알아서 나른다(helper_serve).
@@ -76,7 +78,9 @@ var helper_left := 0.0
 var seat_bonus: Array = [] # 자리마다 더 참아 주는 시간 (초). 편한 의자 (ShopDecor.seat_comfort)
 
 var served: Array = [] # {guest, fish, size, price, heart}
-var missed := 0 # 생선이 없어 그냥 돌아간 손님
+var missed := 0 # 생선이 없어 그냥 돌아간 손님 (재료 소진 뒤로는 없다. 예전 저장과 맞추려고 남김)
+var sold_out := false # 생선이 떨어져 문을 닫았다
+var turned_away := 0 # 재료 소진으로 못 받은 손님 수
 var angry := 0 # 너무 기다려서 그냥 간 손님
 var sales := 0
 var pantry := {} # 곁들임 보관 (GameState.produce). 접시 낼 때 하나씩 붙는다 (Sides)
@@ -220,9 +224,12 @@ func _arrive() -> void:
 			return
 		var fi := pick_fish()
 		if fi < 0:
-			missed += 1
-			events.append({"type": "missed", "name": s.name})
-			continue
+			# 재료 소진: 문 앞에 팻말을 걸고 남은 손님은 받지 않는다
+			sold_out = true
+			turned_away += 1 + schedule.size()
+			schedule.clear()
+			events.append({"type": "sold_out", "count": turned_away})
+			return
 		var e: Dictionary = inventory[fi]
 		inventory.remove_at(fi)
 		# 빈자리 중 아무 데나 (한쪽에 몰리지 않게). 문에서 걸어 들어가 앉으면 주문한다

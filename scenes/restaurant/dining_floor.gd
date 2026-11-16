@@ -190,7 +190,7 @@ func _process(delta: float) -> void:
 		if logic.is_over():
 			_done = true
 			_pad.hide()
-			finished.emit({"served": logic.served, "missed": logic.missed + logic.angry, "sales": logic.sales, "side_sales": logic.side_sales, "sides": logic.served.filter(func(e): return e.side != "").size(), "angry": logic.angry, "hearts": logic.served.filter(func(e): return e.heart).size()})
+			finished.emit({"served": logic.served, "missed": logic.missed + logic.angry, "sales": logic.sales, "side_sales": logic.side_sales, "sides": logic.served.filter(func(e): return e.side != "").size(), "angry": logic.angry, "sold_out": logic.turned_away, "hearts": logic.served.filter(func(e): return e.heart).size()})
 	for p in _pops:
 		p.t += delta
 	_pops = _pops.filter(func(p): return p.t < 1.4)
@@ -270,6 +270,9 @@ func _handle_events() -> void:
 			"missed":
 				Sound.play_sfx("bad", 0.0, -10.0)
 				_pop(to_screen(Vector2(0.5, 0.2)), "생선이 떨어졌어요", UiKit.PINK, false)
+			"sold_out":
+				Sound.play_sfx("okay", 0.0, -6.0)
+				_pop(to_screen(Vector2(0.5, 0.2)), "재료 소진! 오늘은 여기까지", UiKit.CORAL_DEEP, false)
 	logic.events.clear()
 
 
