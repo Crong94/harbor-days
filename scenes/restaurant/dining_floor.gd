@@ -51,6 +51,28 @@ var _taught_plate := false # 처음 노릇할 때 "지금 눌러요" 안내
 var _taught_take := false
 var _taught_clear := false
 var _seat_dish := {} # 자리 → 먹고 간 요리 그림 (빈 그릇 표시)
+const PLATES := ["decor/plate_dirty_fish", "decor/plate_dirty", "decor/plate_dirty_rice"]
+var _plates := {}
+
+
+## 빈 그릇 자리: 그 손님 앞 바 위 (양옆은 바 가운데, 앞 바 손님은 앞 바 위). 화면 좌표, 그릇 아래쪽 근처
+func _plate_pos(seat: int) -> Vector2:
+	var s: Vector2 = DiningLogic.SEATS[seat]
+	if s.y > DiningLogic.FRONT_Y:
+		return to_screen(Vector2(s.x, 0.84))
+	var y := clampf(s.y - 0.005, DiningLogic.INNER_TOP.y + 0.03, DiningLogic.INNER_BOTTOM.y)
+	var k := (y - 0.512) / (0.828 - 0.512)
+	var outer := lerpf(0.323, 0.213, k) # 바 바깥 가장자리 (슬롯 설계 table 윤곽)
+	var mid := (outer + DiningLogic.inner_x(y, true)) / 2.0
+	return to_screen(Vector2(mid if s.x < 0.5 else 1.0 - mid, y))
+
+
+## 빈 그릇 그림 (자리마다 정해진 하나)
+func _plate_tex(seat: int) -> Texture2D:
+	var id: String = PLATES[seat % PLATES.size()]
+	if not _plates.has(id):
+		_plates[id] = _load_art(id)
+	return _plates[id]
 var _helper_bow := 0.0 # 서빙 알바가 접시를 내려놓고 인사하는 시간
 var _started := false # start 전(prepare)에는 시간이 흐르지 않는다
 
@@ -252,7 +274,7 @@ func _guest_at(p: Vector2) -> int:
 ## 누른 곳의 빈 그릇 자리
 func _dirty_at(p: Vector2) -> int:
 	for seat in logic.dirty:
-		if p.distance_to(_seat_bubble(seat)) <= 48.0 or p.distance_to(to_screen(DiningLogic.SEATS[seat]) - Vector2(0, 50)) <= 60.0:
+		if p.distance_to(_plate_pos(seat)) <= 50.0 or p.distance_to(to_screen(DiningLogic.SEATS[seat]) - Vector2(0, 50)) <= 60.0:
 			return seat
 	return -1
 
@@ -494,15 +516,20 @@ func _draw_floor() -> void:
 	elif not logic.dirty.is_empty() and not _taught_clear:
 		_caption(ci, font, hint_at, "빈 그릇을 눌러서 치워요. 치워야 손님이 앉아요")
 	# 빈 그릇 (다 먹고 간 자리)
+	# 그림: decor/plate_dirty*.png (그림 세션 11-16). 자리마다 셋 중 하나, 아래 가운데를 바 위에. 치우러 가는 중이면 흐리게
 	for seat in logic.dirty:
-		var bp := _seat_bubble(seat)
-		var tex: Texture2D = _seat_dish.get(seat)
+		var bp := _plate_pos(seat)
 		var faded := logic._seat_reserved(seat)
-		ci.draw_circle(bp, 24.0, Color(UiKit.OUTLINE, 0.5 if not faded else 0.25))
-		if tex:
-			var w := 40.0
-			var h := w * tex.get_height() / float(tex.get_width())
-			ci.draw_texture_rect(tex, Rect2(bp.x - w / 2.0, bp.y - h / 2.0, w, h), false, Color(0.55, 0.5, 0.48, 0.5 if faded else 0.9))
+		var tex: Texture2D = _plate_tex(seat)
+		if tex == null:
+			tex = _seat_dish.get(seat)
+		if tex == null:
+			continue
+		var w := 60.0
+		var h := w * tex.get_height() / float(tex.get_width())
+		if not faded:
+			_ellipse(ci, bp + Vector2(0, h * 0.35), 34.0 + sin(_t * 4.0) * 2.0, Color(UiKit.FOAM, 0.35), 3.0)
+		ci.draw_texture_rect(tex, Rect2(bp.x - w / 2.0, bp.y + h * 0.4 - h, w, h), false, Color(1, 1, 1, 0.45 if faded else 1.0))
 	# 손님 말풍선: 주문한 요리와 기다림 고리
 	for gi in logic.guests.size():
 		var g: Dictionary = logic.guests[gi]
@@ -718,3 +745,10 @@ func _heart(ci: Control, c: Vector2, r: float, col: Color) -> void:
 	ci.draw_circle(c + Vector2(-r * 0.5, 0), r * 0.55, col)
 	ci.draw_circle(c + Vector2(r * 0.5, 0), r * 0.55, col)
 	ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-r * 1.02, r * 0.15), c + Vector2(r * 1.02, r * 0.15), c + Vector2(0, r * 1.25)]), col)
+
+
+## 바닥에 눕힌 고리 (빈 그릇 자리 표시)
+func _ellipse(ci: Control, c: Vector2, r: float, col: Color, width: float) -> void:
+	ci.draw_set_transform(c, 0.0, Vector2(1.0, 0.4))
+	ci.draw_arc(Vector2.ZERO, r, 0.0, TAU, 32, col, width / 0.4 * 0.5, true)
+	ci.draw_set_transform_matrix(Transform2D.IDENTITY)
