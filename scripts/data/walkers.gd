@@ -3,7 +3,7 @@ extends RefCounted
 ## 마을 지도 위를 걷는 주민 (2026-11-11 사용자 선택: 지도 위 주민 걷기).
 ## 그림: assets/art/sd_guest/<id>_walk.png 한 줄 8칸 (1, 2 앞 / 3, 4 뒤 / 5~8 오른쪽 옆 한 걸음. 왼쪽은 좌우 뒤집기)
 ## 길: 지도 그림 비율 좌표 꺾은선. 끝까지 가면 잠깐 서 있다가 되돌아온다.
-## 나오는 시간: hours [시작 분, 끝 분). 누르면 lines 중 하나를 말한다 (지도 아래 알림).
+## 나오는 시간: hours [시작 분, 끝 분). needs: 켜져 있어야 나오는 flags (없으면 늘). 누르면 lines 중 하나를 말한다 (지도 아래 알림).
 ## 길은 지도 그림(map_village.png)의 배 대는 둑(y 0.36), 가게 앞 큰길(y 0.445), 항구 위쪽 둑길(y 0.265)을 따른다.
 
 const SPEED := 0.012 # 걷는 빠르기 (지도 너비 비율 / 초)
@@ -26,12 +26,16 @@ const LIST := [
 	{"id": "sundeok", "name": "순덕 할머니", "hours": [8 * 60, 18 * 60],
 		"path": [Vector2(0.27, 0.448), Vector2(0.34, 0.447)],
 		"lines": ["아이고 우리 {player}. 오늘도 고생 많았제.", "천천히 해. 바다는 안 도망가.", "영감도 이맘때면 저 둑길을 걸었어."]},
+	# 해솔은 학교 끝난 오후에 밥집과 분교 사이를 오간다. 밥집에서 처음 만난 뒤에 나온다 (Story haesol_first)
+	{"id": "haesol", "name": "해솔", "hours": [14 * 60, 19 * 60], "needs": ["met_haesol"],
+		"path": [Vector2(0.47, 0.452), Vector2(0.555, 0.452)],
+		"lines": ["아저씨! 물고기는 잠잘 때 눈 감아요?", "고등어가 오늘 쥐 잡았어요. 할머니는 칭찬 안 해 줬어요.", "숙제 다 하면 저도 낚시 가르쳐 줘요."]},
 ]
 
 
 ## 지금 시각에 나와 있는 주민들
-static func active(minutes: int) -> Array:
-	return LIST.filter(func(w): return minutes >= int(w.hours[0]) and minutes < int(w.hours[1]))
+static func active(minutes: int, flags := {}) -> Array:
+	return LIST.filter(func(w): return minutes >= int(w.hours[0]) and minutes < int(w.hours[1]) 		and (w.get("needs", []) as Array).all(func(f): return flags.get(f, false)))
 
 
 static func get_walker(id: String) -> Dictionary:

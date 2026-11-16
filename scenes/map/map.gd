@@ -223,7 +223,7 @@ func _rebuild_walkers() -> void:
 	for c in _walker_layer.get_children():
 		c.queue_free()
 	_walkers.clear()
-	for w in Walkers.active(GameState.time_minutes):
+	for w in Walkers.active(GameState.time_minutes, GameState.flags):
 		if not MapWalker.has_sheet(w.id):
 			continue
 		var m := MapWalker.new()

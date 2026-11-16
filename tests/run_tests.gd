@@ -1174,6 +1174,23 @@ func _test_story() -> void:
 		_eq(Locations.LIST.has(place), true, "잡담 장소 %s" % place)
 		_eq(Story.small_talk(place, 3).is_empty(), false, "%s 잡담" % place)
 	_eq(Story.small_talk("없는곳", 1), [], "잡담 없는 곳")
+	# 해솔: 복자를 만난 뒤 엿새째 오후 밥집에서 처음 만나고, 분교가 열리고, 지도에 걷기 시작한다
+	var hf := {"met_bokja": true, "ev_bokja_diner": true}
+	_eq(Story.pending("diner", 6, 15 * 60, {}).get("id", ""), "bokja_diner", "복자를 먼저 만남")
+	_eq(Story.pending("diner", 5, 15 * 60, hf).is_empty(), true, "닷새째엔 해솔 없음")
+	_eq(Story.pending("diner", 6, 10 * 60, hf).is_empty(), true, "오전엔 학교 가서 없음")
+	_eq(Story.pending("diner", 6, 15 * 60, hf).get("id", ""), "haesol_first", "엿새째 오후 밥집에서 해솔")
+	_eq(Locations.is_unlocked("school", hf), false, "만나기 전엔 분교 잠김")
+	_eq(Walkers.active(15 * 60, hf).any(func(w): return w.id == "haesol"), false, "만나기 전엔 지도에 없음")
+	var hgs = load("res://scripts/autoload/game_state.gd").new()
+	hgs.flags = hf.duplicate()
+	Story.finish(Story.pending("diner", 6, 15 * 60, hf), hgs)
+	_eq(Locations.is_unlocked("school", hgs.flags), true, "만나면 분교 열림")
+	_eq(Walkers.active(15 * 60, hgs.flags).any(func(w): return w.id == "haesol"), true, "만난 뒤 오후엔 지도에서 걷기")
+	_eq(Walkers.active(10 * 60, hgs.flags).any(func(w): return w.id == "haesol"), false, "오전엔 학교")
+	_eq(Story.small_talk("school", 3).is_empty(), false, "분교 잡담")
+	_eq(Portraits.path("김해솔") != "", true, "해솔 얼굴 그림")
+	hgs.free()
 
 
 ## 견제의 이득과 손해, 회수, 거리별 어종, 어종 버릇
