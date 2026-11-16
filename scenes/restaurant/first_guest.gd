@@ -221,6 +221,9 @@ func _guest_arrives() -> void:
 		{"speaker": "", "text": "첫 매출 %s." % GameState.format_won(FIRST_SALE)},
 		{"speaker": "", "text": "순덕은 계산을 마치고 나가다 간판을 올려다봤다."},
 		{"speaker": "최순덕", "face": "smile", "text": "{shop|이/가}라... 이름 좋네. 오래 가라고."},
+		{"speaker": "최순덕", "text": "근데 총각. 생선은 잡는 사람 굽는 사람 따로 있는 기라."},
+		{"speaker": "최순덕", "face": "smile", "text": "우리 손녀가 부산 횟집 주방에 있다 내려와서 놀고 있어. 내일 저녁에 보낼 테니 부려 먹어."},
+		{"speaker": "{player}", "face": "smile", "text": "정말요? 감사합니다, 할머니."},
 	]
 	GameState.earn(FIRST_SALE)
 	GameState.note("순덕 할머니가 첫 손님으로 왔다. 이 정도면 해볼 만하겠는데?", 9)

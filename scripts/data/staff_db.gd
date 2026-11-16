@@ -1,6 +1,8 @@
 class_name StaffDB
 extends RefCounted
 ## 식당 알바 (2026-11-11 사용자: 한 번 뽑으면 계속 나오고, 서빙과 주방 중 골라 맡긴다).
+## 2026-11-16 사용자: 요리는 처음부터 다른 인물이 전담한다. 요리사 최세라(순덕 손녀)는 알바가 아니라 COOK (일당 없음).
+## 뽑는 알바는 서빙 여울뿐이다. 예전 저장에 "kitchen": "sera"가 남아 있어도 LIST에 없어서 일당이 나가지 않는다.
 ## 그림은 여울 레포(Crong94/Yeoul)에서 가져온 여울, 차세라 (assets/art/staff, 원본 docs/ref/인물/여울_레포).
 ## 뽑은 알바: GameState.staff {역할: 알바 id}. 일당은 가게를 연 날 영업이 끝날 때 나간다.
 ##   서빙: 완성 접시를 알아서 나른다 (DiningLogic.helper_serve)
@@ -15,13 +17,11 @@ const LIST := {
 		"portrait": "staff/yeoul_portrait",
 		# 우리 SD 화풍 (11-12 그림 세션): 걷기 8칸(빈 쟁반), 반응 3칸(대기, 쟁반 내밀기, 인사)
 		"sd_walk": "staff/yeoul_sd_walk", "sd_react": "staff/yeoul_sd_react"},
-	"sera": {"name": "세라", "role": "kitchen", "wage": 15000,
-		"desc": "빨간 고글을 쓴 씩씩한 알바생. 사장이 홀에 있어도 화로를 지켜요.",
-		"art": "staff/sera_stand", "walk": [], "serve_art": "staff/sera_point",
-		"portrait": "staff/sera_portrait",
-		# 우리 SD 화풍: 조리 4칸(대기, 팬 흔들기 둘, 접시 들어 올리기). 세라는 주방에만 있다
-		"sd_cook": "staff/sera_sd_cook"},
 }
+
+
+## 요리사 (둘째 날부터 늘 주방에 있다. Story sera_arrives)
+const COOK := {"id": "sera", "name": "세라", "full": "최세라", "sd_cook": "staff/sera_sd_cook"}
 
 
 static func get_staff(id: String) -> Dictionary:

@@ -1420,22 +1420,24 @@ func _fish_box(n: int) -> Array:
 	return box
 
 
-## 영업 한 판을 돌린다. good이면 완성 접시를 바로 집어 그 손님에게 걸어간다
+## 영업 한 판을 돌린다. good이면 완성 접시가 나오는 대로 그 손님에게 갖다주고, 한가하면 빈 그릇을 치운다.
+## 주인공이 굽는 판(helper_kitchen false)이면 노릇할 때 담는다
 func _run_dining(d: DiningLogic, good: bool) -> void:
 	var t := 0.0
 	while not d.is_over() and t < 400.0:
 		if good:
-			if d.holding < 0 and not d.pass_dishes.is_empty():
-				d.take(0)
-			if d.holding < 0 and not d.helper_kitchen:
-				# 빈손이면 주방 앞에 가서 굽는다
-				var k: Vector2 = Vector2(0.5, DiningLogic.FLOOR_MIN.y) - d.player
-				d.move = k.normalized() if k.length() > 0.01 else Vector2.ZERO
-			if d.holding >= 0:
-				var to: Vector2 = DiningLogic.serve_spot(d.guests[d.holding].seat) - d.player
-				d.move = to.normalized() if to.length() > 0.02 else Vector2.ZERO
-			elif d.helper_kitchen:
-				d.move = Vector2.ZERO
+			if not d.helper_kitchen:
+				for c in d.cooking:
+					if float(c.t) - float(c.total) >= 0.3:
+						d.plate(int(c.burner))
+			for i in d.pass_dishes.size():
+				if not d._dish_reserved(d.pass_dishes[i]) and d._task_count() < DiningLogic.MAX_TASKS:
+					d.take(i)
+					break
+			if d._task_count() == 0:
+				for seat in d.dirty:
+					d.clear_seat(seat)
+					break
 		d.update(1.0 / 30.0)
 		t += 1.0 / 30.0
 
@@ -1504,15 +1506,16 @@ func _test_dining() -> void:
 	c.setup(4, _fish_box(12), names)
 	_run_dining(c, false)
 	_eq(c.served.size(), 0, "안 나르면 아무도 못 받음")
-	_eq(c.angry, n, "안 나르면 다 화나서 감")
-	_eq(c.inventory.size(), 12, "주방에 아무도 없으면 안 익어서 생선이 다 돌아옴")
+	_eq(c.angry, c.guests.size(), "안 나르면 다 화나서 감")
+	_eq(c.pass_dishes.size() <= DiningLogic.PASS_MAX, true, "내놓는 자리는 세 접시까지")
+	_eq(c.pass_dishes.is_empty(), true, "간 손님 접시는 내놓는 자리에서 치움")
 	var q := DiningLogic.new()
 	q.setup(4, _fish_box(3), names)
 	q.guests = [{"name": "x", "seat": 0, "fish": "bolak", "size": 20.0, "entry": {"id": "bolak", "size": 20.0}, "price": 9000, "state": DiningLogic.GuestState.SEATED, "wait": 0.0, "eat": 0.0, "cooked": false}]
 	q.queue = [0]
 	q._leave_angry(0)
 	_eq([q.inventory.size(), q.queue.size()], [4, 0], "굽기 전에 간 손님 생선은 아이스박스로")
-	_eq(c.pass_dishes.is_empty() and c.cooking.is_empty(), true, "간 손님 접시는 치움")
+	_eq(c.cooking.is_empty(), true, "간 손님 생선은 화구에서 내림")
 	# 생선이 없으면 재료 소진으로 문을 닫는다 (평판 깎이는 돌아간 손님 없음)
 	var e0 := DiningLogic.new()
 	e0.setup(4, [], names)
@@ -1534,28 +1537,51 @@ func _test_dining() -> void:
 	_eq(g.pick_fish(), -1, "감성돔은 보통 손님에게 안 냄")
 	# 값: 빨리 받으면 더, 아슬아슬하면 덜
 	_eq(DiningLogic.pay(10000, 5.0), 11500, "빨리 받으면 하트 값")
-	_eq(DiningLogic.pay(10000, 30.0), 10000, "보통이면 제값")
-	_eq(DiningLogic.pay(10000, 40.0), 8500, "오래 기다리면 깎임")
+	_eq(DiningLogic.pay(10000, 20.0), 10000, "보통이면 제값")
+	_eq(DiningLogic.pay(10000, DiningLogic.PATIENCE), 8500, "오래 기다리면 깎임")
 	_eq(DiningLogic.cook_time(30.0) > DiningLogic.cook_time(15.0), true, "큰 고기는 더 오래 구움")
-	# 접시 바꿔 들기
+	# 고르고 갖다주기: 같은 생선을 시킨 손님이면 누구에게 줘도 되고 다른 요리는 안 받는다
 	var h := DiningLogic.new()
-	h.pass_dishes = [3, 5]
-	_eq(h.take(0), true, "접시 집기")
-	_eq(h.holding, 3, "든 접시")
-	h.take(0)
-	_eq([h.holding, h.pass_dishes], [5, [3]], "바꿔 들면 든 건 내려놓음")
-	_eq(h.take(5), false, "없는 접시는 못 집음")
-	# 걷기는 바닥 밖으로 나가지 않는다
-	var w := DiningLogic.new()
-	w.move = Vector2(-1, 0)
-	for i in 300:
-		w.update(1.0 / 30.0)
-	_eq(w.player.x, DiningLogic.FLOOR_MIN.x, "왼쪽 끝에서 멈춤")
+	h.guests = [
+		{"name": "a", "seat": 0, "fish": "bolak", "size": 18.0, "entry": {}, "price": 6000, "state": DiningLogic.GuestState.SEATED, "wait": 0.0, "eat": 0.0, "cooked": true, "quality": "perfect"},
+		{"name": "b", "seat": 4, "fish": "bolak", "size": 19.0, "entry": {}, "price": 6000, "state": DiningLogic.GuestState.SEATED, "wait": 0.0, "eat": 0.0, "cooked": false, "quality": ""},
+		{"name": "c", "seat": 8, "fish": "noraemi", "size": 20.0, "entry": {}, "price": 7000, "state": DiningLogic.GuestState.SEATED, "wait": 0.0, "eat": 0.0, "cooked": false, "quality": ""},
+	]
+	h.pass_dishes = [0]
+	h.queue = [1, 2]
+	_eq(h.deliver_to(0), "none", "고른 접시가 없으면 못 냄")
+	_eq(h.select(0), true, "접시 고르기")
+	_eq(h.selected, 0, "고른 접시")
+	_eq(h.deliver_to(2), "wrong", "다른 요리를 시킨 손님은 안 받음")
+	_eq(h.deliver_to(1), "ok", "같은 볼락을 시킨 다른 손님에게 줌")
+	_eq([h.pass_dishes, h.queue, h.guests[1].quality, h.guests[0].quality], [[1], [0, 2], "perfect", ""], "두 손님 주문을 맞바꿈")
+	_eq(h.tasks.size(), 1, "할 일 하나")
+	for i in 120:
+		h.update(1.0 / 30.0)
+	_eq(h.guests[1].state, DiningLogic.GuestState.EATING, "걸어가서 냄")
+	_eq(h.served[0].quality, "perfect", "노릇한 접시 값")
+	_eq(h.select(0), false, "내놓는 자리에 없는 접시는 못 고름")
+	# 다 먹고 간 자리는 치워야 손님이 앉는다
+	var dz := DiningLogic.new()
+	dz.dirty = {3: true}
+	_eq(dz.free_seats().has(3), false, "빈 그릇 자리엔 못 앉음")
+	_eq(dz.clear_seat(5), false, "깨끗한 자리는 치울 것 없음")
+	_eq(dz.clear_seat(3), true, "빈 그릇 치우러 감")
+	_eq(dz.clear_seat(3), false, "같은 자리를 두 번 맡지 않음")
+	for i in 200:
+		dz.update(1.0 / 30.0)
+	_eq([dz.dirty.is_empty(), dz.free_seats().has(3), dz.task.is_empty()], [true, true, true], "치우고 홀 자리로 돌아옴")
+	_eq(dz.player.distance_to(DiningLogic.HALL_HOME) < 0.001, true, "주인공은 홀 자리에서 기다림")
+	# 손님 앞까지 가는 길은 통로로만 (바를 넘지 않는다)
+	for i in DiningLogic.SEATS.size():
+		var sp := DiningLogic.serve_spot(i)
+		var inside := sp.x > DiningLogic.inner_x(sp.y, true) and sp.x < DiningLogic.inner_x(sp.y, false) and sp.y <= DiningLogic.AISLE_BOTTOM + 0.001
+		_eq(inside, true, "%d번 손님 서빙 자리는 바 안쪽 통로" % i)
 	# 알바가 서빙을 맡으면 알아서 갖다준다
 	var al := DiningLogic.new()
 	al.setup(4, _fish_box(12), names)
 	al.helper_serve = true
-	al.helper_kitchen = true
+	al.place_staff()
 	_run_dining(al, false)
 	_eq(al.served.size(), al.served.size() + al.angry - al.angry, "알바 셈")
 	_eq(al.angry, 0, "알바가 나르면 화난 손님 없음")
@@ -1594,15 +1620,8 @@ func _test_shop_decor() -> void:
 	d.seat_bonus = comfort
 	_eq(d.patience_of(0), DiningLogic.PATIENCE + 5.0, "편한 의자 자리는 더 참음")
 	_eq(d.patience_of(99), DiningLogic.PATIENCE, "모르는 자리는 기본")
-	# 아래 바 밑 손님은 통로 아래 모서리에서 받는다
-	var sp := DiningLogic.serve_spot(8)
-	_eq(sp, Vector2(DiningLogic.AISLE.x, DiningLogic.AISLE_BOTTOM), "아래 왼쪽 손님 서빙 자리")
-	var ok := true
-	for i in DiningLogic.SEATS.size():
-		var q := DiningLogic.serve_spot(i)
-		if q.x < DiningLogic.FLOOR_MIN.x or q.x > DiningLogic.FLOOR_MAX.x or q.y < DiningLogic.FLOOR_MIN.y or q.y > DiningLogic.FLOOR_MAX.y:
-			ok = false
-	_eq(ok, true, "모든 서빙 자리가 통로 안")
+	_eq(ShopDecor.item_in(decor, "table"), "table_old", "처음 바는 낡은 바")
+	_eq(ShopDecor.slots().filter(func(s): return s.kind == "lamp").size(), 4, "천장 등 자리 네 곳")
 	# 저장된다
 	var gs = load("res://scripts/autoload/game_state.gd").new()
 	_eq(SaveGame.fields(gs).has("shop_decor") and SaveGame.fields(gs).has("owned_decor"), true, "가구는 저장됨")
@@ -1695,42 +1714,54 @@ func _test_walkers() -> void:
 	_eq(GuestSD.find_cuts_n(cols, 8), [0, 107, 207, 307, 407, 507, 607, 707, 800], "여덟 칸 경계")
 
 
-## 요리는 주인공이 주방 앞에 있을 때만, 주방 알바가 있으면 혼자
+## 주방: 세라가 늘 굽고 노릇할 때 담는다. 주인공이 굽는 판(첫날, 시험)은 노릇할 때 눌러 담는다
 func _test_kitchen() -> void:
-	var d := DiningLogic.new()
-	d.guests = [{"name": "x", "seat": 0, "fish": "bolak", "size": 15.0, "entry": {}, "price": 9000, "state": DiningLogic.GuestState.SEATED, "wait": 0.0, "eat": 0.0, "cooked": false}]
-	d.queue = [0]
-	d.player = DiningLogic.START
-	_eq(d.in_kitchen(), false, "처음 자리는 주방 앞이 아님")
-	for i in 30:
-		d.update(1.0 / 10.0)
-	_eq(d.pass_dishes.is_empty() and d.cooking[0].left == d.cooking[0].total, true, "주방에 없으면 안 익음")
-	d.player = Vector2(0.5, DiningLogic.FLOOR_MIN.y)
-	_eq(d.in_kitchen(), true, "통로 맨 위는 주방 앞")
-	for i in 100:
-		d.update(1.0 / 10.0)
-	_eq(d.pass_dishes, [0], "주방 앞에 있으면 익어서 나옴")
+	var g0 := {"name": "x", "seat": 0, "fish": "bolak", "size": 15.0, "entry": {}, "price": 6000, "state": DiningLogic.GuestState.SEATED, "wait": 0.0, "eat": 0.0, "cooked": false, "quality": ""}
 	var e := DiningLogic.new()
-	e.helper_kitchen = true
-	e.guests = d.guests.duplicate(true)
-	e.guests[0].cooked = false
+	_eq(e.helper_kitchen, true, "요리는 세라가 기본")
+	e.guests = [g0.duplicate()]
 	e.queue = [0]
-	for i in 100:
+	for i in 120:
 		e.update(1.0 / 10.0)
-	_eq(e.pass_dishes, [0], "주방 알바가 있으면 혼자 익음")
-	# 서빙 알바는 시간이 걸려 갖다준다
-	e.helper_serve = true
-	e.update(0.1)
-	_eq(e.helper_dish, 0, "서빙 알바가 접시를 집음")
-	for i in 40:
-		e.update(0.1)
-	_eq(e.guests[0].state, DiningLogic.GuestState.EATING, "서빙 알바가 갖다줌")
-	_eq(e.served.size(), 1, "알바가 낸 것도 매출")
-	# 혼자 하는 잘하는 플레이어: 주방과 손님 사이를 오가며 다 받는다
+	_eq([e.pass_dishes, e.guests[0].quality], [[0], "perfect"], "세라는 노릇할 때 담음")
+	# 주인공이 굽는 판
+	var d := DiningLogic.new()
+	d.helper_kitchen = false
+	d.place_staff()
+	d.guests = [g0.duplicate()]
+	d.queue = [0]
+	d.update(0.1)
+	_eq(d.plate(0), "early", "덜 익으면 못 담음")
+	for i in int(DiningLogic.COOK_TIME * 10.0) + 2:
+		d.update(0.1)
+	_eq(d.at_stove(), true, "주인공은 조리대 뒤")
+	_eq(d.plate(0), "perfect", "다 익자마자 담으면 노릇노릇")
+	var b := DiningLogic.new()
+	b.helper_kitchen = false
+	b.place_staff()
+	b.guests = [g0.duplicate()]
+	b.queue = [0]
+	for i in int((DiningLogic.COOK_TIME + DiningLogic.BURN) * 10.0) + 3:
+		b.update(0.1)
+	_eq([b.pass_dishes, b.guests[0].quality, b.burnt], [[0], "burnt", 1], "너무 두면 타서 저절로 내려옴")
+	_eq(DiningLogic.QUALITY_PRICE.burnt < 1.0 and DiningLogic.QUALITY_PRICE.perfect > 1.0, true, "탄 건 싸고 노릇한 건 비쌈")
+	# 서빙 알바는 맨 앞 접시를 알아서 나른다
 	var a := DiningLogic.new()
-	a.setup(4, _fish_box(12), ["손님"])
-	_run_dining(a, true)
-	_eq(a.angry, 0, "혼자서도 잘 오가면 화난 손님 없음 (%d명 중 %d)" % [a.schedule.size() + a.served.size(), a.angry])
+	a.helper_serve = true
+	a.place_staff()
+	a.guests = [g0.duplicate()]
+	a.guests[0].cooked = true
+	a.pass_dishes = [0]
+	a.update(0.1)
+	_eq(a.helper_dish, 0, "서빙 알바가 접시를 집음")
+	for i in 60:
+		a.update(0.1)
+	_eq([a.guests[0].state, a.served.size()], [DiningLogic.GuestState.EATING, 1], "서빙 알바가 갖다줌")
+	# 혼자 잘하면 다 받는다
+	var s := DiningLogic.new()
+	s.setup(4, _fish_box(12), ["손님"])
+	_run_dining(s, true)
+	_eq(s.angry, 0, "혼자서도 잘 나르면 화난 손님 없음")
 
 
 ## 알바 (StaffDB): 한 번 뽑으면 계속, 역할마다 한 명, 일당
@@ -1739,11 +1770,13 @@ func _test_staff() -> void:
 	_eq(StaffDB.wages(staff), 0, "알바 없으면 일당 0")
 	_eq(StaffDB.hire(staff, "yeoul"), true, "여울 뽑기")
 	_eq(StaffDB.in_role(staff, "serve"), "yeoul", "여울은 서빙")
-	_eq(StaffDB.hire(staff, "sera"), true, "세라 뽑기")
-	_eq(StaffDB.in_role(staff, "kitchen"), "sera", "세라는 주방")
-	_eq(StaffDB.wages(staff), 35000, "일당 합 2만 + 1만5천")
+	_eq(StaffDB.wages(staff), 20000, "여울 일당 2만")
+	_eq(StaffDB.hire(staff, "sera"), false, "세라는 알바가 아니라 요리사 (뽑지 않음)")
+	_eq(StaffDB.wages({"kitchen": "sera"}), 0, "예전 저장의 주방 알바는 일당 없음")
+	_eq(ArtSlot.has_art(StaffDB.COOK.sd_cook), true, "요리사 세라 조리 그림")
 	StaffDB.fire(staff, "yeoul")
-	_eq([StaffDB.is_hired(staff, "yeoul"), StaffDB.wages(staff)], [false, 15000], "그만두면 일당도 빠짐")
+	_eq([StaffDB.is_hired(staff, "yeoul"), StaffDB.wages(staff)], [false, 0], "그만두면 일당도 빠짐")
+	_eq(Story.SERA_ARRIVES.size() > 3, true, "세라가 오는 이야기")
 	_eq(StaffDB.hire(staff, "없는사람"), false, "없는 알바는 못 뽑음")
 	for id in StaffDB.LIST:
 		_eq(ArtSlot.has_art(StaffDB.LIST[id].art), true, "%s 그림" % id)

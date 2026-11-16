@@ -17,6 +17,7 @@ const SPEAKERS := {
 	"경자": "gyeongja", "문경자": "gyeongja",
 	"준호": "junho", "이준호": "junho",
 	"해솔": "haesol", "김해솔": "haesol",
+	"세라": "sera", "최세라": "sera",
 	"{player}": "player", "나": "player",
 }
 

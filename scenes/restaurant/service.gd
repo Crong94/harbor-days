@@ -5,7 +5,7 @@ extends Control
 ##   3. 특별 손님(오늘 주문서를 낸 마을 사람): 직접 간을 맞추고 굽는다 (CookingLogic). 별점만큼 값과 평판
 ##   4. 장부: 매출, 지출, 순이익, 평판. 밤 낚시를 갈지 집에 가서 잘지 고른다
 ## 재료는 직접 낚은 생선만 쓴다. 생선이 모자라면 손님이 그냥 돌아간다.
-## 그림: 식당 내부 저녁 bg_shop_inside_night (없으면 식당 외관을 어둡게 깐다)
+## 그림: 식당 내부 저녁 DiningFloor.BG (오픈키친 빈 바탕 밤, 없으면 식당 외관을 어둡게 깐다)
 
 const MAP_SCENE := "res://scenes/map/map.tscn"
 const FISHING_SCENE := "res://scenes/fishing/fishing.tscn"
@@ -28,7 +28,9 @@ var _staff_list: VBoxContainer
 var _decor_panel: Control
 var _decor_list: VBoxContainer
 var _decor_money: Label
-const DECOR_KIND_NAMES := {"chair": "바 의자 (편할수록 손님이 오래 기다려요)", "bar": "바 위 소품", "wall": "벽 장식", "plant": "화분"}
+const DECOR_KIND_NAMES := {"table": "바 (가게 한가운데 U자 바)", "chair": "의자 (편할수록 손님이 오래 기다려요)",
+	"stove": "화구", "hood": "후드", "tool": "조리대 도구", "shelf": "뒷벽 선반", "lamp": "천장 등", "sign": "간판", "light": "줄전구",
+	"bar": "바 위 소품", "wall": "벽 장식", "plant": "화분"}
 var rep_change := 0
 
 var _header: GameHeader
@@ -57,14 +59,15 @@ func _ready() -> void:
 	base.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	base.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(base)
-	var has_inside := ArtSlot.has_art("bg_shop_inside_night")
-	var bg := UiKit.cover_art("bg_shop_inside_night" if has_inside else "bg_shop_front")
+	var has_inside := ArtSlot.has_art(DiningFloor.BG)
+	var bg := UiKit.cover_art(DiningFloor.BG if has_inside else "bg_shop_front")
 	if bg:
 		if not has_inside:
 			bg.modulate = Color(0.62, 0.55, 0.72) # 외관을 저녁빛으로 눌러 임시 배경으로
 		add_child(bg)
-	add_child(UiKit.shade([[0.0, 0.55], [0.2, 0.1], [0.6, 0.1], [1.0, 0.7]], Color("1a1410")))
+	add_child(UiKit.shade([[0.0, 0.45], [0.12, 0.0], [0.86, 0.0], [1.0, 0.4]], Color("1a1410")))
 
+	GameState.staff.erase("kitchen") # 예전 저장의 주방 알바 자리 (요리는 이제 세라가 늘 맡는다)
 	GameState.time_minutes = maxi(GameState.time_minutes, DayFlow.SHOP_OPEN)
 	GameState.opened_today = true
 	GameState.current_location = "shop"
@@ -74,6 +77,7 @@ func _ready() -> void:
 	_floor = DiningFloor.new()
 	add_child(_floor)
 	_floor.finished.connect(_on_floor_finished)
+	_floor.prepare() # 대사가 나오는 동안에도 바와 의자, 요리사가 보인다
 	_build_cook_panel()
 	_build_ledger()
 	_guest = GuestSD.new()
@@ -93,6 +97,11 @@ func _ready() -> void:
 	UiKit.fade_in(self, 0.6)
 	var n := GameState.inventory.size() + (1 if not special_fish.is_empty() else 0)
 	var lines := [{"speaker": "", "text": "저녁 여섯 시. {shop} 문을 열었다."}]
+	if not GameState.has_flag("sera_joined"):
+		# 요리사 세라가 처음 오는 날 (Story.SERA_ARRIVES)
+		lines.append_array(Story.SERA_ARRIVES)
+		GameState.flags["sera_joined"] = true
+		GameState.note("순덕 할머니 손녀 세라가 주방을 맡았다. 나는 고기 잡고 손님 받는다.", 9)
 	if n == 0:
 		lines.append({"speaker": "{player}", "text": "아이스박스가 텅 비었네. 오늘은 팔 게 없다."})
 	else:
@@ -156,9 +165,7 @@ func _on_floor_finished(r: Dictionary) -> void:
 	_header.refresh()
 	var tw := create_tween()
 	tw.tween_interval(1.0)
-	tw.tween_property(_floor, "modulate:a", 0.0, 0.4)
-	tw.tween_callback(_floor.hide)
-	tw.tween_callback(_special_arrives)
+	tw.tween_callback(_special_arrives) # 영업 판(바, 의자, 세라)은 그대로 둔다
 
 
 func _special_arrives() -> void:
@@ -183,6 +190,8 @@ func _special_arrives() -> void:
 		{"speaker": "", "text": "문에 단 종이 딸랑 울렸다. %s다." % Orders.call_name(special.name)},
 		{"speaker": special.name, "text": ask},
 		{"speaker": "{player}", "text": "%s 좋은 걸로 하나 남겨 뒀어요. 바로 구워 드릴게요." % fname},
+		{"speaker": "{player}", "text": "세라야, 이건 간을 내가 볼게."},
+		{"speaker": "최세라", "text": "불은 제가 볼게요. 사장님이 됐다 하면 바로 내릴게요."},
 	])
 
 
@@ -207,8 +216,8 @@ func _on_phase_changed() -> void:
 			_held = false
 			Sound.play_sfx("tap")
 			Haptics.play("tap")
-			_cook_hint.text = "노릇하게 익었을 때 눌러서 불에서 내려요"
-			UiKit.set_chip(_cook_step, "2 / 2 굽기")
+			_cook_hint.text = "노릇해 보이면 눌러서 세라에게 \"지금!\" 하고 알려요"
+			UiKit.set_chip(_cook_step, "2 / 2 굽기 (세라)")
 			_sizzle = 0.0
 		CookingLogic.Phase.DONE:
 			_held = false
