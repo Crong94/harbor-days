@@ -471,7 +471,7 @@ func _watch_fight_events(delta: float) -> void:
 			_kick(0.3)
 			for i in 6:
 				_splashes.append({"t": 0.0, "off": Vector2(randf_range(-30, 30), randf_range(-14, 4))})
-			_pop_text("바늘털이! 계속 감아요", UiKit.SUN, _to_screen(_fish_point()) + Vector2(0, -90), 34, true)
+			_pop_text("바늘털이! 계속 감아요", UiKit.SUN, _above_fish_mark(34), 34, true)
 	if logic.run_dir != 0 and _last_run == 0:
 		Sound.play_sfx("surge", 0.1, -4.0)
 		Haptics.play("surge")
@@ -479,9 +479,9 @@ func _watch_fight_events(delta: float) -> void:
 		_haptic_pull = 0.25
 		if logic.run_count == 1 and logic.habit() == "dive":
 			_kick(0.6)
-			_pop_text("바위로 파고들어요!", UiKit.CORAL, _to_screen(_fish_point()) + Vector2(0, -90), 34, true)
+			_pop_text("바위로 파고들어요!", UiKit.CORAL, _above_fish_mark(34), 34, true)
 		elif logic.run_count == 1 and logic.habit() == "long":
-			_pop_text("길게 차고 나가요!", UiKit.CORAL, _to_screen(_fish_point()) + Vector2(0, -90), 32, true)
+			_pop_text("길게 차고 나가요!", UiKit.CORAL, _above_fish_mark(32), 32, true)
 	_last_run = logic.run_dir
 	if logic.countering and not _was_countering:
 		Sound.play_sfx("tick", 0.05)
@@ -490,7 +490,7 @@ func _watch_fight_events(delta: float) -> void:
 	if logic.exhausted and not _was_exhausted:
 		Sound.play_sfx("pop")
 		Haptics.play("exhausted")
-		_pop_text("지쳤어요!", UiKit.LEAF, _to_screen(_fish_point()) + Vector2(0, -80), 44)
+		_pop_text("지쳤어요!", UiKit.LEAF, _above_fish_mark(44), 44)
 	_was_exhausted = logic.exhausted
 
 	# 장력 위험: 들어가는 순간 소리, 있는 동안 짧은 진동을 빠르게 반복
@@ -1598,19 +1598,42 @@ func _draw_line_layer(ci: Control) -> void:
 
 ## 물 위 물고기 표시 (T2): 줄이 들어가는 자리 위에 작은 힘 막대(분홍, 지치면 연두), 그 위에 남은 줄 숫자,
 ## 막대 옆에 물고기가 가는 방향 갈매기표. 사용자는 그 반대로 끌어 버틴다. 화면 밖으로 나가지 않게
-func _draw_fish_mark(ci: Control, c: Vector2) -> void:
+const MARK_W := 96.0 # 물 위 힘 막대
+const MARK_H := 16.0
+const MARK_SIDE := 46.0 # 갈매기표 자리
+const MARK_NUM_PX := 26 # 남은 줄 숫자 글자 크기
+
+
+## 물 위 힘 막대 윗변 (화면 좌표)
+func _fish_mark_top(c: Vector2) -> float:
 	var sc := _depth_scale(_float_depth())
-	var w := 96.0
-	var h := 16.0
-	var side := 46.0 # 갈매기표 자리
-	var top := c.y - 26.0 * sc - 20.0 - h
+	return clampf(c.y - 26.0 * sc - 20.0 - MARK_H, GameHeader.TOP_PAD + 44.0, size.y - MARK_H - 8.0)
+
+
+## 줄다리기 중 띄우는 글(버릇 안내, 지쳤어요)의 가운데. 남은 줄 숫자 위로 비켜서 겹치지 않게 (11-16 폰 확인)
+## 위에 자리가 없으면(물고기가 화면 위쪽) 힘 막대 아래로
+func _above_fish_mark(px: int) -> Vector2:
+	var c := _fish_point() # 힘 막대와 같은 바다 좌표에서 재고 마지막에 화면 좌표로
+	var top := _fish_mark_top(c)
+	var num_top := top - 8.0 - MARK_NUM_PX # 남은 줄 숫자 윗변
+	var half := px * 0.75
+	var y := num_top - 10.0 - half
+	if y - half < GameHeader.TOP_PAD + 60.0:
+		y = top + MARK_H + 14.0 + half
+	return _to_screen(Vector2(c.x, y))
+
+
+func _draw_fish_mark(ci: Control, c: Vector2) -> void:
+	var w := MARK_W
+	var h := MARK_H
+	var side := MARK_SIDE
+	var top := _fish_mark_top(c)
 	var x := clampf(c.x - w / 2.0, 16.0 + side, size.x - 16.0 - side - w)
-	top = clampf(top, GameHeader.TOP_PAD + 44.0, size.y - h - 8.0)
 	UiKit.draw_bar(ci, Rect2(x, top, w, h), logic.fish_hp, UiKit.LEAF if logic.exhausted else UiKit.PINK, true)
 	# 남은 줄
 	var font := UiKit.font("number")
 	var t := "%dm" % FightView.line_meters(logic.distance, logic.cast_power)
-	var fs := 26
+	var fs := MARK_NUM_PX
 	var tw := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var tp := Vector2(x + (w - tw) / 2.0, top - 8.0)
 	ci.draw_string_outline(font, tp, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 8, UiKit.OUTLINE)
