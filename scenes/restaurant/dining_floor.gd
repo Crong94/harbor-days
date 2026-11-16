@@ -17,6 +17,13 @@ const SEAT_LIFT := 40.0 # 앉은 그림 발끝을 자리점보다 이만큼 위�
 const PLAYER_H := 210.0
 const DISH := 58.0
 const PAD_SIZE := 210.0 # 조이스틱 원판 지름
+## 쟁반 자리 (2026-11-16, 시트에서 쟁반의 회색 금속 부분을 찾아 잰 값). 칸마다 [가로: 칸 가운데에서 칸 폭 비율, 쟁반 윗면: 칸 높이 비율(위 0), 쟁반 폭: 칸 폭 비율].
+## 빈 배열은 쟁반이 몸에 가려 안 보이는 칸(뒷모습)이라 접시를 그리지 않는다. 옆모습 칸을 뒤집으면 가로도 뒤집는다
+const TRAY := {
+	"sd/serve_walk": [[0.037, 0.562, 0.41], [0.039, 0.562, 0.41], [], [], [0.268, 0.537, 0.43], [0.231, 0.537, 0.47], [0.245, 0.537, 0.47], [0.247, 0.54, 0.43]],
+	"staff/yeoul_sd_walk": [[0.059, 0.537, 0.55], [0.051, 0.536, 0.55], [], [], [0.331, 0.537, 0.33], [0.327, 0.537, 0.34], [0.352, 0.532, 0.29], [0.264, 0.539, 0.39]],
+	"staff/yeoul_sd_react": [[], [0.12, 0.558, 0.5], []],
+}
 
 var logic := DiningLogic.new()
 var _guests := {} # guest index → GuestSD
@@ -387,12 +394,17 @@ func _draw_floor() -> void:
 	var pp := to_screen(logic.player)
 	var tex := _player_back if _player_up and _player_back else _player_tex
 	var sheet := "sd/serve_walk" if logic.holding >= 0 else "sd/walk"
+	var on_tray := false # 접시를 쟁반 위에 얹었나 (아니면 예전처럼 머리 위)
 	if _has_sheet(sheet):
 		# 걷기 시트 (빈손, 접시 들고). 서 있을 때는 앞(위로 가던 중이면 뒤) 첫 칸
 		var cell := 2 if _player_up else 0
 		if logic.move != Vector2.ZERO:
 			cell = GuestSD.walk_cell(logic.move, _t)
-		_draw_cell(ci, sheet, 8, cell, pp, PLAYER_H * SHEET_WALK_SCALE, cell >= 4 and _player_face_left)
+		var flip := cell >= 4 and _player_face_left
+		_draw_cell(ci, sheet, 8, cell, pp, PLAYER_H * SHEET_WALK_SCALE, flip)
+		if logic.holding >= 0 and TRAY.has(sheet):
+			_dish_on_tray(ci, logic.holding, sheet, 8, cell, pp, PLAYER_H * SHEET_WALK_SCALE, flip)
+			on_tray = true
 	elif tex:
 		var h := PLAYER_H
 		var w := h * tex.get_width() / float(tex.get_height())
@@ -400,7 +412,7 @@ func _draw_floor() -> void:
 		ci.draw_set_transform(pp + Vector2(0, -step), 0.0, Vector2(-1.0 if _player_face_left else 1.0, 1.0))
 		ci.draw_texture_rect(tex, Rect2(-w / 2.0, -h, w, h), false)
 		ci.draw_set_transform_matrix(Transform2D.IDENTITY)
-	if logic.holding >= 0:
+	if logic.holding >= 0 and not on_tray:
 		var hp := pp + Vector2(0, -PLAYER_H - 10.0)
 		ci.draw_circle(hp, DISH * 0.55, Color(UiKit.OUTLINE, 0.5))
 		ci.draw_circle(hp, DISH * 0.5, Color(UiKit.PAPER, 0.95))
@@ -466,17 +478,48 @@ func _draw_serve_helper_sd(ci: Control) -> void:
 		var goal := to_screen(DiningLogic.serve_spot(logic.guests[logic.helper_dish].seat))
 		var k := 1.0 - clampf(logic.helper_left / DiningLogic.HELPER_TRIP, 0.0, 1.0)
 		at = home.lerp(goal, minf(1.0, k * 1.6)) # 가서 잠깐 서 있다가 낸다
+		var path: String = st.sd_walk
+		var n := 8
+		var cell := 1
+		var h := STAFF_H
+		var flip := false
 		if k < 0.62:
 			var d := goal - home
-			var cell := GuestSD.walk_cell(d, _t)
-			_draw_cell(ci, st.sd_walk, 8, cell, at, STAFF_H * SHEET_WALK_SCALE, cell >= 4 and d.x < 0.0)
+			cell = GuestSD.walk_cell(d, _t)
+			h = STAFF_H * SHEET_WALK_SCALE
+			flip = cell >= 4 and d.x < 0.0
 		else:
-			_draw_cell(ci, st.sd_react, 3, 1, at, STAFF_H, false)
-		var hp := at + Vector2(0, -STAFF_H - 8.0)
-		ci.draw_circle(hp, DISH * 0.45, Color(UiKit.PAPER, 0.95))
-		_dish(ci, logic.helper_dish, hp, DISH * 0.8, 1.0)
+			path = st.sd_react
+			n = 3
+		_draw_cell(ci, path, n, cell, at, h, flip)
+		if TRAY.has(path):
+			_dish_on_tray(ci, logic.helper_dish, path, n, cell, at, h, flip)
+		else:
+			var hp := at + Vector2(0, -STAFF_H - 8.0)
+			ci.draw_circle(hp, DISH * 0.45, Color(UiKit.PAPER, 0.95))
+			_dish(ci, logic.helper_dish, hp, DISH * 0.8, 1.0)
 	else:
 		_draw_cell(ci, st.sd_react, 3, 0, at, STAFF_H, false)
+
+
+## 든 접시를 그 칸의 쟁반 위에 (TRAY). 뒷모습 칸은 쟁반이 가려서 그리지 않는다
+func _dish_on_tray(ci: Control, gi: int, path: String, n: int, i: int, feet: Vector2, cell_h: float, flip: bool) -> void:
+	var tr: Array = TRAY[path][i]
+	if tr.is_empty():
+		return
+	var w := _cell_w(path, n, i, cell_h)
+	var x := feet.x + float(tr[0]) * w * (-1.0 if flip else 1.0)
+	var top := feet.y - cell_h + float(tr[1]) * cell_h
+	var dw := maxf(float(tr[2]) * w, 34.0) # 쟁반 폭에 맞춘 접시 크기
+	var tex: Texture2D = _dish_tex.get(gi)
+	var dh := dw * (tex.get_height() / float(tex.get_width()) if tex else 0.6)
+	_dish(ci, gi, Vector2(x, top - dh * 0.28), dw, 1.0)
+
+
+## 시트 한 칸을 cell_h 높이로 그릴 때의 폭
+func _cell_w(path: String, n: int, i: int, cell_h: float) -> float:
+	var e := _sheet(path, n)
+	return cell_h * (e.cuts[i + 1] - e.cuts[i]) / float(e.tex.get_height())
 
 
 ## 한 줄 시트 (assets/art/<path>.png, n칸). 칸 경계는 가장 빈 열에서 찾는다 (GuestSD.find_cuts_n)
