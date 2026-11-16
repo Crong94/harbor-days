@@ -23,14 +23,19 @@ const FISHING_SLOTS := [
 ## 보통 손님 수 (요일마다 조금씩 다르다)
 const GUESTS_MIN := 3
 const GUESTS_MAX := 5
+## 돈 균형 (2026-11-16, tools/money_balance.gd로 두 달을 돌려 정함. 사용자: E안으로 해 보고 손님 수는 그대로)
+##   예전 값(배수 1.6, 특별 4.5만, 재료비 없음)은 첫 달에 300만~450만 원이 남아 기획서 "초반 3개월은 빠듯하게"와 멀었다.
+##   지금 값은 고정비 80만 원을 내고 새벽만 낚시하면 50만 원쯤, 새벽과 아침 모두 하면 140만 원쯤 남는다.
 ## 구이 한 접시 값 = 생선 값 × 이 배수 (밥, 반찬 포함)
-const DISH_MARKUP := 1.6
-const DISH_MIN := 6000
+const DISH_MARKUP := 1.0
+const DISH_MIN := 5000
+## 접시마다 드는 재료비 (밥, 반찬, 가스). 영업이 끝나면 낸 접시 수만큼 나간다
+const DISH_COST := 2500
 ## 보통 손님이 한 끼에 내는 돈의 끝. 이보다 비싼 생선(감성돔 같은)은 보통 손님에게 내지 않는다.
 ## 그런 고기는 특별 손님에게 내거나 수산시장에 판다
-const REGULAR_MAX := 20000
+const REGULAR_MAX := 12500
 ## 특별 손님 한 접시 값의 끝
-const SPECIAL_MAX := 45000
+const SPECIAL_MAX := 20000
 ## 생선 없이 온 손님이 그냥 돌아갈 때 깎이는 평판
 const REP_MISS := -2
 const REP_SERVED := 1

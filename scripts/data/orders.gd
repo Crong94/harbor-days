@@ -72,7 +72,7 @@ static func of(day: int) -> Dictionary:
 		"fish": fish,
 		"count": p[1],
 		"min_cm": min_cm,
-		"reward": int(FishDB.value_of(fish, lerpf(f.min_cm, f.max_cm, 0.5)) * p[1] * 1.5 / 1000.0) * 1000,
+		"reward": int(FishDB.value_of(fish, lerpf(f.min_cm, f.max_cm, 0.5)) * p[1] / 1000.0) * 1000,
 		"line": line,
 	}
 

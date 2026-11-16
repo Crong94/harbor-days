@@ -7,7 +7,7 @@ extends RefCounted
 
 const OPEN := 5 * 60
 const CLOSE := 17 * 60
-const RATE := 0.7
+const RATE := 0.4 # 식당 접시 값에서 재료비를 뺀 것보다 조금 적게 (흔한 고기는 식당이 낫다)
 
 
 static func is_open(minutes: int) -> bool:

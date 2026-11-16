@@ -22,6 +22,7 @@ var special_fish := {} # 특별 손님에게 낼 생선 {"id", "size"}
 var special_price := 0
 var special_side := "" # 특별 손님 접시에 붙인 곁들임
 var wage_paid := 0 # 오늘 알바 일당
+var dish_cost_paid := 0 # 오늘 재료비 (낸 접시 수 × DayFlow.DISH_COST)
 var _staff_panel: Control
 var _staff_list: VBoxContainer
 var _decor_panel: Control
@@ -142,6 +143,7 @@ func _on_floor_finished(r: Dictionary) -> void:
 	if wage_paid > 0:
 		GameState.spend(wage_paid)
 	GameState.earn(int(r.sales))
+	_pay_dish_cost(r.served.size())
 	rep_change += r.served.size() * DayFlow.REP_SERVED + int(r.missed) * DayFlow.REP_MISS + int(r.get("hearts", 0))
 	if int(r.get("angry", 0)) > 0:
 		GameState.note("손님 %d명이 기다리다 그냥 갔다. 다 구운 접시는 얼른 날라야지." % r.angry, 2)
@@ -211,6 +213,15 @@ func _on_phase_changed() -> void:
 			_special_served()
 
 
+## 낸 접시만큼 재료비 (밥, 반찬, 가스)
+func _pay_dish_cost(plates: int) -> void:
+	if plates <= 0:
+		return
+	var c := plates * DayFlow.DISH_COST
+	dish_cost_paid += c
+	GameState.spend(c)
+
+
 func _special_served() -> void:
 	step = Step.SPECIAL_DONE
 	var st := cook.stars()
@@ -227,6 +238,7 @@ func _special_served() -> void:
 	special_side = Sides.take(GameState.produce, Sides.reserve_for(GameState))
 	special_price += Sides.bonus(special_side)
 	GameState.earn(special_price)
+	_pay_dish_cost(1)
 	var who := Orders.call_name(special.name)
 	if st >= 3:
 		GameState.note("%s 내 생선구이를 먹고 또 오겠다고 했다." % Josa.attach(who, "이/가"), 3)
@@ -331,7 +343,9 @@ func _show_ledger() -> void:
 		for id in GameState.staff.values():
 			names.append(StaffDB.get_staff(id).name)
 		_ledger_rows.add_child(_row("알바 일당", ", ".join(PackedStringArray(names)), "-" + GameState.format_won(wage_paid), UiKit.DANGER))
-	_ledger_rows.add_child(_row("지출", "미끼, 장비, 알바", ("-" if GameState.spent_today > 0 else "") + GameState.format_won(GameState.spent_today), UiKit.DANGER))
+	if dish_cost_paid > 0:
+		_ledger_rows.add_child(_row("재료비", "밥, 반찬, 가스 %d접시" % (dish_cost_paid / DayFlow.DISH_COST), "-" + GameState.format_won(dish_cost_paid), UiKit.DANGER))
+	_ledger_rows.add_child(_row("지출", "미끼, 장비, 알바, 재료비", ("-" if GameState.spent_today > 0 else "") + GameState.format_won(GameState.spent_today), UiKit.DANGER))
 	_ledger_rows.add_child(UiKit.divider())
 	_ledger_rows.add_child(_row("순이익", "", GameState.format_won(GameState.sales_today - GameState.spent_today), UiKit.INK, true))
 	_ledger_rows.add_child(_row("평판", "", ("+%d" % rep_change) if rep_change >= 0 else str(rep_change), UiKit.CORAL if rep_change >= 0 else UiKit.DANGER))

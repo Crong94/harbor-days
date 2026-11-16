@@ -1024,6 +1024,8 @@ func _test_icebox() -> void:
 	_eq(r.served[0].fish, "bolak", "감성돔은 남김")
 	_eq(r.used, [1], "쓴 생선 자리")
 	_eq(DayFlow.special_price("gamseongdom", 52.0, 3), DayFlow.SPECIAL_MAX, "특별 손님 값에도 끝이 있음")
+	_eq(DayFlow.DISH_MIN > DayFlow.DISH_COST, true, "가장 싼 접시도 재료비보다 비싸다")
+	_eq(DayFlow.too_pricey("ureok", 40.0), true, "큰 우럭은 보통 손님에게 안 낸다 (돈 균형 11-16)")
 	_eq(Orders.call_name("최순덕"), "순덕 할머니", "부르는 이름")
 	for c in Orders.CUSTOMERS:
 		_eq(c.react.size(), 3, "%s 반응 세 가지" % c.name)
@@ -1034,7 +1036,7 @@ func _test_market() -> void:
 	_eq(Market.is_open(16 * 60 + 59), true, "오후 5시 전까지")
 	_eq(Market.is_open(17 * 60), false, "오후 5시 닫음")
 	_eq(Market.is_open(22 * 60), false, "밤엔 닫음")
-	_eq(Market.price("bolak", 20.0) < DayFlow.dish_price("bolak", 20.0), true, "흔한 고기는 식당이 더 남음")
+	_eq(Market.price("bolak", 20.0) < DayFlow.dish_price("bolak", 20.0) - DayFlow.DISH_COST, true, "흔한 고기는 재료비를 빼도 식당이 더 남음")
 	_eq(Market.price("gamseongdom", 45.0) > DayFlow.special_price("gamseongdom", 45.0, 3), true, "감성돔은 시장이 더 남음")
 	_eq(Market.better_here("gamseongdom", 45.0), true, "시장이 나은 고기 표시")
 	_eq(Locations.get_loc("market").scene.is_empty(), false, "지도에서 시장으로 감")
