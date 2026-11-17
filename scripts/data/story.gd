@@ -4,7 +4,8 @@ extends RefCounted
 ##
 ## 사건: 지도에서 그 장소로 가면 한 번만 나오는 대화. 조건이 맞는 것 중 목록 앞의 것 하나만 나온다.
 ##   place: 장소 id, day: 이 날부터, needs: 먼저 켜져 있어야 할 flags, time: [시작, 끝] 분 (없으면 아무 때나)
-##   set: 끝나면 켤 flags, money: 받는 돈. 본 사건은 flags["ev_<id>"]로 표시한다
+##   set: 끝나면 켤 flags, money: 받는 돈. 본 사건은 flags["ev_<id>"]로, 본 날은 flags["evday_<id>"]로 표시한다
+##   after: 이 사건을 본 다음 날부터 (같은 날엔 안 나옴)
 ## 잡담: 장소 화면이 아직 없는 곳에 가면 나오는 짧은 대화. 날짜마다 돌아가며 나온다 (지금까지 "준비 중" 토스트였던 자리)
 ##
 ## 대사 규칙 (CLAUDE.md): 자연스러운 구어체, 쉼표 남발과 줄표 금지. 이름은 {player}, {shop} 템플릿
@@ -93,6 +94,97 @@ const EVENTS := [
 			{"speaker": "", "text": "지도에 물빛분교가 열렸어요. 해솔이는 학교 끝난 오후에 마을을 돌아다녀요."},
 		],
 	},
+	# ── 해솔 개인 퀘스트 〈해솔이의 숙제〉 (기획서 5장): '우리 마을 자랑하기' 숙제를 돕고 낚시를 가르쳐 준다.
+	#    분교에서 숙제를 받고 → 전망대, 시장, 경자상회에서 자랑 세 가지 → 방파제에서 해솔이 첫 볼락 → 분교에서 발표 → 밥집에서 복자가 고마워함
+	#    모두 해솔이 학교 끝난 오후(14~19시)에만. 진행은 flags hw_* (HAESOL_HW_STEPS)
+	{
+		"id": "haesol_hw_start", "note": "해솔이 숙제 '우리 마을 자랑하기'를 돕기로 했다. 자랑 세 가지를 모으자.", "place": "school", "day": 7, "needs": ["met_haesol"], "time": [14 * 60, 19 * 60],
+		"set": ["hw_haesol"],
+		"lines": [
+			{"speaker": "", "text": "교실 창가 책상 하나에 해솔이가 턱을 괴고 앉아 있다. 칠판에 '우리 마을 자랑하기 발표'라고 적혀 있다."},
+			{"speaker": "김해솔", "face": "smile", "text": "아저씨 진짜 왔네요! 고등어도 데려올 걸 그랬어요."},
+			{"speaker": "{player}", "text": "숙제는 좀 썼어?"},
+			{"speaker": "김해솔", "face": "sad", "text": "하나도 못 썼어요. 선생님은 마을 어른들한테 물어보래요. 근데 다들 이 동네엔 자랑할 게 없대요."},
+			{"speaker": "{player}", "face": "smile", "text": "그럼 같이 물어보러 다니자. 아저씨도 이 마을 아직 잘 몰라서 궁금하거든."},
+			{"speaker": "김해솔", "face": "smile", "text": "진짜요? 그럼 세 개만 찾아요. 세 개면 발표할 수 있어요!"},
+			{"speaker": "", "text": "해솔이와 마을 자랑 세 가지를 모아요. 오후에 뒷산 전망대, 수산시장, 경자상회에 가 보세요."},
+		],
+	},
+	{
+		"id": "hw_lookout", "note": "해솔이 숙제 하나: 뒷산 전망대에서 보는 마을.", "place": "lookout", "day": 7, "needs": ["hw_haesol"], "time": [14 * 60, 19 * 60],
+		"set": ["hw_lookout"],
+		"lines": [
+			{"speaker": "", "text": "정자에 오르니 해솔이가 먼저 와서 숨을 몰아쉬고 있다."},
+			{"speaker": "김해솔", "text": "여기 맨날 오는 덴데 이게 자랑이에요?"},
+			{"speaker": "{player}", "text": "저기 봐. 빨간 등대랑 섬들이 줄 서 있잖아. 서울에서는 이런 거 보려면 돈 내고 비행기 타야 해."},
+			{"speaker": "김해솔", "face": "smile", "text": "우와. 그럼 우리 마을은 공짜로 보는 거네요. 하나 적었어요!"},
+		],
+	},
+	{
+		"id": "hw_market", "note": "해솔이 숙제 둘: 수산시장 경매 종.", "place": "market", "day": 7, "needs": ["hw_haesol", "met_yongpal"], "time": [14 * 60, 17 * 60],
+		"set": ["hw_market"],
+		"lines": [
+			{"speaker": "", "text": "해솔이가 경매 종 앞에 쪼그려 앉아 있다. 용팔 아저씨가 종을 닦다가 웃는다."},
+			{"speaker": "오용팔", "face": "smile", "text": "해솔이 숙제가? 이 종은 내 아버지 때부터 쳤다. 칠십 년도 넘었지."},
+			{"speaker": "김해솔", "text": "칠십 년이요? 우리 할머니보다 나이 많아요?"},
+			{"speaker": "오용팔", "text": "그렇지. 배가 들어오면 이 종이 온 마을을 깨웠다. 요새는 쉬는 날이 많아서 그렇지."},
+			{"speaker": "{player}", "face": "smile", "text": "아저씨가 고기 많이 잡아 오면 이 종도 자주 울리겠네."},
+			{"speaker": "김해솔", "face": "smile", "text": "두 개째! 칠십 살 먹은 종이요."},
+		],
+	},
+	{
+		"id": "hw_store", "note": "해솔이 숙제 셋: 경자상회 외상장부.", "place": "store", "day": 7, "needs": ["hw_haesol", "met_kyungja"], "time": [14 * 60, 19 * 60],
+		"set": ["hw_store"],
+		"lines": [
+			{"speaker": "", "text": "해솔이가 계산대에 매달려 경자 할머니 장부를 들여다보고 있다."},
+			{"speaker": "문경자", "text": "이건 보면 안 돼. 어른들 비밀이야."},
+			{"speaker": "김해솔", "face": "sad", "text": "그럼 뭐가 자랑이에요?"},
+			{"speaker": "문경자", "face": "smile", "text": "돈 없을 때 그냥 가져가라고 할 수 있는 가게. 오십 년 동안 그런 데가 여기 하나 있었다고 써."},
+			{"speaker": "{player}", "text": "그거 진짜 자랑이네요. 서울엔 그런 가게 없어요."},
+			{"speaker": "김해솔", "face": "smile", "text": "세 개째예요! 근데 아저씨 하나 더 하고 싶어요. 저 낚시 해 보고 싶어요."},
+		],
+	},
+	{
+		"id": "hw_fishing", "note": "해솔이가 방파제에서 첫 볼락을 잡았다. 내 첫 물고기도 볼락이었다.", "place": "breakwater", "day": 7,
+		"needs": ["hw_lookout", "hw_market", "hw_store"], "time": [14 * 60, 19 * 60],
+		"set": ["hw_fished"],
+		"lines": [
+			{"speaker": "", "text": "방파제 끝에 해솔이가 작은 대나무 낚싯대를 들고 서 있다. 할머니 창고에서 찾았다고 한다."},
+			{"speaker": "김해솔", "text": "아저씨 이거 어떻게 해요? 할머니는 위험하다고 혼자는 하지 말래요."},
+			{"speaker": "{player}", "face": "smile", "text": "찌를 물 위에 띄우고 기다리는 거야. 찌가 쏙 들어가면 그때 들어 올려."},
+			{"speaker": "", "text": "해솔이는 한참 동안 숨도 안 쉬고 찌만 본다. 그러다 찌가 쏙 들어갔다."},
+			{"speaker": "김해솔", "face": "smile", "text": "들어갔어요! 들어갔어요! 아저씨 이거 무거워요!"},
+			{"speaker": "{player}", "text": "천천히. 줄 감으면서 들어 올려."},
+			{"speaker": "", "text": "손바닥만 한 볼락 한 마리가 햇빛에 반짝이며 올라왔다."},
+			{"speaker": "{player}", "face": "smile", "text": "볼락이네. 아저씨가 여기 와서 처음 잡은 것도 볼락이었어."},
+			{"speaker": "김해솔", "face": "smile", "text": "진짜요? 그럼 우리 둘 다 첫 물고기가 똑같네요. 이것도 숙제에 쓸래요. 우리 마을은 바다에서 볼락이 나와요!"},
+			{"speaker": "", "text": "해솔이는 볼락을 바다에 놓아주었다. 내일 학교에서 발표한다고 한다."},
+		],
+	},
+	{
+		"id": "haesol_hw_done", "note": "해솔이가 마을 자랑 발표를 했다. 선생님이 참 잘했다고 했단다.", "place": "school", "day": 8, "needs": ["hw_fished"], "after": "hw_fishing", "time": [14 * 60, 19 * 60],
+		"set": ["haesol_hw_done"],
+		"lines": [
+			{"speaker": "", "text": "교실 뒤 게시판에 해솔이 숙제가 붙어 있다. 맨 위에 크게 '우리 마을 자랑 네 가지'라고 적혀 있다."},
+			{"speaker": "김해솔", "face": "smile", "text": "아저씨! 발표 했어요. 선생님이 박수를 엄청 크게 쳤어요. 학생이 저 하나라 박수 치는 사람도 선생님 하나지만요."},
+			{"speaker": "{player}", "face": "smile", "text": "잘했네. 뭐가 제일 좋았대?"},
+			{"speaker": "김해솔", "text": "볼락이요. 선생님도 낚시 배우고 싶대요. 근데 아저씨 네 번째는 몰래 하나 더 적었어요."},
+			{"speaker": "{player}", "text": "뭔데?"},
+			{"speaker": "김해솔", "face": "smile", "text": "서울에서 온 아저씨가 생선 구워 주는 가게가 생겼다고요. 그게 제일 큰 자랑이래요."},
+			{"speaker": "", "text": "〈해솔이의 숙제〉를 마쳤어요. 복자네 밥집에 들러 보세요."},
+		],
+	},
+	{
+		"id": "haesol_bokja_thanks", "note": "복자 할머니가 해솔이 숙제 고맙다며 생선튀김 비법을 알려 줬다.", "place": "diner", "day": 8, "needs": ["haesol_hw_done"],
+		"set": ["recipe_fish_fry"],
+		"lines": [
+			{"speaker": "김복자", "face": "sad", "text": "니가 우리 해솔이 숙제 봐줬다매. 그 아가 저녁 내내 볼락 얘기만 하더라."},
+			{"speaker": "{player}", "face": "smile", "text": "해솔이가 다 했어요. 저는 따라다니기만 했고요."},
+			{"speaker": "김복자", "text": "그래도 고맙다. 엄마 아빠 멀리 있는 아가 그래 웃는 거 오랜만에 봤다."},
+			{"speaker": "김복자", "face": "smile", "text": "옛다. 우리 집 생선튀김 반죽 비법이다. 아무한테도 안 가르쳐 준 기다. 망하지 말라고 주는 거다."},
+			{"speaker": "", "text": "복자 할머니의 생선튀김 비법을 배웠어요."},
+		],
+	},
 ]
 
 ## 요리사 최세라가 처음 오는 날 (2026-11-16 사용자: 주인공은 낚시와 서빙, 요리는 다른 인물이 전담).
@@ -155,6 +247,8 @@ static func pending(place: String, day: int, minutes: int, flags: Dictionary) ->
 				ok = false
 		if ev.has("time") and (minutes < ev.time[0] or minutes >= ev.time[1]):
 			ok = false
+		if ev.has("after") and (not flags.has("evday_" + ev.after) or day <= int(flags["evday_" + ev.after])):
+			ok = false
 		if ok:
 			return ev
 	return {}
@@ -163,6 +257,7 @@ static func pending(place: String, day: int, minutes: int, flags: Dictionary) ->
 ## 사건을 본 것으로 표시하고 결과(flags, 돈)를 넣는다
 static func finish(ev: Dictionary, gs: Object) -> void:
 	gs.flags["ev_" + ev.id] = true
+	gs.flags["evday_" + ev.id] = int(gs.day)
 	for f in ev.get("set", []):
 		gs.flags[f] = true
 	if int(ev.get("money", 0)) > 0:

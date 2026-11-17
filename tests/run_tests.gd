@@ -1190,6 +1190,37 @@ func _test_story() -> void:
 	_eq(Walkers.active(10 * 60, hgs.flags).any(func(w): return w.id == "haesol"), false, "오전엔 학교")
 	_eq(Story.small_talk("school", 3).is_empty(), false, "분교 잡담")
 	_eq(Portraits.path("김해솔") != "", true, "해솔 얼굴 그림")
+	# 〈해솔이의 숙제〉: 분교 → 자랑 세 곳 → 방파제 첫 볼락 → 다음 날 분교 발표 → 밥집 복자
+	hgs.flags["met_yongpal"] = true
+	hgs.flags["met_kyungja"] = true
+	hgs.flags["ev_yongpal_first"] = true
+	hgs.flags["ev_kyungja_store"] = true
+	hgs.day = 7
+	_eq(Story.pending("lookout", 7, 15 * 60, hgs.flags).is_empty(), true, "숙제 받기 전엔 전망대 사건 없음")
+	_eq(Story.pending("school", 6, 15 * 60, hgs.flags).is_empty(), true, "엿새째엔 숙제 안 받음")
+	_eq(Story.pending("school", 7, 10 * 60, hgs.flags).is_empty(), true, "오전엔 수업 중")
+	var hw: Dictionary = Story.pending("school", 7, 15 * 60, hgs.flags)
+	_eq(hw.get("id", ""), "haesol_hw_start", "이레째 오후 분교에서 숙제")
+	Story.finish(hw, hgs)
+	_eq(Story.pending("breakwater", 7, 15 * 60, hgs.flags).get("id", "") == "hw_fishing", false, "자랑 셋 모으기 전엔 낚시 안 함")
+	_eq(Story.pending("market", 7, 18 * 60, hgs.flags).is_empty(), true, "시장 닫은 뒤엔 없음")
+	for p in [["lookout", "hw_lookout"], ["market", "hw_market"], ["store", "hw_store"]]:
+		var e: Dictionary = Story.pending(p[0], 7, 15 * 60, hgs.flags)
+		_eq(e.get("id", ""), p[1], "자랑 %s" % p[0])
+		Story.finish(e, hgs)
+	var fe: Dictionary = Story.pending("breakwater", 7, 15 * 60, hgs.flags)
+	_eq(fe.get("id", ""), "hw_fishing", "자랑 셋 뒤 방파제에서 해솔 첫 볼락")
+	Story.finish(fe, hgs)
+	_eq(Story.pending("school", 7, 16 * 60, hgs.flags).is_empty(), true, "발표는 다음 날")
+	hgs.day = 8
+	var de: Dictionary = Story.pending("school", 8, 15 * 60, hgs.flags)
+	_eq(de.get("id", ""), "haesol_hw_done", "다음 날 분교에서 발표")
+	Story.finish(de, hgs)
+	var be: Dictionary = Story.pending("diner", 8, 12 * 60, hgs.flags)
+	_eq(be.get("id", ""), "haesol_bokja_thanks", "밥집에서 복자가 고마워함")
+	Story.finish(be, hgs)
+	_eq(hgs.has_flag("recipe_fish_fry"), true, "생선튀김 비법")
+	_eq(Story.pending("school", 9, 15 * 60, hgs.flags).is_empty(), true, "숙제는 한 번만")
 	hgs.free()
 
 

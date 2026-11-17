@@ -170,6 +170,6 @@
 2. 3안 낮 판(bg_shop_hall_day)은 아직 안 씀. 첫날 튜토리얼(first_guest, 지금 bg_shop_inside_day)이나 낮 장면에 쓸지 사용자에게 물음
 3. 3안 각도 의자 그림이 오면 의자 자리마다 얹고 HallCover 모양을 맞춤
 4. 첫날 튜토리얼(first_guest)은 아직 주인공이 직접 굽는다. 사용자가 원하면 세라가 첫날부터 굽게 바꾼다
-5. 해솔 개인 퀘스트 〈해솔이의 숙제〉, 버스와 옆마을, 지도 방위
+5. 〈해솔이의 숙제〉는 11-18에 넣음(Story 사건 7개, 보상 flags recipe_fish_fry는 아직 쓰는 곳 없음). 다음은 버스와 옆마을, 지도 방위
 마지막: 테스트 통과와 화면 확인 → 내 파일만 커밋([skip ci]) → ./tools/backup.sh → 새 bundle을 드라이브 `오늘의바다_백업`에 올리라고 안내. GitHub push는 원할 때만. 이 문서(docs/HANDOFF.md)를 갱신한다
 ```
