@@ -21,7 +21,9 @@ const LIST := {
 
 
 ## 요리사 (둘째 날부터 늘 주방에 있다. Story sera_arrives)
-const COOK := {"id": "sera", "name": "세라", "full": "최세라", "sd_cook": "staff/sera_sd_cook"}
+## 걷기 8칸(1·2 앞, 3·4 뒤, 5~8 오른쪽 옆), 반응 3칸(서 있기, 만족 엄지 척, 곤란)
+const COOK := {"id": "sera", "name": "세라", "full": "최세라", "sd_cook": "staff/sera_sd_cook",
+	"sd_walk": "staff/sera_sd_walk", "sd_react": "staff/sera_sd_react"}
 
 
 static func get_staff(id: String) -> Dictionary:

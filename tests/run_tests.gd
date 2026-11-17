@@ -1789,6 +1789,8 @@ func _test_staff() -> void:
 	_eq(StaffDB.hire(staff, "sera"), false, "세라는 알바가 아니라 요리사 (뽑지 않음)")
 	_eq(StaffDB.wages({"kitchen": "sera"}), 0, "예전 저장의 주방 알바는 일당 없음")
 	_eq(ArtSlot.has_art(StaffDB.COOK.sd_cook), true, "요리사 세라 조리 그림")
+	_eq(ArtSlot.has_art(StaffDB.COOK.sd_walk), true, "요리사 세라 걷기 그림")
+	_eq(ArtSlot.has_art(StaffDB.COOK.sd_react), true, "요리사 세라 반응 그림")
 	StaffDB.fire(staff, "yeoul")
 	_eq([StaffDB.is_hired(staff, "yeoul"), StaffDB.wages(staff)], [false, 0], "그만두면 일당도 빠짐")
 	_eq(Story.SERA_ARRIVES.size() > 3, true, "세라가 오는 이야기")

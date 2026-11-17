@@ -71,6 +71,19 @@ func _plate_tex(seat: int) -> Texture2D:
 		_plates[id] = _load_art(id)
 	return _plates[id]
 var _helper_bow := 0.0 # 서빙 알바가 접시를 내려놓고 인사하는 시간
+## 요리사 세라: 접시를 담으면 주방 바 쪽(SERA_PASS)으로 몇 걸음 가서 내놓고 돌아온다 (보이기만 하는 움직임, 규칙은 그대로).
+## 노릇노릇이면 엄지 척, 타면 곤란한 얼굴 (반응 시트)
+const SERA_PASS := Vector2(496 / 982.0, 506 / 1602.0)
+## 세라 걷기 시트는 칸 위아래 여백이 커서(인물 471/724, 발 아래 여백 107) 조리 시트(인물 832/887)와 키를 맞춰 크게 그린다
+const SERA_WALK_H := CHAR_H * 1.51
+const SERA_SPEED := 0.22
+const SERA_REACT_T := 0.9
+var _sera_pos := DiningLogic.COOK_SPOT
+var _sera_path: Array = []
+var _sera_dir := Vector2.DOWN
+var _sera_react := 0.0
+var _sera_react_cell := 0
+var _sera_react_next := -1 # 조리대로 돌아오면 보일 반응 칸 (-1이면 없음. 바 쪽은 화구 고리에 얼굴이 가려서 돌아와서)
 var _started := false # start 전(prepare)에는 시간이 흐르지 않는다
 
 
@@ -311,6 +324,7 @@ func _process(delta: float) -> void:
 		return
 	_t += delta
 	_helper_bow = maxf(0.0, _helper_bow - delta)
+	_update_sera(delta)
 	if _started and not _done:
 		logic.update(delta)
 		_handle_events()
@@ -367,6 +381,8 @@ func _handle_events() -> void:
 				Sound.play_sfx("tick", 0.05)
 			"plated":
 				var at := to_screen(BURNER_UI[e.burner]) + Vector2(0, -BURNER_R - 12.0)
+				if logic.helper_kitchen:
+					sera_plated(e.quality)
 				match e.quality:
 					"perfect":
 						Sound.play_sfx("good", 0.05, -4.0)
@@ -594,11 +610,52 @@ func _draw_floor() -> void:
 		_caption(ci, font, Vector2(size.x / 2.0, to_screen(Vector2(0.5, 0.24)).y), "마감! 남은 손님만 받아요")
 
 
+## 세라가 접시를 담았다: 바 쪽으로 갔다 돌아오고, 돌아오면 결과에 따라 반응
+func sera_plated(quality: String) -> void:
+	_sera_path = [SERA_PASS, DiningLogic.COOK_SPOT]
+	_sera_react_next = {"perfect": 1, "burnt": 2}.get(quality, -1)
+
+
+func _update_sera(delta: float) -> void:
+	if _sera_react > 0.0:
+		_sera_react = maxf(0.0, _sera_react - delta)
+		return
+	if _sera_path.is_empty():
+		return
+	var target: Vector2 = _sera_path[0]
+	var d := target - _sera_pos
+	var step := SERA_SPEED * delta
+	if d.length() <= step:
+		_sera_pos = target
+		_sera_path.pop_front()
+		if _sera_path.is_empty() and _sera_react_next >= 0:
+			_sera_react_cell = _sera_react_next
+			_sera_react = SERA_REACT_T
+			_sera_react_next = -1
+	else:
+		_sera_dir = d.normalized()
+		_sera_pos += _sera_dir * step
+
+
+func sera_moving() -> bool:
+	return not _sera_path.is_empty() and _sera_react <= 0.0
+
+
 ## 요리사: 주방 알바가 있으면 세라, 없으면 주인공 (조리대 뒤에 서서 손님 쪽을 본다)
 func _draw_cook(ci: Control) -> void:
 	var at := to_screen(DiningLogic.COOK_SPOT)
 	if logic.helper_kitchen:
 		var cook: String = StaffDB.COOK.sd_cook
+		var walk: String = StaffDB.COOK.get("sd_walk", "")
+		var react: String = StaffDB.COOK.get("sd_react", "")
+		if _sera_react > 0.0 and react != "" and _has_sheet(react):
+			_draw_cell(ci, react, 3, _sera_react_cell, to_screen(_sera_pos), CHAR_H * 1.05, false)
+			return
+		if sera_moving() and walk != "" and _has_sheet(walk):
+			var wc := GuestSD.walk_cell(_sera_dir, _t)
+			var feet := to_screen(_sera_pos) + Vector2(0, SERA_WALK_H * 107.0 / 724.0 - CHAR_H * 1.05 * 27.0 / 887.0)
+			_draw_cell(ci, walk, 8, wc, feet, SERA_WALK_H, wc >= 4 and _sera_dir.x < 0.0)
+			return
 		if cook != "" and _has_sheet(cook):
 			var cell := (1 + int(_t * 4.0) % 2) if not logic.cooking.is_empty() else 0
 			_draw_cell(ci, cook, 4, cell, at, CHAR_H * 1.05, false)
