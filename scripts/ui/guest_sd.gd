@@ -33,10 +33,14 @@ static var _cache := {} # id → {"tex": Texture2D, "cuts": [x0, x1, x2, x3]}
 ## 홀 식당 (2026-11-17 3안): 앉은 그림을 엉덩이 바닥에 맞춘다. seat_k > 0이면 이 노드의 원점이 엉덩이 자리다.
 ##   back, front: 그림 가운데를 원점에. side: 엉덩이 뒤쪽 끝을 원점에 (의자 뒤쪽 끝에 맞춤)
 ##   그림마다 발바닥에서 엉덩이 바닥까지 비율 (칸 0 그림 높이 대비, 그림 세션이 눈금으로 잼). 없는 그림은 HIP_DEFAULT
+## 이름 없는 손님과 해솔(11-17 그림 세션 눈금 측정)은 같은 방법으로 잰 박만수 값과의 차이(back 0.05, side 0.06, front 0.04)를 빼서 맞췄다
 const HIP_UP := {
-	"back": {"mansu": 0.20, "sundeok": 0.16, "bokja": 0.18, "junho": 0.16, "gyeongja": 0.18},
-	"side": {"mansu": 0.20, "sundeok": 0.20, "bokja": 0.18, "junho": 0.17, "gyeongja": 0.15},
-	"front": {"mansu": 0.18, "sundeok": 0.16, "bokja": 0.14, "junho": 0.14, "gyeongja": 0.14},
+	"back": {"mansu": 0.20, "sundeok": 0.16, "bokja": 0.18, "junho": 0.16, "gyeongja": 0.18,
+		"guest_tourist": 0.20, "guest_fisher": 0.17, "guest_student": 0.20, "guest_office": 0.23, "guest_haenyeo": 0.15, "haesol": 0.23},
+	"side": {"mansu": 0.20, "sundeok": 0.20, "bokja": 0.18, "junho": 0.17, "gyeongja": 0.15,
+		"guest_tourist": 0.17, "guest_fisher": 0.16, "guest_student": 0.19, "guest_office": 0.22, "guest_haenyeo": 0.12, "haesol": 0.21},
+	"front": {"mansu": 0.18, "sundeok": 0.16, "bokja": 0.14, "junho": 0.14, "gyeongja": 0.14,
+		"guest_tourist": 0.19, "guest_fisher": 0.16, "guest_student": 0.21, "guest_office": 0.24, "guest_haenyeo": 0.14, "haesol": 0.24},
 }
 const HIP_DEFAULT := {"back": 0.18, "side": 0.18, "front": 0.15}
 var seat_k := 0.0 # 시트 px → 화면 px (홀 식당). 0이면 예전처럼 노드 아래 가운데가 발
