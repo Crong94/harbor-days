@@ -1549,6 +1549,22 @@ func _test_dining() -> void:
 	q._leave_angry(0)
 	_eq([q.inventory.size(), q.queue.size()], [4, 0], "굽기 전에 간 손님 생선은 아이스박스로")
 	_eq(c.cooking.is_empty(), true, "간 손님 생선은 화구에서 내림")
+	# 생선튀김: 비법을 모르면 다 구이, 배우면 손님 일부가 튀김을 시키고 값을 더 낸다
+	_eq(a.served.filter(func(x): return x.dish == "fry").size(), 0, "비법 없으면 튀김 주문 없음")
+	var fr := DiningLogic.new()
+	fr.fry = true
+	fr.setup(4, _fish_box(DiningLogic.GUESTS_MAX + 1), names)
+	var fr_n := fr.schedule.size()
+	_run_dining(fr, true)
+	var fried := fr.served.filter(func(x): return x.dish == "fry")
+	_eq(fried.size() > 0 and fried.size() < fr_n, true, "비법을 배우면 일부만 튀김 (%d/%d)" % [fried.size(), fr_n])
+	_eq(fr.served.size(), fr_n, "튀김이 섞여도 잘 나르면 다 받음")
+	_eq(DiningLogic.dish_price_of("bolak", 20.0, "fry") > DiningLogic.dish_price_of("bolak", 20.0, "grill"), true, "튀김이 구이보다 비쌈")
+	_eq(DiningLogic.dish_price_of("bolak", 20.0, "grill"), DayFlow.dish_price("bolak", 20.0), "구이 값은 그대로")
+	_eq(ResourceLoader.exists("res://assets/art/" + Catalog.dish_art(DiningLogic.dish_art_id("bolak", "fry")) + ".png"), true, "튀김 그림 있음")
+	var fs := DiningLogic.new()
+	fs.guests = [{"fish": "bolak", "dish": "fry"}, {"fish": "bolak", "dish": "grill"}, {"fish": "bolak"}]
+	_eq([fs.same_order(0, 1), fs.same_order(1, 2)], [false, true], "튀김 접시는 구이 손님에게 못 냄")
 	# 생선이 없으면 재료 소진으로 문을 닫는다 (평판 깎이는 돌아간 손님 없음)
 	var e0 := DiningLogic.new()
 	e0.setup(4, [], names)

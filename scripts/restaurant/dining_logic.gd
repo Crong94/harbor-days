@@ -127,6 +127,13 @@ var pantry := {}
 var reserve := {}
 var side_sales := 0
 var _rng := RandomNumberGenerator.new()
+## 생선튀김 (2026-11-18). 복자 할머니 비법(recipe_fish_fry)을 배우면 손님 일부가 구이 대신 튀김을 시킨다.
+## 튀김은 값을 더 받는다. 굽는 규칙(화구, 노릇노릇, 탐)은 구이와 같다
+const FRY_SHARE := 0.35
+const FRY_PRICE := 1.25
+const FRY_ART := "bungjangeo-twigim"
+var fry := false
+var _fry_rng := RandomNumberGenerator.new()
 var events: Array = [] # 화면 연출용 한 번짜리 알림 {type, ...}
 
 
@@ -136,6 +143,7 @@ func setup(day: int, inv: Array, names: Array) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("영업-%d" % day)
 	_rng.seed = hash("자리-%d" % day)
+	_fry_rng.seed = hash("튀김-%d" % day)
 	var n := rng.randi_range(GUESTS_MIN, GUESTS_MAX)
 	schedule.clear()
 	var last := OPEN_SECONDS * LAST_ARRIVAL
@@ -297,7 +305,7 @@ func deliver_to(gi: int) -> String:
 	if selected < 0:
 		return "none"
 	if gi < 0 or gi >= guests.size() or guests[gi].state != GuestState.SEATED or _dish_reserved(gi) \
-			or guests[gi].fish != guests[selected].fish or not _waiting_dish(gi):
+			or not same_order(gi, selected) or not _waiting_dish(gi):
 		events.append({"type": "wrong", "guest": gi})
 		return "wrong"
 	if _task_count() >= MAX_TASKS:
@@ -550,6 +558,26 @@ func patience_of(seat: int) -> float:
 
 
 ## 받는 시점의 값. 빨리 받으면 하트 값, 아슬아슬하면 깎인 값
+## 한 접시 값: 구이는 DayFlow.dish_price, 튀김은 그보다 FRY_PRICE배
+static func dish_price_of(fish_id: String, size_cm: float, dish: String) -> int:
+	var base := DayFlow.dish_price(fish_id, size_cm)
+	if dish != "fry":
+		return base
+	return int(roundf(base * FRY_PRICE / 500.0) * 500.0)
+
+
+## 두 손님이 같은 요리를 시켰나 (같은 생선, 같은 조리법). 접시를 바꿔 내도 되는지 볼 때 쓴다
+func same_order(a: int, b: int) -> bool:
+	return guests[a].fish == guests[b].fish and guests[a].get("dish", "grill") == guests[b].get("dish", "grill")
+
+
+## 요리 그림 id (dish/<id>.png)
+static func dish_art_id(fish_id: String, dish: String) -> String:
+	if dish == "fry":
+		return FRY_ART
+	return FishDB.get_fish(fish_id).get("grill", "bollak-gui")
+
+
 static func pay(price: int, waited: float) -> int:
 	var k := 1.0
 	if waited <= PATIENCE * QUICK:
@@ -571,7 +599,8 @@ func _serve(gi: int, by_player: bool) -> void:
 	g.state = GuestState.EATING
 	g.paid = price
 	sales += price
-	served.append({"guest": g.name, "fish": g.fish, "size": g.size, "price": price, "heart": heart, "side": side, "quality": q})
+	served.append({"guest": g.name, "fish": g.fish, "size": g.size, "price": price, "heart": heart, "side": side, "quality": q,
+		"dish": g.get("dish", "grill")})
 	events.append({"type": "served", "guest": gi, "heart": heart, "price": price, "side": side, "quality": q, "helper": not by_player})
 
 
@@ -629,9 +658,10 @@ func _arrive() -> void:
 		var e: Dictionary = inventory[fi]
 		inventory.remove_at(fi)
 		var seat: int = seats[_rng.randi() % seats.size()]
+		var dish := "fry" if fry and _fry_rng.randf() < FRY_SHARE else "grill"
 		var g := {
-			"name": s.name, "seat": seat, "fish": e.id, "size": e.size, "entry": e,
-			"price": DayFlow.dish_price(e.id, e.size), "state": GuestState.WALKING,
+			"name": s.name, "seat": seat, "fish": e.id, "size": e.size, "entry": e, "dish": dish,
+			"price": dish_price_of(e.id, e.size, dish), "state": GuestState.WALKING,
 			"wait": 0.0, "eat": 0.0, "cooked": false, "quality": "",
 			"pos": ENTRANCE, "path": entry_path(seat), "dir": Vector2.UP,
 		}

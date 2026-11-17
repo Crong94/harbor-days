@@ -102,6 +102,7 @@ func prepare() -> void:
 func start(day: int, inventory: Array) -> void:
 	logic.helper_serve = StaffDB.in_role(GameState.staff, "serve") != ""
 	logic.helper_kitchen = true # 요리는 세라가 늘 맡는다
+	logic.fry = GameState.flags.has("recipe_fish_fry")
 	logic.setup(day, inventory, DayFlow.GUESTS)
 	logic.place_staff()
 	logic.seat_bonus = ShopDecor.seat_comfort(GameState.shop_decor)
@@ -361,7 +362,7 @@ func _handle_events() -> void:
 				_people.add_child(sd) # 가구 덮개와 함께 y 순서로 (사람과 말풍선 뒤)
 				_guests[gi] = sd
 				UiKit.fade_in(sd, 0.3)
-				_dish_tex[gi] = _load_art(Catalog.dish_art(FishDB.get_fish(g.fish).get("grill", "bollak-gui")))
+				_dish_tex[gi] = _load_art(Catalog.dish_art(DiningLogic.dish_art_id(g.fish, g.get("dish", "grill"))))
 				if not _fish_tex.has(g.fish):
 					_fish_tex[g.fish] = _load_art("fish_" + g.fish)
 			"order":
@@ -585,7 +586,7 @@ func _draw_floor() -> void:
 		var col := UiKit.LEAF if left > 0.5 else (UiKit.SUN if left > 0.2 else UiKit.DANGER)
 		var r := 26.0
 		var carried := gi == logic.holding or gi == logic.helper_dish or logic._dish_reserved(gi)
-		var can_take: bool = logic.selected >= 0 and not carried and g.fish == logic.guests[logic.selected].fish and logic._waiting_dish(gi)
+		var can_take: bool = logic.selected >= 0 and not carried and logic.same_order(gi, logic.selected) and logic._waiting_dish(gi)
 		if can_take:
 			ci.draw_circle(p, r + 11.0 + sin(_t * 9.0) * 3.0, Color(UiKit.SUN, 0.6))
 		elif carried:

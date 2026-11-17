@@ -161,7 +161,11 @@ func _on_floor_finished(r: Dictionary) -> void:
 	elif int(r.get("sold_out", 0)) > 0:
 		GameState.note("생선이 다 팔려서 일찍 문을 닫았다. 손님 %d명은 못 받았다. 내일은 더 잡아 와야지." % r.sold_out, 2)
 	elif r.served.size() >= DiningLogic.GUESTS_MIN:
-		GameState.note("손님 %d명이 다 생선구이를 먹고 갔다. 가게가 북적였다." % r.served.size(), 1)
+		var fried := r.served.filter(func(x): return x.get("dish", "grill") == "fry").size()
+		if fried > 0:
+			GameState.note("손님 %d명이 생선구이랑 튀김을 다 먹고 갔다. 복자 할머니 튀김이 %d접시나 나갔다." % [r.served.size(), fried], 1)
+		else:
+			GameState.note("손님 %d명이 다 생선구이를 먹고 갔다. 가게가 북적였다." % r.served.size(), 1)
 	_header.refresh()
 	var tw := create_tween()
 	tw.tween_interval(1.0)
