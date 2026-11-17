@@ -8,7 +8,7 @@ extends Control
 ## 그림: 배경 bg_shop_hall_night (2026-11-17 홀 구조 3안, 가구가 그려진 바탕), 손님 SD sd_guest/<id>_*.png
 ##   (앉은 그림 seat_back, seat_side, seat_front), 주인공 sd/walk·serve_walk, 알바 staff/*, 요리 dish/<recipe>.png, 생선 fish_<id>.png
 ## 손님이 의자, 테이블, 선반 뒤에 앉으면 그 가구 모양대로 배경을 잘라 손님 위에 다시 덮는다 (HallCover. 그림 세션 확인 그림과 같은 모양)
-## 가게 꾸미기 슬롯(ShopDecor)은 6차 바탕 자리라 3안에서는 아직 그리지 않는다.
+## 가게 꾸미기(ShopDecor)는 3안 빈자리에 간판, 줄전구, 바 위 소품, 벽 장식, 화분만 얹는다 (의자는 편안함만).
 ## 끝나면 finished(결과)를 보낸다 (장부가 그대로 쓴다).
 
 signal finished(result: Dictionary)
@@ -164,11 +164,9 @@ func bg_px(v: float) -> float:
 
 func _load_decor() -> void:
 	_decor.clear()
-	if BG == "bg_shop_hall_night":
-		# 3안 바탕은 가구가 그려져 있다. 꾸미기 슬롯은 3안 자리로 다시 짤 때까지 그리지 않는다
-		_decor_layer.queue_redraw()
-		return
 	for sl in ShopDecor.slots():
+		if not ShopDecor.DRAWN_KINDS.has(sl.kind):
+			continue # 3안 바탕에 이미 그려진 가구
 		var art := ShopDecor.art_of(ShopDecor.item_in(GameState.shop_decor, sl.id))
 		var tex := _load_art(art) if not art.is_empty() else null
 		if tex:

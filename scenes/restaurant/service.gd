@@ -581,7 +581,7 @@ func _open_decor() -> void:
 	for c in _decor_list.get_children():
 		c.queue_free()
 	_decor_money.text = "가진 돈 " + GameState.format_won(GameState.money)
-	for kind in ShopDecor.KINDS:
+	for kind in ShopDecor.SHOP_KINDS:
 		_decor_list.add_child(UiKit.text(DECOR_KIND_NAMES[kind], "title", UiKit.INK))
 		var now := ShopDecor.kind_item(GameState.shop_decor, kind)
 		for id in ShopDecor.items_of(kind):

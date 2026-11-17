@@ -1629,8 +1629,14 @@ func _test_shop_decor() -> void:
 	d.seat_bonus = comfort
 	_eq(d.patience_of(0), DiningLogic.PATIENCE + 5.0, "편한 의자 자리는 더 참음")
 	_eq(d.patience_of(99), DiningLogic.PATIENCE, "모르는 자리는 기본")
-	_eq(ShopDecor.item_in(decor, "table"), "table_old", "처음 바는 낡은 바")
-	_eq(ShopDecor.slots().filter(func(s): return s.kind == "lamp").size(), 4, "천장 등 자리 네 곳")
+	_eq(ShopDecor.item_in(decor, "table"), "", "3안은 바 슬롯 없음 (바탕에 그려짐)")
+	_eq(ShopDecor.slots().filter(func(s): return s.kind == "lamp").size(), 0, "3안은 천장 등이 바탕에 그려져 있음")
+	for sl in ShopDecor.slots():
+		_eq(sl.pos.x >= 0.0 and sl.pos.x <= 1.0 and sl.pos.y >= 0.0 and sl.pos.y <= 1.0, true, "%s 자리는 배경 안" % sl.id)
+	for k in ShopDecor.SHOP_KINDS:
+		_eq(ShopDecor.slots().any(func(s): return s.kind == k), true, "상점 종류 %s는 자리가 있음" % k)
+	for k in ShopDecor.DRAWN_KINDS:
+		_eq(ShopDecor.SHOP_KINDS.has(k), true, "그리는 종류 %s는 상점에 있음" % k)
 	# 저장된다
 	var gs = load("res://scripts/autoload/game_state.gd").new()
 	_eq(SaveGame.fields(gs).has("shop_decor") and SaveGame.fields(gs).has("owned_decor"), true, "가구는 저장됨")

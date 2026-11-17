@@ -65,43 +65,31 @@ const DEFAULTS := {"table": "table_old", "chair": "chair_basic", "stove": "stove
 	"shelf": "shelf_none", "lamp": "lamp_bulb_short", "sign": "sign_old", "light": "light_none",
 	"bar": "bar_none", "wall": "wall_none", "plant": "plant_none"}
 
-## 종류별 그리기. h: 높이, w: 폭 (배경 그림 941px 기준). box가 있는 슬롯은 그 상자에 비율 그대로 꽉 차게.
-## table은 배경 크기 캔버스를 그대로 덮는다. front: 요리사와 조리대 앞면 위에 그린다(화구, 도구).
+## 3안(홀 구조, 2026-11-17)에서 상점에 내놓는 종류. 바탕에 이미 그려진 바, 화구, 후드, 도구, 선반, 천장 등은 빠진다.
+## 의자도 바탕에 그려져 있어 그리지 않고 편안함(손님이 더 기다림)만 남는다. 3안 각도에 맞는 의자 그림이 오면 다시 그린다
+const SHOP_KINDS := ["chair", "sign", "light", "bar", "wall", "plant"]
+## 3안에서 실제로 그리는 종류
+const DRAWN_KINDS := ["sign", "light", "bar", "wall", "plant"]
+
+## 종류별 그리기 (배경 px, 982x1602). h: 높이, w: 폭
 ## glow: 불빛이라 밤에도 밝기를 낮추지 않는다. center: 기준점이 그림 가운데 (벽 장식)
 const DRAW := {
-	"table": {"canvas": true}, "chair": {"h": 92.0}, "bar": {"h": 56.0}, "wall": {"h": 95.0, "center": true}, "plant": {"h": 110.0},
+	"table": {"canvas": true}, "chair": {"h": 92.0}, "bar": {"h": 58.0}, "wall": {"h": 78.0, "center": true}, "plant": {"h": 112.0},
 	"stove": {"front": true}, "tool": {"front": true}, "hood": {}, "shelf": {},
-	"lamp": {"glow": true}, "sign": {"w": 318.0}, "light": {"w": 900.0, "glow": true},
+	"lamp": {"glow": true}, "sign": {"w": 250.0}, "light": {"w": 960.0, "glow": true},
 }
 
-## 의자 말고 슬롯 (슬롯 설계 7·8차, 배경 전체 비율, 기준점은 아래 가운데). box: 칸 크기(배경 px)
+## 의자 말고 슬롯 (3안 배경 빈자리를 격자로 잼. 배경 전체 비율, 기준점은 아래 가운데, 벽 장식만 가운데)
 const EXTRA_SLOTS := [
-	{"id": "table", "kind": "table", "pos": Vector2(0.5, 1.0)},
-	{"id": "stove_L", "kind": "stove", "pos": Vector2(0.245, 0.452)},
-	{"id": "hood_L", "kind": "hood", "pos": Vector2(0.243, 0.223), "box": Vector2(170, 122)},
-	{"id": "tool_L", "kind": "tool", "pos": Vector2(0.136, 0.432), "box": Vector2(48, 58)},
-	{"id": "shelf_U1", "kind": "shelf", "pos": Vector2(0.239, 0.293), "box": Vector2(158, 89)},
-	{"id": "shelf_U2", "kind": "shelf", "pos": Vector2(0.420, 0.293), "box": Vector2(158, 89)},
-	{"id": "shelf_U3", "kind": "shelf", "pos": Vector2(0.600, 0.293), "box": Vector2(158, 89)},
-	{"id": "shelf_U4", "kind": "shelf", "pos": Vector2(0.781, 0.293), "box": Vector2(158, 89)},
-	{"id": "shelf_D1", "kind": "shelf", "pos": Vector2(0.239, 0.349), "box": Vector2(158, 84)},
-	{"id": "shelf_D2", "kind": "shelf", "pos": Vector2(0.420, 0.349), "box": Vector2(158, 84), "default": "shelf_old_pot"},
-	{"id": "shelf_D3", "kind": "shelf", "pos": Vector2(0.600, 0.349), "box": Vector2(158, 84), "default": "shelf_old_bowls"},
-	{"id": "shelf_D4", "kind": "shelf", "pos": Vector2(0.781, 0.349), "box": Vector2(158, 84), "default": "shelf_old_rice"},
-	{"id": "lamp_1", "kind": "lamp", "pos": Vector2(0.085, 0.197), "lamp_h": 170.0, "default": "lamp_bulb_long"},
-	{"id": "lamp_2", "kind": "lamp", "pos": Vector2(0.417, 0.141), "lamp_h": 150.0},
-	{"id": "lamp_3", "kind": "lamp", "pos": Vector2(0.584, 0.141), "lamp_h": 150.0},
-	{"id": "lamp_4", "kind": "lamp", "pos": Vector2(0.915, 0.197), "lamp_h": 170.0, "default": "lamp_bulb_long"},
-	{"id": "sign", "kind": "sign", "pos": Vector2(0.511, 0.219)},
-	{"id": "light", "kind": "light", "pos": Vector2(0.5, 0.114)},
-	{"id": "bar_0", "kind": "bar", "pos": Vector2(0.336, 0.579)},
-	{"id": "bar_1", "kind": "bar", "pos": Vector2(0.291, 0.738)},
-	{"id": "bar_2", "kind": "bar", "pos": Vector2(0.662, 0.579)},
-	{"id": "bar_3", "kind": "bar", "pos": Vector2(0.707, 0.738)},
-	{"id": "wall_0", "kind": "wall", "pos": Vector2(0.069, 0.449)},
-	{"id": "wall_1", "kind": "wall", "pos": Vector2(0.930, 0.208)},
-	{"id": "plant_0", "kind": "plant", "pos": Vector2(0.06, 0.95)},
-	{"id": "plant_1", "kind": "plant", "pos": Vector2(0.94, 0.95)},
+	{"id": "sign", "kind": "sign", "pos": Vector2(490 / 982.0, 1233 / 1602.0)}, # 출입문 위 처마 보
+	{"id": "light", "kind": "light", "pos": Vector2(491 / 982.0, 1338 / 1602.0)}, # 앞 처마 아래로 늘어뜨림
+	{"id": "bar_0", "kind": "bar", "pos": Vector2(835 / 982.0, 578 / 1602.0)}, # 주방 바 오른쪽 끝
+	{"id": "bar_1", "kind": "bar", "pos": Vector2(437 / 982.0, 560 / 1602.0)}, # 주방 바 모서리
+	{"id": "bar_2", "kind": "bar", "pos": Vector2(118 / 982.0, 772 / 1602.0)}, # 창가 선반 가운데
+	{"id": "wall_0", "kind": "wall", "pos": Vector2(700 / 982.0, 105 / 1602.0)}, # 주방 위 벽
+	{"id": "wall_1", "kind": "wall", "pos": Vector2(855 / 982.0, 912 / 1602.0)}, # 칸막이 앞면
+	{"id": "plant_0", "kind": "plant", "pos": Vector2(118 / 982.0, 1196 / 1602.0)}, # 홀 왼쪽 아래 구석
+	{"id": "plant_1", "kind": "plant", "pos": Vector2(625 / 982.0, 1196 / 1602.0)}, # 입구 오른쪽
 ]
 
 
