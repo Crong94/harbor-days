@@ -30,6 +30,17 @@ const TEMP_FACES := ["bokja", "junho", "gyeongja", "mansu", "sundeok"]
 
 static var _cache := {} # id → {"tex": Texture2D, "cuts": [x0, x1, x2, x3]}
 
+## 홀 식당 (2026-11-17 3안): 앉은 그림을 엉덩이 바닥에 맞춘다. seat_k > 0이면 이 노드의 원점이 엉덩이 자리다.
+##   back, front: 그림 가운데를 원점에. side: 엉덩이 뒤쪽 끝을 원점에 (의자 뒤쪽 끝에 맞춤)
+##   그림마다 발바닥에서 엉덩이 바닥까지 비율 (칸 0 그림 높이 대비, 그림 세션이 눈금으로 잼). 없는 그림은 HIP_DEFAULT
+const HIP_UP := {
+	"back": {"mansu": 0.20, "sundeok": 0.16, "bokja": 0.18, "junho": 0.16, "gyeongja": 0.18},
+	"side": {"mansu": 0.20, "sundeok": 0.20, "bokja": 0.18, "junho": 0.17, "gyeongja": 0.15},
+	"front": {"mansu": 0.18, "sundeok": 0.16, "bokja": 0.14, "junho": 0.14, "gyeongja": 0.14},
+}
+const HIP_DEFAULT := {"back": 0.18, "side": 0.18, "front": 0.15}
+var seat_k := 0.0 # 시트 px → 화면 px (홀 식당). 0이면 예전처럼 노드 아래 가운데가 발
+
 var guest_id := ""
 var pose := "stand"
 var seat := "" # "", "back", "side"
@@ -76,7 +87,83 @@ static func _seat_sheet(id: String, kind: String) -> Dictionary:
 
 ## 지금 앉은 그림으로 그리는가
 func seated() -> bool:
-	return has_seat(guest_id, seat)
+	return has_seat(guest_id, seat_kind())
+
+
+## 실제로 쓰는 앉은 시트 종류. 앞모습 시트가 없으면 옆모습으로 대신한다
+func seat_kind() -> String:
+	if seat == "front" and not has_seat(guest_id, "front"):
+		return "side"
+	return seat
+
+
+## 앉은 시트 칸마다 그림이 있는 사각형과 엉덩이 뒤쪽 끝 (홀 식당용)
+## {tex, cells: [Rect2], h0: 칸 0 그림 높이, butt: [칸 안 x (오른쪽을 보는 그림의 등 쪽 끝)]}
+static func seat_cells(id: String, kind: String) -> Dictionary:
+	var key := id + "/" + kind + "/cells"
+	if _cache.has(key):
+		return _cache[key]
+	var tex: Texture2D = load(seat_path(id, kind))
+	var img := tex.get_image()
+	if img.is_compressed():
+		img.decompress()
+	var cw := img.get_width() / 4
+	var hip: float = HIP_UP.get(kind, {}).get(id, HIP_DEFAULT.get(kind, 0.18))
+	var cells := []
+	var butt := []
+	for i in 4:
+		var r := img.get_region(Rect2i(i * cw, 0, cw, img.get_height())).get_used_rect()
+		r.position.x += i * cw
+		cells.append(Rect2(r))
+	var h0: float = cells[0].size.y
+	for i in 4:
+		var r: Rect2 = cells[i]
+		# 엉덩이 높이 바로 위 몇 줄에서 가장 왼쪽 (등 쪽) 픽셀
+		var y := int(r.end.y - hip * h0 - 4.0)
+		var bx := r.size.x / 2.0
+		for x in range(int(r.position.x), int(r.end.x)):
+			var hit := false
+			for yy in range(maxi(0, y - 3), y + 1):
+				if img.get_pixel(x, yy).a > 0.24:
+					hit = true
+					break
+			if hit:
+				bx = x - r.position.x
+				break
+		butt.append(bx)
+	var e := {"tex": tex, "cells": cells, "h0": h0, "hip": hip, "butt": butt}
+	_cache[key] = e
+	return e
+
+
+## 홀 식당 앉은 그림의 머리 꼭대기 (원점 기준 위로 몇 px)
+func seated_top() -> float:
+	if not seated() or seat_k <= 0.0:
+		return 0.0
+	var e := seat_cells(guest_id, seat_kind())
+	var r: Rect2 = e.cells[SEAT_POSES.get(pose, 0)]
+	return (r.size.y - float(e.hip) * float(e.h0)) * seat_k
+
+
+func _draw_hall_seat() -> void:
+	var kind := seat_kind()
+	var e := seat_cells(guest_id, kind)
+	var i: int = SEAT_POSES.get(pose, 0)
+	var src: Rect2 = e.cells[i]
+	var k := seat_k
+	var bounce := 1.0 + 0.06 * sin(_pop * PI) * (1.0 - _pop * 0.5)
+	var breathe := 1.0 + 0.012 * sin(_t * 2.4)
+	var dw := src.size.x * k
+	var dh := src.size.y * k * breathe * bounce
+	var hip := float(e.hip) * float(e.h0) * k
+	# 그림 왼쪽 끝 (뒤집기 전 좌표). side는 등 쪽 끝을 원점에, 나머지는 가운데를
+	var x0 := -dw / 2.0
+	if seat == "side":
+		x0 = -float(e.butt[i]) * k
+	if flip:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2(-1, 1))
+	draw_texture_rect_region(e.tex, Rect2(x0, hip - dh, dw, dh), src)
+	draw_set_transform_matrix(Transform2D.IDENTITY)
 
 
 ## 열마다 그림이 있는 정도(알파 합)에서 세 칸 경계를 찾는다. [0, a, b, 너비]
@@ -185,9 +272,12 @@ func _draw() -> void:
 		_draw_walk()
 		return
 	var sit := seated()
+	if sit and seat_k > 0.0:
+		_draw_hall_seat()
+		return
 	if not sit and not has_sheet(guest_id):
 		return
-	var e := _seat_sheet(guest_id, seat) if sit else _sheet(guest_id)
+	var e := _seat_sheet(guest_id, seat_kind()) if sit else _sheet(guest_id)
 	var tex: Texture2D = e.tex
 	var i: int = SEAT_POSES.get(pose, 0) if sit else POSES.get(pose, 0)
 	var x0: int = e.cuts[i]

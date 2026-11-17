@@ -3,17 +3,16 @@ extends RefCounted
 ## 저녁 영업 (2026-11-16 다시 짬. 사용자: "한 사람은 주방에서 계속 요리하고 다른 한 사람은 서빙만").
 ## 장면 없이 규칙만 담아 헤드리스로 시험한다. 화면은 scenes/restaurant/dining_floor.gd.
 ##
-## 사람은 둘 자리: 주방(조리대 뒤에 서서 굽는다)과 홀(완성 접시를 들고 U자 바 안쪽 통로로 날라 준다).
+## 사람은 둘 자리: 주방(화구 앞에서 굽는다)과 홀(완성 접시를 들고 테이블 사이 빈 바닥으로 날라 준다).
 ##   2026-11-16 사용자: "주인공은 낚시, 서빙을 담당하고 다른 등장인물이 요리 전담". 요리사는 순덕 할머니 손녀 최세라 (둘째 날부터, Story sera_arrives).
 ##   세라는 노릇할 때 담아 조리대 끝 내놓는 자리에 놓는다. 주인공은 접시를 눌러(take) 손님에게 갖다준다.
 ##   내놓는 자리가 꽉 차면 세라가 접시를 못 내려서 화구 위 생선이 탈 수 있다 (빨리 날라야 하는 까닭).
 ##   서빙 알바(여울)를 뽑으면 여울도 맨 앞 접시부터 알아서 나른다.
 ##   helper_kitchen이 false면 예전처럼 주인공이 직접 굽는다 (plate, 첫날 튜토리얼과 시험용).
-## 사람은 조이스틱 없이 정해진 길로만 걷는다: 주방 → 조리대 옆 출구 → 바 안쪽 통로 → 손님 앞 → 돌아옴.
+## 사람은 조이스틱 없이 정해진 길(LANE)로만 걷는다: 홀 자리 → 길 → 손님 곁 서빙 자리 → 돌아옴.
 ##
-## 손님: 문으로 들어와 벽 쪽 길로 걸어 바 바깥 의자에 앉고 주문한다. 아이스박스에서 생선 한 마리를 고른다.
+## 손님: 아래 문으로 들어와 가운데 길로 걸어 자리에 앉고 주문한다. 아이스박스에서 생선 한 마리를 고른다.
 ## 생선이 떨어지면 "재료 소진"으로 문을 닫는다 (2026-11-16). 남은 손님은 오지 않고 평판도 깎이지 않는다.
-## 좌표는 식당 배경 그림(bg_shop_openkitchen_*, 941x1671) 전체 비율, 발끝 기준. 그림 세션 슬롯 설계 7·8차 값.
 
 enum GuestState { SEATED, EATING, LEFT, WALKING } # WALKING: 문에서 자리까지 걷는 중 (도착하면 주문)
 
@@ -38,35 +37,61 @@ const WALK_SPEED := 0.42 # 주인공, 서빙 알바 걷는 속도 (그림 비율
 const GUEST_SPEED := 0.4
 const HELPER_AUTO := [0.3, 1.3] # 주방 알바는 다 익고 이 사이에 담는다 (거의 노릇노릇)
 
-## 손님 자리 (의자 기준점, 슬롯 설계 7차 chair_0~9). 바 바깥: 왼쪽 4, 오른쪽 4, 앞 바 아래 2
-## 11-16 영상 확인: 옆모습 손님은 몸이 그림 칸 가운데보다 바 쪽으로 나와서 양옆 자리를 바깥으로 조금 옮겼다 (왼쪽 0.012, 오른쪽 0.035)
-const SEATS := [
-	Vector2(0.233, 0.598), Vector2(0.204, 0.683), Vector2(0.174, 0.768), Vector2(0.145, 0.853),
-	Vector2(0.787, 0.598), Vector2(0.817, 0.683), Vector2(0.847, 0.768), Vector2(0.876, 0.853),
-	Vector2(0.389, 0.917), Vector2(0.610, 0.917),
-]
-const FRONT_Y := 0.88 # 이보다 아래 자리는 앞 바 손님 (등을 보인다)
-## U자 바 안쪽 가장자리 (위 끝과 아래 끝). 원근 때문에 아래로 갈수록 벌어진다
-const INNER_TOP := Vector2(0.386, 0.512) # 왼쪽 안쪽 위 끝 (오른쪽은 좌우 대칭)
-const INNER_BOTTOM := Vector2(0.328, 0.793)
-const SERVE_INSET := 0.045 # 바 안쪽 가장자리에서 이만큼 통로 쪽에 서서 낸다
-const AISLE_BOTTOM := 0.775 # 통로 맨 아래 (앞 바 손님은 여기서 받는다)
+## 2026-11-17 홀 구조 3안 (사용자 결정, 회사 PC 그림 세션): 배경 bg_shop_hall_night (982x1602).
+## 위 오른쪽 주방 앞 바 4석, 왼쪽 창가 선반 2석, 가운데 테이블 둘 (4인씩), 오른쪽 칸막이 2인 테이블. 모두 16석.
+## 좌표는 배경 px를 W, H로 나눈 비율. 자리 좌표는 엉덩이 바닥(앉는 면) 기준이다 (그림 세션 앉은손님_확인그림.py 값)
+const W := 982.0
+const H := 1602.0
 
-## 주방과 출구
-const COOK_SPOT := Vector2(0.266, 0.455) # 요리사 발끝 (조리대 뒤)
-const BURNERS := [Vector2(0.232, 0.428), Vector2(0.300, 0.428)] # 화구 불 두 개 (조리대 윗면)
-const PASS := Vector2(0.405, 0.432) # 완성 접시 내놓는 자리 (조리대 오른쪽 끝)
-const PASS_STEP := 0.05 # 접시가 여럿이면 오른쪽으로 이어 놓는다
-const KITCHEN_EXIT := Vector2(0.475, 0.462) # 조리대 옆 트인 곳
-const AISLE_TOP := Vector2(0.5, 0.53)
-const HALL_HOME := Vector2(0.515, 0.468) # 홀 담당(주인공)이 접시를 기다리는 자리 (조리대 끝 바로 옆)
+## 손님 자리 (엉덩이 바닥). 0~3 주방 앞 바, 4·5 창가, 6·7 가운데 테이블 위쪽, 8·9 아래쪽,
+## 10·11 아래 테이블 위쪽, 12·13 아래쪽, 14·15 칸막이
+const SEATS := [
+	Vector2(518 / W, 639 / H), Vector2(622 / W, 639 / H), Vector2(723 / W, 639 / H), Vector2(824 / W, 639 / H),
+	Vector2(230 / W, 639 / H), Vector2(198 / W, 786 / H),
+	Vector2(333 / W, 784 / H), Vector2(422 / W, 784 / H), Vector2(335 / W, 903 / H), Vector2(424 / W, 903 / H),
+	Vector2(247 / W, 1015 / H), Vector2(337 / W, 1015 / H), Vector2(248 / W, 1157 / H), Vector2(337 / W, 1157 / H),
+	Vector2(698 / W, 1060 / H), Vector2(846 / W, 1060 / H),
+]
+## 앉은 그림: back 등을 보임, front 얼굴을 보임 (테이블 너머), side 옆모습 (오른쪽을 봄. SEAT_FLIP이면 왼쪽)
+const SEAT_VIEW := ["back", "back", "back", "back", "side", "side", "front", "front", "back", "back",
+	"front", "front", "back", "back", "side", "side"]
+const SEAT_FLIP := [false, false, false, false, true, true, false, false, false, false,
+	false, false, false, false, false, true]
+## 서빙 자리 (주인공이 서서 내는 곳, 발끝)
+const SPOTS := [
+	Vector2(518 / W, 735 / H), Vector2(622 / W, 735 / H), Vector2(723 / W, 735 / H), Vector2(824 / W, 735 / H),
+	Vector2(262 / W, 650 / H), Vector2(252 / W, 796 / H),
+	Vector2(258 / W, 800 / H), Vector2(505 / W, 800 / H), Vector2(258 / W, 905 / H), Vector2(505 / W, 905 / H),
+	Vector2(425 / W, 1035 / H), Vector2(425 / W, 1035 / H), Vector2(425 / W, 1150 / H), Vector2(425 / W, 1150 / H),
+	Vector2(690 / W, 1165 / H), Vector2(840 / W, 1165 / H),
+]
+## 다 먹고 간 빈 그릇 자리 (바, 선반, 테이블 위)
+const PLATE_SPOTS := [
+	Vector2(518 / W, 578 / H), Vector2(622 / W, 578 / H), Vector2(723 / W, 578 / H), Vector2(824 / W, 578 / H),
+	Vector2(150 / W, 618 / H), Vector2(122 / W, 765 / H),
+	Vector2(333 / W, 805 / H), Vector2(422 / W, 805 / H), Vector2(335 / W, 850 / H), Vector2(424 / W, 850 / H),
+	Vector2(247 / W, 1040 / H), Vector2(337 / W, 1040 / H), Vector2(248 / W, 1085 / H), Vector2(337 / W, 1085 / H),
+	Vector2(748 / W, 1010 / H), Vector2(800 / W, 1010 / H),
+]
+
+## 걷는 길: 바닥의 빈 곳을 잇는 한 줄 (A 왼쪽 위 - B 왼쪽 길과 바 앞 띠가 만나는 곳 - C 가운데 위 - M 가운데 - E 문 앞)
+const LANE := [Vector2(258 / W, 590 / H), Vector2(258 / W, 725 / H), Vector2(530 / W, 725 / H),
+	Vector2(530 / W, 1040 / H), Vector2(530 / W, 1165 / H)]
+## 자리마다 서빙 자리로 들어가는 길 점 (LANE 번호)
+const SEAT_ACCESS := [[1, 2], [1, 2], [1, 2], [1, 2], [0, 1], [0, 1],
+	[1], [2, 3], [1], [2, 3], [3], [3], [3, 4], [3, 4], [4], [4]]
+
+## 주방
+const COOK_SPOT := Vector2(590 / W, 515 / H) # 요리사 발끝 (화구 앞)
+const BURNERS := [Vector2(655 / W, 452 / H), Vector2(725 / W, 447 / H)] # 화구 불 두 개
+## 완성 접시 내놓는 자리 (주방 바 왼쪽 날개 위, 홀 쪽)
+const PASS_SPOTS := [Vector2(385 / W, 440 / H), Vector2(398 / W, 490 / H), Vector2(412 / W, 540 / H)]
+const KITCHEN_EXIT := Vector2(258 / W, 470 / H)
+const HALL_HOME := Vector2(232 / W, 560 / H) # 홀 담당(주인공)이 접시를 기다리는 자리 (내놓는 자리 옆)
 const START := COOK_SPOT
 
-## 손님 입구 (오른쪽 벽 문) 와 벽 쪽 길
-const ENTRANCE := Vector2(0.95, 0.475)
-const LANE_RIGHT := 0.925
-const LANE_LEFT := 0.07
-const LANE_BOTTOM := 0.97
+## 손님 입구 (아래 가운데 문)
+const ENTRANCE := Vector2(480 / W, 1192 / H)
 
 var time := 0.0
 var inventory: Array = []
@@ -244,7 +269,7 @@ func _to_pass(c: Dictionary, q: String) -> void:
 # 같은 생선을 시킨 손님이면 누구에게 줘도 된다 (두 손님의 주문을 맞바꾼다). 다른 요리를 시킨 손님은 안 받는다.
 
 const MAX_TASKS := 3
-const HELPER_HOME := Vector2(0.66, 0.478) # 서빙 알바가 기다리는 자리 (주인공 오른쪽)
+const HELPER_HOME := Vector2(245 / W, 470 / H) # 서빙 알바가 기다리는 자리 (주인공 뒤)
 
 var selected := -1 # 고른 접시 (주문한 guest index). 아직 내놓는 자리에 있다
 var tasks: Array = [] # 줄 선 일 [{type: "serve", dish} / {type: "clear", seat}]
@@ -337,42 +362,66 @@ func _swap(a: int, b: int) -> void:
 		guests[b][k] = t
 
 
-## 서빙 자리: 손님 앞 바 안쪽 가장자리에서 통로 쪽으로 조금
+## 서빙 자리: 그 손님 곁 빈 바닥
 static func serve_spot(seat: int) -> Vector2:
-	var s: Vector2 = SEATS[seat]
-	if s.y > FRONT_Y:
-		return Vector2(clampf(s.x, 0.42, 0.58), AISLE_BOTTOM)
-	var y := clampf(s.y, AISLE_TOP.y + 0.02, AISLE_BOTTOM)
-	var x := inner_x(y, s.x < 0.5)
-	return Vector2(x + (SERVE_INSET if s.x < 0.5 else -SERVE_INSET), y)
+	return SPOTS[seat]
 
 
-## 바 안쪽 가장자리 x (그 높이에서)
-static func inner_x(y: float, left: bool) -> float:
-	var k := clampf((y - INNER_TOP.y) / (INNER_BOTTOM.y - INNER_TOP.y), 0.0, 1.0)
-	var x := lerpf(INNER_TOP.x, INNER_BOTTOM.x, k)
-	return x if left else 1.0 - x
+## LANE i번에서 j번까지 지나는 점들 (둘 다 넣는다)
+static func _lane(i: int, j: int) -> Array:
+	var out := []
+	var step := 1 if j >= i else -1
+	var k := i
+	while true:
+		out.append(LANE[k])
+		if k == j:
+			break
+		k += step
+	return out
 
 
-## from에서 그 자리 앞까지 가는 길 (주방 안이면 출구로 먼저 나온다)
+## from(들어가는 길 점 from_access 중 하나로 LANE에 올라탐)에서 to까지 가장 짧은 길. to는 넣고 from은 넣지 않는다
+static func _route(from: Vector2, from_access: Array, to: Vector2, to_access: Array) -> Array:
+	var best := []
+	var best_len := INF
+	for i in from_access:
+		for j in to_access:
+			var pts := _lane(i, j)
+			var length := from.distance_to(pts[0]) + to.distance_to(pts[pts.size() - 1])
+			for k in range(1, pts.size()):
+				length += pts[k - 1].distance_to(pts[k])
+			if length < best_len:
+				best_len = length
+				best = pts
+	return best + [to]
+
+
+## 홀 자리, 알바 자리, 주방에서 LANE에 올라타는 점
+static func _home_access(from: Vector2) -> Array:
+	return [4] if from.distance_to(ENTRANCE) < 0.02 else [0]
+
+
+## from에서 그 자리 서빙 자리까지 가는 길 (주방 안이면 주방 출구로 먼저 나온다)
 static func _path_to_guest(from: Vector2, seat: int) -> Array:
-	var spot := serve_spot(seat)
 	var path := []
-	if from.x < KITCHEN_EXIT.x - 0.01 and from.y < AISLE_TOP.y:
+	if from.distance_to(COOK_SPOT) < 0.01:
 		path.append(KITCHEN_EXIT)
-	path.append(AISLE_TOP)
-	path.append(Vector2(AISLE_TOP.x, spot.y))
-	path.append(spot)
+		from = KITCHEN_EXIT
+	return path + _route(from, _home_access(from), SPOTS[seat], SEAT_ACCESS[seat])
+
+
+## 그 자리 서빙 자리에서 홀 자리(또는 주방)로 돌아가는 길
+static func _path_home(seat: int, home: Vector2) -> Array:
+	var to := KITCHEN_EXIT if home.distance_to(COOK_SPOT) < 0.01 else home
+	var path := _route(SPOTS[seat], SEAT_ACCESS[seat], to, [0])
+	if to != home:
+		path.append(home)
 	return path
 
 
-## 자리 앞에서 돌아가는 길
-static func _path_home(from: Vector2, home: Vector2) -> Array:
-	var path := [Vector2(AISLE_TOP.x, from.y), AISLE_TOP]
-	if home.x < KITCHEN_EXIT.x:
-		path.append(KITCHEN_EXIT)
-	path.append(home)
-	return path
+## 그 일의 자리 (접시를 낼 손님 자리, 또는 치울 자리)
+func _task_seat(t: Dictionary) -> int:
+	return int(t.seat) if t.type == "clear" else int(guests[t.dish].seat)
 
 
 ## 주인공이 돌아갈 자리
@@ -395,7 +444,7 @@ func _walk_player(dt: float) -> void:
 			task = {}
 		else:
 			_finish_task(task, true)
-			player_path = _path_home(player, player_home())
+			player_path = _path_home(_task_seat(task), player_home())
 			task["back"] = true
 
 
@@ -475,7 +524,7 @@ func _helper_step(dt: float) -> void:
 			helper_task = {}
 		else:
 			_finish_task(helper_task, false)
-			helper_path = _path_home(helper, HELPER_HOME)
+			helper_path = _path_home(_task_seat(helper_task), HELPER_HOME)
 			helper_task["back"] = true
 
 
@@ -584,27 +633,15 @@ func _arrive() -> void:
 			"name": s.name, "seat": seat, "fish": e.id, "size": e.size, "entry": e,
 			"price": DayFlow.dish_price(e.id, e.size), "state": GuestState.WALKING,
 			"wait": 0.0, "eat": 0.0, "cooked": false, "quality": "",
-			"pos": ENTRANCE, "path": entry_path(seat), "dir": Vector2.LEFT,
+			"pos": ENTRANCE, "path": entry_path(seat), "dir": Vector2.UP,
 		}
 		guests.append(g)
 		events.append({"type": "arrive", "guest": guests.size() - 1})
 
 
-## 문에서 그 자리까지 걷는 길. 오른쪽 손님은 오른쪽 벽 길로, 앞 바와 왼쪽 손님은 맨 아래 길을 지나 간다
+## 문에서 그 자리까지 걷는 길: 문 앞에서 가운데 길을 따라 서빙 자리까지 와서 자리에 앉는다
 static func entry_path(seat: int) -> Array:
-	var s: Vector2 = SEATS[seat]
-	var path := [Vector2(LANE_RIGHT, ENTRANCE.y)]
-	if s.y > FRONT_Y:
-		path.append(Vector2(LANE_RIGHT, LANE_BOTTOM))
-		path.append(Vector2(s.x, LANE_BOTTOM))
-	elif s.x > 0.5:
-		path.append(Vector2(LANE_RIGHT, s.y))
-	else:
-		path.append(Vector2(LANE_RIGHT, LANE_BOTTOM))
-		path.append(Vector2(LANE_LEFT, LANE_BOTTOM))
-		path.append(Vector2(LANE_LEFT, s.y))
-	path.append(s)
-	return path
+	return _route(ENTRANCE, [4], SPOTS[seat], SEAT_ACCESS[seat]) + [SEATS[seat]]
 
 
 func _walk_guests(dt: float) -> void:

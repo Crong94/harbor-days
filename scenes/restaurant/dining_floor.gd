@@ -5,26 +5,28 @@ extends Control
 ##   주방: 요리사 세라가 조리대 뒤에서 굽는다. 요리사 양옆 동그라미가 화구 두 개의 익은 정도다.
 ##   홀: 완성 접시가 조리대 끝에 놓이면 눌러서 주인공이 갖다준다. 서빙 알바 여울이 있으면 여울도 맨 앞 접시부터 나른다.
 ##   조이스틱 없이 누르기만 하고, 사람은 정해진 길로만 걷는다.
-## 그림: 배경 bg_shop_openkitchen_night (빈 바탕 6차), 바와 가구는 ShopDecor 슬롯 그림 (decor/),
-##   손님 SD sd_guest/<id>_*.png, 주인공 sd/walk·serve_walk, 알바 staff/*, 요리 dish/<recipe>.png, 생선 fish_<id>.png
+## 그림: 배경 bg_shop_hall_night (2026-11-17 홀 구조 3안, 가구가 그려진 바탕), 손님 SD sd_guest/<id>_*.png
+##   (앉은 그림 seat_back, seat_side, seat_front), 주인공 sd/walk·serve_walk, 알바 staff/*, 요리 dish/<recipe>.png, 생선 fish_<id>.png
+## 손님이 의자, 테이블, 선반 뒤에 앉으면 그 가구 모양대로 배경을 잘라 손님 위에 다시 덮는다 (HallCover. 그림 세션 확인 그림과 같은 모양)
+## 가게 꾸미기 슬롯(ShopDecor)은 6차 바탕 자리라 3안에서는 아직 그리지 않는다.
 ## 끝나면 finished(결과)를 보낸다 (장부가 그대로 쓴다).
 
 signal finished(result: Dictionary)
 
-const BG := "bg_shop_openkitchen_night"
-const BG_SIZE := Vector2(941, 1671)
+const BG := "bg_shop_hall_night"
+const BG_SIZE := Vector2(982, 1602)
 ## 사람 키 (화면 px, 서 있는 키). 슬롯 설계 7차: SD 1.3배
 const CHAR_H := 195.0
 const GUEST_H := CHAR_H
 ## 걷기 시트는 칸 위 여백이 커서 이만큼 키워 그린다 (GuestSD.WALK_SCALE과 같은 값)
 const SHEET_WALK_SCALE := 1.2
-const SEAT_LIFT := 30.0 # 앉은 그림 발끝을 의자 기준점보다 이만큼 위에 (의자 앉는 높이)
+## 앉은 시트 px → 배경 px (그림 세션 확인 그림의 K. 바른 자세 시트를 이 배율로 놓으면 의자 크기와 맞는다)
+const SEAT_K := 0.44
+const SEAT_LIFT := 30.0 # 앉은 그림이 없어 서 있는 그림으로 대신할 때 발을 자리보다 이만큼 위에
 const DISH := 50.0
 const NIGHT_DIM := Color(0.85, 0.85, 0.85)
-## 조리대 앞면 (요리사 다리를 가린다). 빈 바탕에서 잘라 요리사 위에 다시 덮는다 (슬롯 설계 8차)
-const COUNTER := Rect2(0.08, 0.413, 0.36, 0.092)
 ## 화구 고리 (요리사 양옆, 누르는 자리)
-const BURNER_UI := [Vector2(0.135, 0.365), Vector2(0.4, 0.365)]
+const BURNER_UI := [Vector2(470 / 982.0, 330 / 1602.0), Vector2(715 / 982.0, 330 / 1602.0)]
 const BURNER_R := 38.0
 ## 쟁반 자리 (시트에서 쟁반의 회색 금속 부분을 찾아 잰 값). 칸마다 [가로: 칸 가운데에서 칸 폭 비율, 쟁반 윗면: 칸 높이 비율, 쟁반 폭: 칸 폭 비율].
 ## 빈 배열은 쟁반이 몸에 가려 안 보이는 칸(뒷모습)
@@ -45,6 +47,8 @@ var _t := 0.0
 var _done := false
 var _bg_tex: Texture2D
 var _decor_layer: Control # 바, 의자, 장식 (손님 뒤)
+var _people: Control # 손님과 가구 덮개 (y 순서로 그린다)
+var _covers: Array = [] # 자리마다 HallCover
 var _draw_layer: Control # 사람, 화구, 접시, 말풍선 (손님 앞)
 var _decor := [] # [{pos, tex, kind}]
 var _taught_plate := false # 처음 노릇할 때 "지금 눌러요" 안내
@@ -55,16 +59,9 @@ const PLATES := ["decor/plate_dirty_fish", "decor/plate_dirty", "decor/plate_dir
 var _plates := {}
 
 
-## 빈 그릇 자리: 그 손님 앞 바 위 (양옆은 바 가운데, 앞 바 손님은 앞 바 위). 화면 좌표, 그릇 아래쪽 근처
+## 빈 그릇 자리: 그 손님 앞 바, 선반, 테이블 위. 화면 좌표, 그릇 아래쪽 근처
 func _plate_pos(seat: int) -> Vector2:
-	var s: Vector2 = DiningLogic.SEATS[seat]
-	if s.y > DiningLogic.FRONT_Y:
-		return to_screen(Vector2(s.x, 0.84))
-	var y := clampf(s.y - 0.005, DiningLogic.INNER_TOP.y + 0.03, DiningLogic.INNER_BOTTOM.y)
-	var k := (y - 0.512) / (0.828 - 0.512)
-	var outer := lerpf(0.323, 0.213, k) # 바 바깥 가장자리 (슬롯 설계 table 윤곽)
-	var mid := (outer + DiningLogic.inner_x(y, true)) / 2.0
-	return to_screen(Vector2(mid if s.x < 0.5 else 1.0 - mid, y))
+	return to_screen(DiningLogic.PLATE_SPOTS[seat])
 
 
 ## 빈 그릇 그림 (자리마다 정해진 하나)
@@ -122,6 +119,18 @@ func _ready() -> void:
 	_decor_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_decor_layer.draw.connect(_draw_decor)
 	add_child(_decor_layer)
+	_people = Control.new()
+	_people.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_people.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_people)
+	if _bg_tex:
+		for i in DiningLogic.SEATS.size():
+			var cv := HallCover.new()
+			cv.dining = self
+			cv.polys = HallCover.polys_for(i)
+			cv.key = DiningLogic.SEATS[i].y + 0.0005
+			_people.add_child(cv)
+			_covers.append(cv)
 	_draw_layer = Control.new()
 	_draw_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_draw_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -155,6 +164,10 @@ func bg_px(v: float) -> float:
 
 func _load_decor() -> void:
 	_decor.clear()
+	if BG == "bg_shop_hall_night":
+		# 3안 바탕은 가구가 그려져 있다. 꾸미기 슬롯은 3안 자리로 다시 짤 때까지 그리지 않는다
+		_decor_layer.queue_redraw()
+		return
 	for sl in ShopDecor.slots():
 		var art := ShopDecor.art_of(ShopDecor.item_in(GameState.shop_decor, sl.id))
 		var tex := _load_art(art) if not art.is_empty() else null
@@ -263,7 +276,7 @@ func _guest_at(p: Vector2) -> int:
 	for gi in logic.guests.size():
 		if logic.guests[gi].state != DiningLogic.GuestState.SEATED:
 			continue
-		var body := _seat_screen(gi) - Vector2(0, SEAT_LIFT + _seated_h() * 0.5)
+		var body := _seat_screen(gi) - Vector2(0, _head_h(gi) * 0.5)
 		var d := minf(p.distance_to(_bubble_pos(gi)) * 0.8, p.distance_to(body))
 		if d < best_d:
 			best_d = d
@@ -288,9 +301,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 
 
-## 내놓는 자리 i번 접시 화면 위치 (조리대 끝에서 출구 쪽으로)
+## 내놓는 자리 i번 접시 화면 위치 (주방 바 왼쪽 날개 위)
 func _pass_pos(i: int) -> Vector2:
-	return to_screen(DiningLogic.PASS + Vector2(i * DiningLogic.PASS_STEP, 0.0))
+	return to_screen(DiningLogic.PASS_SPOTS[i])
 
 
 # ─── 진행 ───────────────────────────────────────────
@@ -331,10 +344,9 @@ func _handle_events() -> void:
 				var sd := GuestSD.new()
 				sd.guest_id = _faces.get(g.name, GuestSD.TEMP_FACES[0])
 				sd.size = Vector2(GUEST_H * 0.75, GUEST_H)
-				sd.walk = "side"
-				sd.flip = true
-				add_child(sd)
-				move_child(sd, _draw_layer.get_index()) # 바와 의자 앞, 사람과 말풍선 뒤
+				sd.walk = "back"
+				sd.flip = false
+				_people.add_child(sd) # 가구 덮개와 함께 y 순서로 (사람과 말풍선 뒤)
 				_guests[gi] = sd
 				UiKit.fade_in(sd, 0.3)
 				_dish_tex[gi] = _load_art(Catalog.dish_art(FishDB.get_fish(g.fish).get("grill", "bollak-gui")))
@@ -344,10 +356,11 @@ func _handle_events() -> void:
 				var gi: int = e.guest
 				if _guests.has(gi):
 					var sd: GuestSD = _guests[gi]
-					var seat_pos: Vector2 = DiningLogic.SEATS[logic.guests[gi].seat]
+					var seat_i: int = logic.guests[gi].seat
 					sd.walk = ""
-					sd.seat = "back" if seat_pos.y > DiningLogic.FRONT_Y else "side"
-					sd.flip = sd.seat == "side" and seat_pos.x > 0.5
+					sd.seat = DiningLogic.SEAT_VIEW[seat_i]
+					sd.flip = DiningLogic.SEAT_FLIP[seat_i]
+					sd.seat_k = bg_px(SEAT_K)
 					sd.set_pose("stand")
 				Sound.play_sfx("tap", 0.05, -10.0)
 			"cook":
@@ -431,26 +444,41 @@ func _seat_screen(gi: int) -> Vector2:
 	return to_screen(DiningLogic.SEATS[logic.guests[gi].seat])
 
 
-## 앉은 키 (화면 px)
-func _seated_h() -> float:
-	return GUEST_H * GuestSD.SEAT_H
+## 앉은 손님 엉덩이 자리에서 머리 꼭대기까지 (화면 px). 그림을 모르면 보통 키
+func _head_h(gi: int) -> float:
+	if _guests.has(gi):
+		var top: float = _guests[gi].seated_top()
+		if top > 0.0:
+			return top
+	return bg_px(140.0)
 
 
-## 주문 말풍선 자리: 양옆 손님은 바 위 (통로 쪽 머리 높이), 앞 바 손님은 머리 위
+## 말풍선 놓는 쪽: 0 머리 위, -1 왼쪽, 1 오른쪽. 테이블 손님은 머리 위에 두면 맞은편 손님 얼굴을 가려서 옆으로
+const BUBBLE_SIDE := [0, 0, 0, 0, 0, 0, -1, 1, -1, 1, -1, 1, -1, 1, 0, 0]
+
+
+## 주문 말풍선 자리
 func _bubble_pos(gi: int) -> Vector2:
-	return _seat_bubble(logic.guests[gi].seat)
+	return _bubble_at(logic.guests[gi].seat, _head_h(gi))
 
 
 func _seat_bubble(seat_i: int) -> Vector2:
-	var seat: Vector2 = DiningLogic.SEATS[seat_i]
-	var feet := to_screen(seat) - Vector2(0, SEAT_LIFT)
-	if seat.y > DiningLogic.FRONT_Y:
-		return feet + Vector2(0, -_seated_h() - 34.0)
-	var side := 1.0 if seat.x < 0.5 else -1.0
-	return feet + Vector2(side * GUEST_H * 0.5, -_seated_h() * 0.95)
+	return _bubble_at(seat_i, bg_px(140.0))
 
 
+func _bubble_at(seat_i: int, head: float) -> Vector2:
+	var at := to_screen(DiningLogic.SEATS[seat_i])
+	var side: int = BUBBLE_SIDE[seat_i]
+	if side == 0:
+		return at - Vector2(0, head + 30.0)
+	return at + Vector2(side * bg_px(72.0), -head * 0.72)
+
+
+## 손님을 자리에 놓고, 손님과 가구 덮개를 위에서 아래 순서로 다시 줄 세운다
 func _place_guests() -> void:
+	var order := []
+	for cv in _covers:
+		order.append([cv.key, cv])
 	for gi in _guests:
 		var sd: GuestSD = _guests[gi]
 		var g: Dictionary = logic.guests[gi]
@@ -463,11 +491,19 @@ func _place_guests() -> void:
 				sd.walk = "back" if dir.y < 0.0 else "front"
 				sd.flip = false
 			sd.position = to_screen(g.pos) - Vector2(sd.size.x / 2.0, sd.size.y)
+			order.append([float(g.pos.y), sd])
 			continue
-		var feet := _seat_screen(gi)
-		if sd.seated():
-			feet.y -= SEAT_LIFT
-		sd.position = feet - Vector2(sd.size.x / 2.0, sd.size.y)
+		var seat_i: int = g.seat
+		var at := _seat_screen(gi)
+		if sd.seated() and sd.seat_k > 0.0:
+			sd.position = at # 원점이 엉덩이 자리
+		else:
+			sd.position = at - Vector2(sd.size.x / 2.0, sd.size.y + SEAT_LIFT)
+		order.append([float(DiningLogic.SEATS[seat_i].y), sd])
+	order.sort_custom(func(a, b): return a[0] < b[0])
+	for i in order.size():
+		if order[i][1].get_index() != i:
+			_people.move_child(order[i][1], i)
 
 
 # ─── 그리기 ─────────────────────────────────────────
@@ -477,11 +513,6 @@ func _draw_floor() -> void:
 	var ci := _draw_layer
 	var font := UiKit.font("cute")
 	_draw_cook(ci)
-	# 조리대 앞면을 요리사 위에 다시 덮는다
-	if _bg_tex:
-		var src := Rect2(COUNTER.position * BG_SIZE, COUNTER.size * BG_SIZE)
-		var dst := Rect2(to_screen(COUNTER.position), COUNTER.size * floor_rect().size)
-		ci.draw_texture_rect_region(_bg_tex, dst, src)
 	_draw_decor_items(ci, true) # 화구, 도구
 	# 화구 위 생선 (조리대 윗면에 작게)
 	for c in logic.cooking:
@@ -510,7 +541,7 @@ func _draw_floor() -> void:
 	if _done or not _started:
 		pass
 	elif not logic.pass_dishes.is_empty() and not _taught_take and logic.selected < 0:
-		_caption(ci, font, hint_at, "조리대 끝에 나온 접시를 눌러요")
+		_caption(ci, font, hint_at, "주방 바 끝에 나온 접시를 눌러요")
 	elif logic.selected >= 0 and not _taught_take:
 		_caption(ci, font, hint_at, "반짝이는 손님을 누르면 갖다줘요")
 	elif not logic.dirty.is_empty() and not _taught_clear:

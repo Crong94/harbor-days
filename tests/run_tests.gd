@@ -1477,21 +1477,23 @@ func _test_dining() -> void:
 	for i in DiningLogic.SEATS.size():
 		var path := DiningLogic.entry_path(i)
 		_eq(path[path.size() - 1], DiningLogic.SEATS[i], "%d번 자리까지 가는 길 끝은 자리" % i)
-		_eq(is_equal_approx(path[0].x, DiningLogic.LANE_RIGHT), true, "%d번 길은 오른쪽 벽 길에서 시작" % i)
+		_eq(path[0], DiningLogic.LANE[4], "%d번 길은 문 앞 길에서 시작" % i)
+		_eq(path[path.size() - 2], DiningLogic.SPOTS[i], "%d번 손님은 서빙 자리를 거쳐 앉음" % i)
 	var wk := DiningLogic.new()
 	wk.setup(4, _fish_box(12), names)
-	wk.update(wk.schedule[0].t + 0.01)
+	while wk.guests.is_empty():
+		wk.update(1.0 / 30.0)
 	_eq(wk.guests[0].state, DiningLogic.GuestState.WALKING, "들어온 손님은 먼저 걷는다")
 	_eq(wk.queue.is_empty(), true, "걷는 동안은 주문 없음")
 	for k in 300:
 		wk.update(1.0 / 30.0)
 	_eq(wk.guests[0].state, DiningLogic.GuestState.SEATED, "10초 안에 자리에 앉음")
 	_eq(wk.guests[0].pos, DiningLogic.SEATS[wk.guests[0].seat], "앉은 자리에 서 있음")
-	# 빈자리를 고루 쓴다 (왼쪽 바부터 채우지 않는다)
+	# 빈자리를 고루 쓴다 (한쪽부터 채우지 않는다)
 	var sides := {}
 	for g in a.guests:
 		sides["L" if DiningLogic.SEATS[g.seat].x < 0.5 else "R"] = true
-	_eq(sides.size(), 2, "손님이 양쪽 바에 고루 앉음")
+	_eq(sides.size(), 2, "손님이 홀 양쪽에 고루 앉음")
 	# 이름 없는 손님 그림: 이름마다 정해진 그림, 모르는 이름도 다섯 중 하나
 	_eq(GuestSD.face_for("물질 마친 해녀"), "guest_haenyeo" if GuestSD.has_sheet("guest_haenyeo") else GuestSD.face_for("물질 마친 해녀"), "해녀 손님 그림")
 	for gname in DayFlow.GUESTS:
@@ -1572,11 +1574,18 @@ func _test_dining() -> void:
 		dz.update(1.0 / 30.0)
 	_eq([dz.dirty.is_empty(), dz.free_seats().has(3), dz.task.is_empty()], [true, true, true], "치우고 홀 자리로 돌아옴")
 	_eq(dz.player.distance_to(DiningLogic.HALL_HOME) < 0.001, true, "주인공은 홀 자리에서 기다림")
-	# 손님 앞까지 가는 길은 통로로만 (바를 넘지 않는다)
+	# 손님 앞까지 가는 길은 길(LANE)을 따라 서빙 자리로, 돌아올 때도 길로 홀 자리까지
+	_eq([DiningLogic.SEATS.size(), DiningLogic.SEAT_VIEW.size(), DiningLogic.SEAT_FLIP.size(), DiningLogic.SPOTS.size(),
+		DiningLogic.PLATE_SPOTS.size(), DiningLogic.SEAT_ACCESS.size()], [16, 16, 16, 16, 16, 16], "홀 16석 자리표 길이가 맞음")
 	for i in DiningLogic.SEATS.size():
-		var sp := DiningLogic.serve_spot(i)
-		var inside := sp.x > DiningLogic.inner_x(sp.y, true) and sp.x < DiningLogic.inner_x(sp.y, false) and sp.y <= DiningLogic.AISLE_BOTTOM + 0.001
-		_eq(inside, true, "%d번 손님 서빙 자리는 바 안쪽 통로" % i)
+		var go := DiningLogic._path_to_guest(DiningLogic.HALL_HOME, i)
+		_eq(go[go.size() - 1], DiningLogic.serve_spot(i), "%d번 손님에게 가는 길 끝은 서빙 자리" % i)
+		_eq(DiningLogic.LANE.has(go[0]), true, "%d번 손님에게 갈 때 길로 먼저 감" % i)
+		var back := DiningLogic._path_home(i, DiningLogic.HALL_HOME)
+		_eq(back[back.size() - 1], DiningLogic.HALL_HOME, "%d번 자리에서 홀 자리로 돌아옴" % i)
+		_eq(HallCover.polys_for(i).is_empty(), false, "%d번 자리 가구 덮개" % i)
+	var kp := DiningLogic._path_to_guest(DiningLogic.COOK_SPOT, 0)
+	_eq(kp[0], DiningLogic.KITCHEN_EXIT, "주방에서 나갈 땐 주방 출구로")
 	# 알바가 서빙을 맡으면 알아서 갖다준다
 	var al := DiningLogic.new()
 	al.setup(4, _fish_box(12), names)
@@ -1597,9 +1606,9 @@ func _test_dining() -> void:
 func _test_shop_decor() -> void:
 	var decor := {}
 	var owned := []
-	_eq(DiningLogic.SEATS.size(), 10, "손님 자리 10석 (왼쪽 4, 오른쪽 4, 아래 2)")
+	_eq(DiningLogic.SEATS.size(), 16, "손님 자리 16석 (홀 3안)")
 	var chairs := ShopDecor.slots().filter(func(s): return s.kind == "chair").size()
-	_eq(chairs, 10, "의자 슬롯은 자리마다")
+	_eq(chairs, 16, "의자 슬롯은 자리마다")
 	_eq(ShopDecor.item_in(decor, "chair_3"), "chair_basic", "안 놓으면 기본 의자")
 	_eq(ShopDecor.item_in(decor, "bar_0"), "bar_none", "바 위는 기본 빈 자리")
 	_eq(ShopDecor.art_of("bar_none"), "", "빈 자리는 그리지 않음")
@@ -1609,7 +1618,7 @@ func _test_shop_decor() -> void:
 	_eq(ShopDecor.place(decor, owned, "chair_0", "chair_wood"), true, "산 의자 놓기")
 	_eq(ShopDecor.place(decor, owned, "bar_0", "chair_wood"), false, "의자를 바 위에 놓을 순 없음")
 	_eq(ShopDecor.place(decor, owned, "nope", "chair_wood"), false, "없는 슬롯")
-	_eq(ShopDecor.place_all(decor, owned, "chair", "chair_wood"), 10, "의자 한 번에 바꾸기")
+	_eq(ShopDecor.place_all(decor, owned, "chair", "chair_wood"), 16, "의자 한 번에 바꾸기")
 	_eq(ShopDecor.place(decor, owned, "wall_0", "wall_none"), true, "기본 물건은 사지 않아도 놓음")
 	decor["bar_1"] = "chair_wood" # 망가진 저장값
 	_eq(ShopDecor.item_in(decor, "bar_1"), "bar_none", "종류가 틀린 값은 기본으로")
@@ -1797,11 +1806,23 @@ func _test_seated() -> void:
 	_eq(sd.seated(), false, "그림 없으면 서 있는 그림으로")
 	sd.free()
 	_eq(GuestSD.SEAT_POSES.size(), 4, "앉은 자세 네 가지 (기다림, 먹는 중, 만족, 화남)")
-	var front := 0
-	for p in DiningLogic.SEATS:
-		if p.y > DiningLogic.FRONT_Y:
-			front += 1
-	_eq(front, 2, "앞 바 손님 두 자리 (뒷모습)")
+	var views := {}
+	for v in DiningLogic.SEAT_VIEW:
+		views[v] = int(views.get(v, 0)) + 1
+	_eq(views, {"back": 8, "side": 4, "front": 4}, "홀 자리 방향: 등 8, 옆 4, 얼굴 4")
+	# 앞모습 시트가 없는 손님은 옆모습으로 대신 앉는다
+	var fr := GuestSD.new()
+	fr.guest_id = "mansu"
+	fr.seat = "front"
+	_eq(fr.seat_kind(), "front", "만수는 앞모습 시트 있음")
+	fr.guest_id = "guest_fisher"
+	_eq(fr.seat_kind(), "front" if GuestSD.has_seat("guest_fisher", "front") else "side", "앞모습 없으면 옆모습")
+	fr.free()
+	# 엉덩이 자리 맞추기: 칸마다 그림 사각형과 엉덩이 비율
+	var cells := GuestSD.seat_cells("mansu", "side")
+	_eq(cells.cells.size(), 4, "앉은 시트 네 칸")
+	_eq(is_equal_approx(float(cells.hip), 0.20), true, "만수 옆모습 엉덩이 비율")
+	_eq(float(cells.butt[0]) >= 0.0 and float(cells.butt[0]) < cells.cells[0].size.x * 0.5, true, "엉덩이 뒤쪽 끝은 칸 왼쪽 절반 안 (%.0f)" % float(cells.butt[0]))
 
 
 ## 순덕 할머니 집 그림: 부탁에 맞는 동작
