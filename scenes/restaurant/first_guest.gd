@@ -2,7 +2,7 @@ extends Control
 ## 챕터 2 〈첫 번째 손님〉. 새벽에 잡은 볼락을 소금구이로 굽고, 최순덕이 첫 손님으로 온다.
 ## 기획서 6장 챕터 2 끝부분. 요리 규칙은 CookingLogic, 이 스크립트는 이야기 순서와 화면 표시만 맡는다.
 ##
-## 그림: 식당 내부 bg_shop_hall_day, 순덕 초상화 npc_sundeok (사용자에게 받음. 없으면 그림 자리만 보인다)
+## 그림: 식당 4안 낮 판 (Shop4View: shop4/bg_day 위에 가구와 소품, 없으면 bg_shop_hall_day), 순덕 초상화 npc_sundeok (사용자에게 받음. 없으면 그림 자리만 보인다)
 ##       화로 kitchen/grill, 볼락구이 dish/bollak-gui (바다 한 접시에서 가져옴)
 
 const NEXT_SCENE := "res://scenes/map/map.tscn"
@@ -39,7 +39,13 @@ func _ready() -> void:
 	base.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	base.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(base)
-	var bg := UiKit.cover_art("bg_shop_hall_day")
+	# 식당 4안 낮 판 (빈 바탕 위에 가구와 소품). 4안 그림이 없으면 예전 3안 한 장 그림
+	var bg: Control = null
+	if Shop4View.has_art(false):
+		bg = Shop4View.new()
+		bg.decor = GameState.shop_decor
+	else:
+		bg = UiKit.cover_art("bg_shop_hall_day")
 	if bg:
 		add_child(bg)
 	add_child(UiKit.shade([[0.0, 0.5], [0.2, 0.0], [0.7, 0.0], [1.0, 0.6]], Color("1a1410")))
@@ -56,7 +62,7 @@ func _ready() -> void:
 	bar.add_child(UiKit.spacer())
 	bar.add_child(UiKit.chip("", "오전 07:30", "icon_clock"))
 	if not bg:
-		var note := UiKit.text("식당 내부 그림 준비 중 · bg_shop_hall_day", "caption", Color(1, 1, 1, 0.35), HORIZONTAL_ALIGNMENT_CENTER)
+		var note := UiKit.text("식당 내부 그림 준비 중 · shop4/bg_day", "caption", Color(1, 1, 1, 0.35), HORIZONTAL_ALIGNMENT_CENTER)
 		note.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 		note.offset_top = 92
 		add_child(note)

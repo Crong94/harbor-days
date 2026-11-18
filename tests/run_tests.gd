@@ -2079,3 +2079,10 @@ func _test_shop4() -> void:
 	# 위쪽 줄 테이블 손님은 테이블보다 먼저 그려 다리가 가린다
 	_eq(Shop4.SEAT_KEY[6] < 794.0 and Shop4.SEAT_KEY[10] < 1046.0, true, "테이블 위쪽 줄은 테이블 뒤")
 	_eq(Shop4.SEAT_KEY[4] < 1300.0, true, "창가 손님 다리는 창가 바가 덮음")
+	# 첫날 정지 화면 (Shop4View): 낮 판 그림이 있고, 덮기는 영업 판과 같다
+	_eq(Shop4View.has_art(false), true, "4안 낮 판 그림 있음")
+	var v := Shop4View.new()
+	v.size = Vector2(720, 1280)
+	_eq(v.floor_rect().size.y, 1280.0, "세로 화면은 높이를 맞춰 덮음")
+	_eq(v.floor_rect().position.x < 0.0, true, "넘치는 가로는 가운데 기준으로 잘림")
+	v.free()
