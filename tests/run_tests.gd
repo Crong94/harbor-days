@@ -1278,9 +1278,64 @@ func _test_fishing_depth() -> void:
 	_eq(FishDB.top_at(night, 0.1), "bolak", "어두운 발밑은 볼락")
 	_eq(FishDB.top_at(day, 0.95) != "bolak", true, "밝은 먼 물은 볼락이 아님 (%s)" % FishDB.top_at(day, 0.95))
 	# 어종 버릇
-	for id in ["noraemi", "ureok", "hakgongchi", "gamseongdom"]:
+	for id in FishDB.FISH:
 		_eq(FishDB.habit_text(id).is_empty(), false, "%s 버릇 설명" % id)
-	_eq(FishDB.habit_text("bolak"), "", "볼락은 버릇 없음")
+	_eq(FishDB.get_fish("bolak").beat > FishDB.get_fish("mangsang").beat, true, "볼락 박자가 망상어보다 잘다")
+	# 박자: 볼락은 같은 시간에 망상어보다 박자가 더 많이 돈다
+	var beats := {}
+	for id in ["bolak", "mangsang"]:
+		var bl := _new_logic(90)
+		bl.forgiving = false
+		bl.force_first_fish = id
+		_cast(bl)
+		_run_until(bl, [S.BITE], func(_x): return false, 20.0)
+		bl.press()
+		for i in 180:
+			if bl.state == S.REELING:
+				bl.update(1.0 / 60.0, bl.tension < 0.5)
+		beats[id] = bl.beat_ticks
+	_eq(beats.bolak > beats.mangsang, true, "볼락 박자 %d > 망상어 %d" % [beats.bolak, beats.mangsang])
+	# 쏨뱅이: 발밑에 오면 지쳤어도 한 번 바위틈으로 처박는다
+	var sb := _new_logic(91)
+	sb.forgiving = false
+	sb.force_first_fish = "ssombaengi"
+	_cast(sb)
+	_run_until(sb, [S.BITE], func(_x): return false, 20.0)
+	sb.press()
+	sb.fish_hp = 0.0
+	sb.update(1.0 / 60.0, true)
+	_eq(sb.exhausted, true, "쏨뱅이 지침")
+	sb.distance = FishingLogic.HOLE_AT - 0.01
+	sb.update(1.0 / 60.0, true)
+	_eq(sb.hole_dived and not sb.exhausted and sb.run_dir != 0, true, "쏨뱅이 발밑 처박기")
+	var runs := sb.run_count
+	sb.run_dir = 0
+	sb.update(1.0 / 60.0, true)
+	_eq(sb.run_count, runs, "처박기는 한 번만")
+	# 망상어: 거의 늘 같은 쪽으로 차고 나간다
+	var same := 0
+	var total := 0
+	for sd in 6:
+		var m := _new_logic(120 + sd)
+		m.forgiving = false
+		m.force_first_fish = "mangsang"
+		_cast(m)
+		_run_until(m, [S.BITE], func(_x): return false, 20.0)
+		m.press()
+		var prev := 0
+		var last_count := 0
+		for i in 1200:
+			if m.state != S.REELING:
+				break
+			m.update(1.0 / 60.0, m.tension < 0.5)
+			if m.run_count != last_count and m.run_dir != 0:
+				if prev != 0:
+					total += 1
+					if m.run_dir == prev:
+						same += 1
+				prev = m.run_dir
+				last_count = m.run_count
+	_eq(total > 0 and same * 10 >= total * 6, true, "망상어는 같은 쪽으로 (%d/%d)" % [same, total])
 	# 우럭은 물자마자 파고든다
 	var u := _new_logic(44)
 	u.forgiving = false

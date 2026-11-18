@@ -152,6 +152,8 @@ var _hitstop := 0.0
 var _was_exhausted := false
 var _last_run := 0
 var _last_jumps := 0
+var _last_beat := 0 # 어종 박자 진동 (FishingLogic.beat_ticks)
+var _hole_seen := false
 var _hint_sticky := false # 실패 안내를 READY에서도 남겨 두는지
 var _was_countering := false
 var _tutor_fight_shown := false
@@ -466,6 +468,8 @@ func _watch_fight_events(delta: float) -> void:
 	if logic.state != FishingLogic.State.REELING:
 		_last_run = 0
 		_last_tension_level = 0
+		_last_beat = 0
+		_hole_seen = false
 		return
 	# 어종 버릇: 바늘털이 (학공치), 첫 파고들기 (우럭)
 	if logic.jumps != _last_jumps:
@@ -487,6 +491,13 @@ func _watch_fight_events(delta: float) -> void:
 			_pop_text("바위로 파고들어요!", UiKit.CORAL, _above_fish_mark(34), 34, true)
 		elif logic.run_count == 1 and logic.habit() == "long":
 			_pop_text("길게 차고 나가요!", UiKit.CORAL, _above_fish_mark(32), 32, true)
+		elif logic.run_count == 1 and logic.habit() == "side":
+			_pop_text("몸을 눕혀 버텨요!", UiKit.CORAL, _above_fish_mark(32), 32, true)
+	if logic.hole_dived and not _hole_seen:
+		_hole_seen = true
+		_kick(0.6)
+		Haptics.play("surge")
+		_pop_text("바위틈으로 처박아요!", UiKit.CORAL, _above_fish_mark(34), 34, true)
 	_last_run = logic.run_dir
 	if logic.countering and not _was_countering:
 		Sound.play_sfx("tick", 0.05)
@@ -511,6 +522,12 @@ func _watch_fight_events(delta: float) -> void:
 			Haptics.play("danger")
 			_haptic_danger = 0.16
 		return
+	# 쉬는 동안 어종 박자대로 톡 (볼락은 잘게 자주, 망상어는 느긋하게)
+	if logic.beat_ticks != _last_beat:
+		_last_beat = logic.beat_ticks
+		if _held and logic.run_dir == 0 and not logic.exhausted and _haptic_pull <= 0.0:
+			Haptics.play("nibble")
+			return
 	# 물고기가 당길 때 약하게 반복. 반대로 잘 버티는 중이면 드물게, 쉬는 중에는 힘센 고기만 가끔
 	if logic.exhausted or _haptic_pull > 0.0:
 		return
