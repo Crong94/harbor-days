@@ -49,6 +49,7 @@ func _init() -> void:
 	_test_sundeok_art()
 	_test_bus()
 	_test_board()
+	_test_shop4()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -1510,7 +1511,7 @@ func _test_dining() -> void:
 	for i in DiningLogic.SEATS.size():
 		var path := DiningLogic.entry_path(i)
 		_eq(path[path.size() - 1], DiningLogic.SEATS[i], "%d번 자리까지 가는 길 끝은 자리" % i)
-		_eq(path[0], DiningLogic.LANE[4], "%d번 길은 문 앞 길에서 시작" % i)
+		_eq(path[0], DiningLogic.LANE[DiningLogic.ENTRY_LANE], "%d번 길은 문 앞 길에서 시작" % i)
 		_eq(path[path.size() - 2], DiningLogic.SPOTS[i], "%d번 손님은 서빙 자리를 거쳐 앉음" % i)
 	var wk := DiningLogic.new()
 	wk.setup(4, _fish_box(12), names)
@@ -1632,7 +1633,11 @@ func _test_dining() -> void:
 		_eq(DiningLogic.LANE.has(go[0]), true, "%d번 손님에게 갈 때 길로 먼저 감" % i)
 		var back := DiningLogic._path_home(i, DiningLogic.HALL_HOME)
 		_eq(back[back.size() - 1], DiningLogic.HALL_HOME, "%d번 자리에서 홀 자리로 돌아옴" % i)
-		_eq(HallCover.polys_for(i).is_empty(), false, "%d번 자리 가구 덮개" % i)
+		if DiningLogic.SEAT_VIEW[i] == "back":
+			_eq(Shop4.SEAT_STOOL[i] >= 0, true, "%d번 뒷모습 손님은 스툴 덮개가 있음" % i)
+			var st: Array = Shop4.STOOLS[Shop4.SEAT_STOOL[i]]
+			_eq(absf(DiningLogic.SEATS[i].x * DiningLogic.W - float(st[1])) < 1.0, true, "%d번 자리는 그 스툴 가운데" % i)
+		_eq(Shop4.SEAT_KEY[i] > 0.0, true, "%d번 자리 그리는 순서" % i)
 	var kp := DiningLogic._path_to_guest(DiningLogic.COOK_SPOT, 0)
 	_eq(kp[0], DiningLogic.KITCHEN_EXIT, "주방에서 나갈 땐 주방 출구로")
 	# 알바가 서빙을 맡으면 알아서 갖다준다
@@ -1655,7 +1660,7 @@ func _test_dining() -> void:
 func _test_shop_decor() -> void:
 	var decor := {}
 	var owned := []
-	_eq(DiningLogic.SEATS.size(), 16, "손님 자리 16석 (홀 3안)")
+	_eq(DiningLogic.SEATS.size(), 16, "손님 자리 16석 (식당 4안)")
 	var chairs := ShopDecor.slots().filter(func(s): return s.kind == "chair").size()
 	_eq(chairs, 16, "의자 슬롯은 자리마다")
 	_eq(ShopDecor.item_in(decor, "chair_3"), "chair_basic", "안 놓으면 기본 의자")
@@ -2029,3 +2034,31 @@ func _test_board() -> void:
 	_eq(ev.size(), 1, "이장 첫 만남 사건")
 	_eq("hall_open" in ev[0].set, true, "회관이 열림")
 	_eq(Locations.get_loc("hall").scene, "res://scenes/village/hall.tscn", "회관 화면 연결")
+
+
+## 식당 4안 물건 배치 (Shop4)
+func _test_shop4() -> void:
+	_eq(Shop4.SEAT_KEY.size(), 16, "자리마다 그리는 순서")
+	_eq(Shop4.SEAT_STOOL.size(), 16, "자리마다 스툴 덮개 표")
+	for it in Shop4.ITEMS:
+		_eq(ArtSlot.has_art(Shop4.path(it[0], true, it[7])), true, "4안 그림 있음 %s" % it[0])
+		_eq(ArtSlot.has_art(Shop4.path(it[0], false, it[7])), true, "4안 낮 그림 있음 %s" % it[0])
+	_eq(ArtSlot.has_art(Shop4.bg_id(true)) and ArtSlot.has_art(Shop4.bg_id(false)), true, "빈 바탕 낮밤")
+	var r := Shop4.rect_of(["x", 366, 598, 134, 0.0, "bc", false, false], Vector2(1748, 751))
+	_eq(r.end.y, 598.0, "아래 가운데 기준이면 바닥이 y")
+	_eq(r.get_center().x, 366.0, "아래 가운데 기준이면 가운데가 x")
+	var sr := Shop4.stool_rect(Shop4.STOOLS[0])
+	_eq([sr.end.y, sr.size.y], [724.0, 111.0], "바 스툴 높이 111, 바닥 724")
+	# 뒷모습 손님 엉덩이는 스툴 방석 안에 (방석 윗면과 앞 테두리 사이)
+	for i in 16:
+		var si: int = Shop4.SEAT_STOOL[i]
+		if si < 0:
+			continue
+		var st: Array = Shop4.STOOLS[si]
+		var rr := Shop4.stool_rect(st)
+		var y: float = DiningLogic.SEATS[i].y * DiningLogic.H
+		_eq(y > rr.position.y and y < rr.position.y + float(Shop4.STOOL_FRONT[st[0]]) * rr.size.y, true, "%d번 엉덩이가 방석 위" % i)
+		_eq(Shop4.SEAT_KEY[i] > float(st[3]), true, "%d번 손님은 스툴 다음에 그림" % i)
+	# 위쪽 줄 테이블 손님은 테이블보다 먼저 그려 다리가 가린다
+	_eq(Shop4.SEAT_KEY[6] < 794.0 and Shop4.SEAT_KEY[10] < 1046.0, true, "테이블 위쪽 줄은 테이블 뒤")
+	_eq(Shop4.SEAT_KEY[4] < 1300.0, true, "창가 손님 다리는 창가 바가 덮음")
