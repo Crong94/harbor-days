@@ -177,7 +177,8 @@
 
 - 식당 4안 영업 판(61e833b, 그림 세션 724b4ca의 assets/art/shop4). 배치 데이터 scripts/restaurant/shop4.gd(Shop4, 그림 세션 4안_합친확인그림.py 좌표 그대로), 한 장씩 그리는 Shop4Prop. 물건과 손님은 _people 한 층에서 key 순서(바탕 px, 앉은 손님 Shop4.SEAT_KEY, 걷는 손님 발 y). 뒷모습 손님 앞에 스툴 아랫부분(stool_cover), 칸막이 손님 앞에 2인 테이블 y 1142 아래, 문 위 들보 띠를 다시 덮는다. 밤에는 glow 아닌 물건과 손님에 (0.86, 0.76, 0.74). HallCover는 지움
 - DiningLogic 좌표 4안으로: SEATS(엉덩이), SPOTS, PLATE_SPOTS, LANE 6점(0 창가 아래, 1 창가 위, 2 홀 자리 앞 HOME_LANE, 3~5 가운데 통로, 5 문 앞 ENTRY_LANE), 요리사는 오른쪽 벽 옆모습 화구 앞, 픽업대(카운터 모서리)에 완성 접시. 픽업대 접시는 주인공보다 나중에 그린다
-- 아직: 가게 꾸미기(ShopDecor)는 4안 자리가 없어 그리지 않는다(편안함만). 첫날 튜토리얼(first_guest)은 여전히 3안 낮 한 장 그림. 낮 판(shop4 *_day)은 준비만 됨. 확인 영상 _shot/shop4_auto.avi(dining_auto yeoul)
+- 4안 가게 꾸미기 자리(ShopDecor.EXTRA_SLOTS에 key): 간판 문 위 들보, 줄전구 들보 아래, 바 위 소품 창가 바 둘과 칸막이 테이블, 벽 장식 왼쪽 위 빈 벽 둘, 화분 홀 왼쪽 위와 아래. DiningFloor._load_decor4가 Shop4Prop으로 얹고 장부에서 바꾸면 바로 다시 놓음. 문 위 램프가 간판 가운데를 조금 덮는다(받아들임)
+- 아직: 의자는 4안 각도 그림이 없어 편안함만. 첫날 튜토리얼(first_guest)은 여전히 3안 낮 한 장 그림. 낮 판(shop4 *_day)은 준비만 됨. 확인 영상 _shot/shop4_auto.avi(dining_auto yeoul)
 
 ## 이번에 해 줬으면 하는 것
 0. 폰에서 버스 타기, 읍내 장터, 외지 손님 확인. 지도 장소 시트 높이가 정상인지도 같이 본다
