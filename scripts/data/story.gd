@@ -186,6 +186,19 @@ const EVENTS := [
 		],
 	},
 	{
+		"id": "mansu_rocks", "note": "감성돔을 올렸더니 만수 할아버지가 검은여 갯바위 가는 길을 알려 줬다.", "place": "breakwater", "day": 2, "needs": ["learned_tide_talk", "caught_gamseongdom"],
+		"set": ["learned_tide"],
+		"lines": [
+			{"speaker": "", "text": "방파제 끝에서 만수 할아버지가 일어나 바지를 턴다."},
+			{"speaker": "박만수", "text": "감성돔 올렸다매. 용팔이가 온 동네에 떠들고 다니더라."},
+			{"speaker": "{player}", "face": "smile", "text": "운이 좋았어요. 손이 아직도 얼얼해요."},
+			{"speaker": "박만수", "face": "smile", "text": "운도 실력이다. 약속은 약속이니 검은여 가는 길 알려 주꾸마."},
+			{"speaker": "박만수", "text": "물은 하루 두 번 빠진다. 날마다 한 시간 가까이씩 늦어지고. 빠진 앞뒤 한 시간 반만 들어가라."},
+			{"speaker": "박만수", "face": "sad", "text": "물 들어오는 거 보이믄 고기 물고 있어도 바로 나와라. 바다는 기다려 주지 않는다."},
+			{"speaker": "", "text": "검은여 갯바위가 열렸어요. 지도에서 갯바위를 누르면 오늘 물 빠지는 시간이 나와요. 우럭과 감성돔이 잘 나와요."},
+		],
+	},
+	{
 		"id": "taesik_first", "note": "이장 정태식 아저씨를 만났다. 마을회관 게시판에 붙은 의뢰를 들어주면 된다.", "place": "store", "day": 9, "needs": ["first_guest_done"], "time": [9 * 60, 19 * 60],
 		"set": ["hall_open", "met_taesik"],
 		"lines": [

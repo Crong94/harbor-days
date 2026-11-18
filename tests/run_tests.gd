@@ -50,6 +50,7 @@ func _init() -> void:
 	_test_bus()
 	_test_board()
 	_test_shop4()
+	_test_spots()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -2086,3 +2087,55 @@ func _test_shop4() -> void:
 	_eq(v.floor_rect().size.y, 1280.0, "세로 화면은 높이를 맞춰 덮음")
 	_eq(v.floor_rect().position.x < 0.0, true, "넘치는 가로는 가운데 기준으로 잘림")
 	v.free()
+
+
+## 낚시터: 북쪽 방파제와 검은여 갯바위 (2026-11-18)
+func _test_spots() -> void:
+	_eq(Spots.of_location("rocks"), "rocks", "갯바위에서 오면 갯바위")
+	_eq(Spots.of_location("home"), "breakwater", "모르는 곳은 방파제")
+	_eq(Spots.fish_mult("breakwater", "ureok"), 1.0, "방파제는 배율 그대로")
+	var ctx := {"brightness": 0.3, "depth": 0.6, "weather": "sunny"}
+	var rc := ctx.duplicate()
+	rc["spot"] = "rocks"
+	_eq(FishDB.weight_of("ureok", rc) > FishDB.weight_of("ureok", ctx) * 2.0, true, "갯바위는 우럭이 잘 나옴")
+	_eq(FishDB.weight_of("mangsang", rc) < FishDB.weight_of("mangsang", ctx), true, "갯바위엔 망상어가 드묾")
+	# 감성돔 비율: 방파제보다 갯바위에서 몇 배
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var g := {"breakwater": 0, "rocks": 0}
+	for sp in g:
+		var c := ctx.duplicate()
+		c["spot"] = sp
+		for i in 4000:
+			if FishDB.pick_ctx(rng, c) == "gamseongdom":
+				g[sp] += 1
+	_eq(g.rocks > g.breakwater * 2, true, "갯바위 감성돔이 방파제보다 두 배 넘게 (%d / %d)" % [g.rocks, g.breakwater])
+	# 물때: 하루 두 번 간조, 날마다 늦어짐
+	_eq(Spots.low_tides(1)[0], Spots.FIRST_LOW, "첫날 첫 간조")
+	_eq(Spots.low_tides(2)[0], Spots.FIRST_LOW + Spots.TIDE_SHIFT, "다음 날 50분 늦게")
+	_eq(Spots.low_tides(1).size(), 2, "하루 두 번")
+	var low: int = Spots.low_tides(1)[0]
+	_eq(Spots.rocks_until(1, low), low + Spots.LOW_SPAN, "간조 때 열려 있고 한 시간 반 뒤 물이 듦")
+	_eq(Spots.rocks_until(1, low + Spots.LOW_SPAN + 10), -1, "물이 들면 닫힘")
+	var some := 0
+	for d in range(1, 31):
+		var times := Spots.rocks_fishing_times(d)
+		if not times.is_empty():
+			some += 1
+		for t in times:
+			_eq(Spots.can_fish_rocks(d, int(t[0])), true, "%d일 %s 갯바위 낚시 가능" % [d, Bus.clock(int(t[0]))])
+			_eq(Spots.rocks_end(d, int(t[0])) <= int(t[1]), true, "%d일 끝나는 시각은 물이 들거나 시간대가 끝날 때" % d)
+	_eq(some >= 20, true, "한 달 중 3분의 2 넘는 날은 갯바위 낚시 시간이 있음 (%d일)" % some)
+	_eq(Spots.times_text([[6 * 60, 7 * 60 + 30]]), "06:00~07:30", "시간 글자")
+	_eq(Spots.schedule("breakwater", SeaBackdrop.FISHING_SCHEDULE), SeaBackdrop.FISHING_SCHEDULE, "방파제 배경표 그대로")
+	_eq(Spots.schedule("rocks", SeaBackdrop.FISHING_SCHEDULE), SeaBackdrop.FISHING_SCHEDULE, "갯바위 그림이 없으면 방파제 배경표")
+	# 만수 이야기가 갯바위를 연다
+	var ev: Array = Story.EVENTS.filter(func(e): return e.id == "mansu_rocks")
+	_eq(ev.size(), 1, "만수 갯바위 사건")
+	_eq("learned_tide" in ev[0].set and "caught_gamseongdom" in ev[0].needs, true, "감성돔을 잡아야 열림")
+	_eq(Locations.get_loc("rocks").scene, "res://scenes/fishing/fishing.tscn", "갯바위는 낚시 화면")
+	_eq(Locations.get_loc("rocks").unlock, "learned_tide", "물때를 배워야 열림")
+	# 낚시 규칙: 갯바위 고기는 조금 더 크다
+	var a := FishingLogic.new()
+	a.spot = "rocks"
+	_eq(a.spot, "rocks", "낚시 규칙에 낚시터")

@@ -73,7 +73,7 @@ const LIST := {
 	},
 	"rocks": {
 		"name": "검은여 갯바위", "pos": Vector2(0.749, 0.586), "unlock": "learned_tide",
-		"scene": "", "desc": "물때를 알아야 들어갈 수 있는 중급 낚시터",
+		"scene": "res://scenes/fishing/fishing.tscn", "desc": "물때를 알아야 들어갈 수 있는 중급 낚시터",
 	},
 	"hidden_rocks": {
 		"name": "숨은 갯바위", "pos": Vector2(0.866, 0.571), "unlock": "found_hidden_rocks", "hidden": true,

@@ -86,7 +86,7 @@ static func rarity(id: String) -> Dictionary:
 
 
 ## 지금 상황에서 한 종이 나올 가중치.
-## ctx: brightness(0~1), depth(던진 거리 0~1), bait(미끼 id), weather(SeaDay id), rare_boost(희귀 이상 배율)
+## ctx: brightness(0~1), depth(던진 거리 0~1), bait(미끼 id), weather(SeaDay id), rare_boost(희귀 이상 배율), spot(낚시터 id)
 static func weight_of(id: String, ctx: Dictionary) -> float:
 	var f := get_fish(id)
 	if f.is_empty():
@@ -105,6 +105,8 @@ static func weight_of(id: String, ctx: Dictionary) -> float:
 		w *= BaitDB.like_mult(bait, id)
 	# 날씨
 	w *= f.weather.get(ctx.get("weather", ""), 1.0)
+	# 낚시터 (갯바위는 바위 고기와 감성돔이 잘 나온다. Spots)
+	w *= Spots.fish_mult(ctx.get("spot", "breakwater"), id)
 	# 연속 PERFECT 같은 버프
 	if f.rarity != "common":
 		w *= ctx.get("rare_boost", 1.0)

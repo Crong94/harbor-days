@@ -118,6 +118,7 @@ var escape := 0.0 # 차고 나가는 걸 그냥 두면 차오른다. 1이 되면
 
 ## 오늘의 바다와 미끼 (화면에서 넣는다)
 var bait := "krill"
+var spot := "breakwater" # 낚시터 (Spots). 나오는 고기와 크기가 달라진다
 var weather := "sunny"
 var bite_mult := 1.0 # 물때, 날씨에 따른 입질 속도 (클수록 빨리)
 
@@ -302,9 +303,9 @@ func _hook() -> void:
 			boost *= 2.0
 		fish_id = FishDB.pick_ctx(rng, {
 			"brightness": brightness, "depth": cast_power, "bait": bait,
-			"weather": weather, "rare_boost": boost,
+			"weather": weather, "rare_boost": boost, "spot": spot,
 		})
-	fish_size = FishDB.roll_size(rng, fish_id, _size_bonus)
+	fish_size = FishDB.roll_size(rng, fish_id, _size_bonus + float(Spots.get_spot(spot).size_bonus))
 	tension = 0.3
 	distance = 1.0
 	fish_hp = 0.75 if hook_grade == "perfect" else 1.0

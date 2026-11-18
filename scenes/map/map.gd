@@ -46,6 +46,9 @@ var _dialogue: DialogueBox # 이야기 사건과 잡담 (처음 쓸 때 만든�
 
 
 func _ready() -> void:
+	# 갯바위 열기 전 저장: 이미 도감에 감성돔이 있으면 잡은 것으로 친다 (Story mansu_rocks)
+	if GameState.dex.has("gamseongdom"):
+		GameState.flags["caught_gamseongdom"] = true
 	var sea := ColorRect.new()
 	sea.color = Color("2f86b8")
 	sea.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -466,6 +469,16 @@ func _select(id: String) -> void:
 				_go_btn.text = "지금은 낚시 시간이 아니에요"
 				_sheet_desc.text = GameState.line(loc.desc) + "
 새벽 5시~11시, 밤 9시~11시 반에 낚시할 수 있어요."
+		"rocks":
+			var times := Spots.rocks_fishing_times(GameState.day)
+			var when := "오늘 물 빠지는 낚시 시간: " + Spots.times_text(times) if not times.is_empty() else "오늘은 낚시 시간에 물이 안 빠져요."
+			if not Spots.can_fish_rocks(GameState.day, arrive):
+				_action = ""
+				_go_btn.text = "지금은 물이 차 있어요" if DayFlow.can_fish(arrive) else "지금은 낚시 시간이 아니에요"
+			else:
+				_go_btn.text = "들어가기" if here else "가기 (물 들어오는 %s)" % Bus.clock(Spots.rocks_end(GameState.day, arrive))
+			_sheet_desc.text = GameState.line(loc.desc) + "
+" + when
 		"market":
 			if not Market.is_open(arrive):
 				_action = ""

@@ -71,6 +71,7 @@ var tutorial := true
 ## 자유 낚시가 끝나는 시각 (DayFlow 시간대 끝)
 var session_end := float(LATE_MIN)
 var night := false
+var spot := "breakwater" # 낚시터 (Spots). 지도에서 온 장소로 정한다
 var sea := {}
 var order := {}
 
@@ -181,6 +182,9 @@ func _ready() -> void:
 		minutes = float(GameState.time_minutes)
 		var slot := DayFlow.fishing_slot(GameState.time_minutes)
 		session_end = float(slot.end) if not slot.is_empty() else minf(minutes + 120.0, float(LATE_MIN))
+		spot = Spots.of_location(GameState.current_location)
+		if spot == "rocks":
+			session_end = float(Spots.rocks_end(GameState.day, int(minutes))) # 물이 들어오면 나와야 한다
 		night = not slot.is_empty() and slot.id == "night"
 		logic.forgiving = false
 		logic.force_first_fish = ""
@@ -192,6 +196,7 @@ func _ready() -> void:
 	logic.weather = sea.weather
 	logic.bite_mult = sea.bite
 	logic.bait = GameState.equipped_bait
+	logic.spot = spot
 
 	_world = Control.new()
 	_world.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -204,7 +209,7 @@ func _ready() -> void:
 	_bg.art_blend = BG_ART_BLEND
 	_bg.art_view = ART_VIEW
 	_bg.sun_art = "sun"
-	_bg.art_schedule = SeaBackdrop.FISHING_SCHEDULE # 밤, 새벽, 아침, 저녁 그림을 시각에 따라 이어 붙인다
+	_bg.art_schedule = Spots.schedule(spot, SeaBackdrop.FISHING_SCHEDULE) # 밤, 새벽, 아침, 저녁 그림을 시각에 따라 이어 붙인다 (낚시터마다)
 	_bg.water_band = Vector2(WATER_TOP_Y, WATER_BOTTOM_Y)
 	_bg.minutes = minutes
 	_world.add_child(_bg)
@@ -260,7 +265,7 @@ func _ready() -> void:
 		var best: Array = SeaDay.best_fish(sea, logic.brightness, 2)
 		var names := ", ".join(PackedStringArray(best.map(func(id): return FishDB.get_fish(id).name)))
 		_play_story([
-			{"speaker": "", "text": "북쪽 방파제. 빨간 등대 아래 늘 앉던 자리."},
+			{"speaker": "", "text": Spots.get_spot(spot).intro},
 			{"speaker": "", "text": "오늘의 바다는 %s. 이런 날엔 %s 입질이 좋다." % [SeaDay.summary(sea), names]},
 			{"speaker": "{player}", "text": "오늘은 뭐가 물려나."},
 		])
@@ -690,6 +695,8 @@ func _record_catch() -> void:
 	elif _card_record:
 		GameState.note("%s 최대 기록을 %.1fcm로 늘렸다." % [fname, logic.fish_size], 2)
 	GameState.dex[logic.fish_id] = maxf(best, logic.fish_size)
+	if logic.fish_id == "gamseongdom":
+		GameState.flags["caught_gamseongdom"] = true # 만수가 갯바위에 데려가 준다 (Story mansu_rocks)
 
 
 # ─── 이야기 ─────────────────────────────────────────
@@ -714,7 +721,7 @@ func _start_ending() -> void:
 	var n := GameState.caught_today.size()
 	if not tutorial:
 		_play_story([
-			{"speaker": "{player}", "text": ("밤이 깊었다. 이제 들어가 자자." if night else "물때가 지났다. 이번 낚시는 여기까지.") if minutes >= session_end else "이번 낚시는 여기까지."},
+			{"speaker": "{player}", "text": _end_line()},
 		])
 		return
 	_play_story([
@@ -722,6 +729,14 @@ func _start_ending() -> void:
 		{"speaker": "{player}", "text": "볼락은 밝아지면 숨는다고 했지. 오늘은 여기까지." if n > 0 else "오늘은 여기까지."},
 		{"speaker": "{player}", "text": "%d마리. 이걸로 {shop} 문을 열어 보자." % n},
 	])
+
+
+func _end_line() -> String:
+	if minutes < session_end:
+		return "이번 낚시는 여기까지."
+	if spot == "rocks" and Spots.rocks_until(GameState.day, int(minutes)) < 0:
+		return "발밑까지 물이 차오른다. 길이 잠기기 전에 나가자."
+	return "밤이 깊었다. 이제 들어가 자자." if night else "물때가 지났다. 이번 낚시는 여기까지."
 
 
 # ─── 화면 구성 ──────────────────────────────────────
