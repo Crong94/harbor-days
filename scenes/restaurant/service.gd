@@ -636,6 +636,8 @@ func _buy_decor(kind: String, id: String) -> void:
 
 func _place_decor(kind: String, id: String) -> void:
 	ShopDecor.place_all(GameState.shop_decor, GameState.owned_decor, kind, id)
+	if _floor:
+		_floor._load_decor() # 뒤에 보이는 가게에도 바로 놓인다
 	Sound.play_sfx("tap")
 	_open_decor()
 

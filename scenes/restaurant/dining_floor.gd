@@ -8,7 +8,7 @@ extends Control
 ## 그림: 식당 4안 (2026-11-18, Shop4). 빈 바탕 shop4/bg_night 위에 주방 장비, 카운터, 스툴, 테이블, 소품을 낱장으로 얹는다. 손님 SD sd_guest/<id>_*.png
 ##   (앉은 그림 seat_back, seat_side, seat_front), 주인공 sd/walk·serve_walk, 알바 staff/*, 요리 dish/<recipe>.png, 생선 fish_<id>.png
 ## 물건과 손님은 한 층(_people)에서 key 순서로 그린다 (Shop4Prop). 뒷모습 손님이 앉은 스툴 아랫부분과 칸막이 테이블 아랫부분은 손님 위에 한 번 더 덮는다.
-## 가게 꾸미기(ShopDecor)는 4안 자리를 아직 안 정해서 그리지 않는다 (의자 편안함만 쓴다).
+## 가게 꾸미기(ShopDecor)는 4안 빈자리에 간판, 줄전구, 바 위 소품, 벽 장식, 화분을 얹는다 (의자는 편안함만).
 ## 끝나면 finished(결과)를 보낸다 (장부가 그대로 쓴다).
 
 signal finished(result: Dictionary)
@@ -180,6 +180,26 @@ func _build_shop4() -> void:
 		[PackedVector2Array([bm.position, Vector2(bm.end.x, bm.position.y), bm.end, Vector2(bm.position.x, bm.end.y)])])
 
 
+## 4안 꾸미기: 간판, 줄전구, 바 위 소품, 벽 장식, 화분을 4안 빈자리에 얹는다 (ShopDecor.EXTRA_SLOTS의 key 순서로 손님과 함께)
+var _decor_props: Array = []
+func _load_decor4() -> void:
+	for p in _decor_props:
+		_props.erase(p)
+		p.queue_free()
+	_decor_props.clear()
+	var dim := Shop4.NIGHT_TINT if night else Color.WHITE
+	for sl in ShopDecor.slots():
+		if not ShopDecor.DRAWN_KINDS.has(sl.kind) or not sl.has("key"):
+			continue
+		var art := ShopDecor.art_of(ShopDecor.item_in(GameState.shop_decor, sl.id))
+		var tex := _load_art(art) if not art.is_empty() else null
+		if tex == null:
+			continue
+		var glow: bool = ShopDecor.DRAW.get(sl.kind, {}).get("glow", false)
+		_add_prop(tex, ShopDecor.draw_rect(sl, tex.get_size()), sl.key, Color.WHITE if glow else dim)
+		_decor_props.append(_props[-1])
+
+
 func _add_prop(tex: Texture2D, r: Rect2, key: float, tint: Color, polys: Array = []) -> void:
 	var p := Shop4Prop.new()
 	p.dining = self
@@ -218,8 +238,9 @@ func bg_px(v: float) -> float:
 func _load_decor() -> void:
 	_decor.clear()
 	if not _props.is_empty():
+		_load_decor4()
 		_decor_layer.queue_redraw()
-		return # 4안: 꾸미기 자리는 아직 없다
+		return
 	for sl in ShopDecor.slots():
 		if not ShopDecor.DRAWN_KINDS.has(sl.kind):
 			continue # 3안 바탕에 이미 그려진 가구

@@ -5,7 +5,7 @@ extends RefCounted
 ## 그림: assets/art/decor/<item id>.png (그림 세션이 종류별로 받는다). 그림이 없으면 아무것도 그리지 않는다.
 ## 놓은 것: GameState.shop_decor {슬롯 id: 물건 id}, 가진 것: GameState.owned_decor [물건 id]
 ## 비어 있는 슬롯은 그 종류의 기본 물건(값 0)을 쓴다. 의자는 편할수록 손님이 더 오래 기다려 준다(comfort초).
-## 자리 위치는 식당 배경 그림 전체 비율, 아래 가운데 기준 (벽 장식만 가운데 기준). DiningLogic과 같은 좌표, 그림 세션이 잰 값.
+## 자리 위치는 식당 바탕 그림 전체 비율, 아래 가운데 기준 (벽 장식만 가운데 기준). DiningLogic, Shop4와 같은 좌표.
 ## 사고 놓기: 식당 장부의 "가게 꾸미기". 한 종류는 한 번에 같은 물건으로 바꾼다 (place_all).
 
 const ART_DIR := "decor/"
@@ -65,32 +65,50 @@ const DEFAULTS := {"table": "table_old", "chair": "chair_basic", "stove": "stove
 	"shelf": "shelf_none", "lamp": "lamp_bulb_short", "sign": "sign_old", "light": "light_none",
 	"bar": "bar_none", "wall": "wall_none", "plant": "plant_none"}
 
-## 3안(홀 구조, 2026-11-17)에서 상점에 내놓는 종류. 바탕에 이미 그려진 바, 화구, 후드, 도구, 선반, 천장 등은 빠진다.
-## 의자도 바탕에 그려져 있어 그리지 않고 편안함(손님이 더 기다림)만 남는다. 3안 각도에 맞는 의자 그림이 오면 다시 그린다
+## 4안(2026-11-18)에서 상점에 내놓는 종류. 주방 장비, 카운터, 테이블, 천장 등은 4안 낱장 그림(Shop4)이 맡아 빠진다.
+## 의자는 4안 각도 그림이 없어 그리지 않고 편안함(손님이 더 기다림)만 남는다
 const SHOP_KINDS := ["chair", "sign", "light", "bar", "wall", "plant"]
-## 3안에서 실제로 그리는 종류
+## 4안에서 실제로 그리는 종류
 const DRAWN_KINDS := ["sign", "light", "bar", "wall", "plant"]
 
-## 종류별 그리기 (배경 px, 982x1602). h: 높이, w: 폭
-## glow: 불빛이라 밤에도 밝기를 낮추지 않는다. center: 기준점이 그림 가운데 (벽 장식)
+## 종류별 그리기 (바탕 px, 982x1602). h: 높이, w: 폭
+## glow: 불빛이라 밤에도 어둡게 하지 않는다. center: 기준점이 그림 가운데 (벽 장식)
 const DRAW := {
-	"table": {"canvas": true}, "chair": {"h": 92.0}, "bar": {"h": 58.0}, "wall": {"h": 78.0, "center": true}, "plant": {"h": 112.0},
+	"table": {"canvas": true}, "chair": {"h": 92.0}, "bar": {"h": 52.0}, "wall": {"h": 78.0, "center": true}, "plant": {"h": 112.0},
 	"stove": {"front": true}, "tool": {"front": true}, "hood": {}, "shelf": {},
-	"lamp": {"glow": true}, "sign": {"w": 250.0}, "light": {"w": 960.0, "glow": true},
+	"lamp": {"glow": true}, "sign": {"w": 230.0}, "light": {"w": 960.0, "glow": true},
 }
 
-## 의자 말고 슬롯 (3안 배경 빈자리를 격자로 잼. 배경 전체 비율, 기준점은 아래 가운데, 벽 장식만 가운데)
+## 의자 말고 슬롯 (4안 빈 바탕과 Shop4 소품 사이 빈자리. 바탕 px 비율, 기준점은 아래 가운데, 벽 장식만 가운데)
+## key: 4안 물건과 손님 사이 그리는 순서 (Shop4.ITEMS와 같은 바탕 px 기준)
 const EXTRA_SLOTS := [
-	{"id": "sign", "kind": "sign", "pos": Vector2(490 / 982.0, 1233 / 1602.0)}, # 출입문 위 처마 보
-	{"id": "light", "kind": "light", "pos": Vector2(491 / 982.0, 1338 / 1602.0)}, # 앞 처마 아래로 늘어뜨림
-	{"id": "bar_0", "kind": "bar", "pos": Vector2(835 / 982.0, 578 / 1602.0)}, # 주방 바 오른쪽 끝
-	{"id": "bar_1", "kind": "bar", "pos": Vector2(437 / 982.0, 560 / 1602.0)}, # 주방 바 모서리
-	{"id": "bar_2", "kind": "bar", "pos": Vector2(118 / 982.0, 772 / 1602.0)}, # 창가 선반 가운데
-	{"id": "wall_0", "kind": "wall", "pos": Vector2(700 / 982.0, 105 / 1602.0)}, # 주방 위 벽
-	{"id": "wall_1", "kind": "wall", "pos": Vector2(855 / 982.0, 912 / 1602.0)}, # 칸막이 앞면
-	{"id": "plant_0", "kind": "plant", "pos": Vector2(118 / 982.0, 1196 / 1602.0)}, # 홀 왼쪽 아래 구석
-	{"id": "plant_1", "kind": "plant", "pos": Vector2(625 / 982.0, 1196 / 1602.0)}, # 입구 오른쪽
+	{"id": "sign", "kind": "sign", "pos": Vector2(491 / 982.0, 1298 / 1602.0), "key": 5000.5}, # 문 위 앞벽 들보
+	{"id": "light", "kind": "light", "pos": Vector2(491 / 982.0, 1362 / 1602.0), "key": 5000.6}, # 들보 아래로 늘어뜨림 (홀 바닥에 안 걸치게)
+	{"id": "bar_0", "kind": "bar", "pos": Vector2(118 / 982.0, 712 / 1602.0), "key": 1301.5}, # 창가 바, 꽃병과 위쪽 촛불 사이
+	{"id": "bar_1", "kind": "bar", "pos": Vector2(118 / 982.0, 1062 / 1602.0), "key": 1301.5}, # 창가 바, 아래쪽 촛불과 꽃병 사이
+	{"id": "bar_2", "kind": "bar", "pos": Vector2(754 / 982.0, 1080 / 1602.0), "key": 1195.5}, # 칸막이석 2인 테이블 가운데
+	{"id": "wall_0", "kind": "wall", "pos": Vector2(128 / 982.0, 262 / 1602.0), "key": 5.0}, # 왼쪽 위 빈 벽 (뒷방 통로를 막은 자리)
+	{"id": "wall_1", "kind": "wall", "pos": Vector2(215 / 982.0, 262 / 1602.0), "key": 5.0},
+	{"id": "plant_0", "kind": "plant", "pos": Vector2(132 / 982.0, 536 / 1602.0), "key": 536.0}, # 홀 왼쪽 위, 창가 바 위 끝 앞
+	{"id": "plant_1", "kind": "plant", "pos": Vector2(118 / 982.0, 1243 / 1602.0), "key": 1243.0}, # 홀 왼쪽 아래 구석
 ]
+
+
+## 4안에 놓을 자리 (바탕 px). tex_size는 그 물건 그림 크기
+static func draw_rect(sl: Dictionary, tex_size: Vector2) -> Rect2:
+	var spec: Dictionary = DRAW.get(sl.kind, {"h": 100.0})
+	var w: float
+	var h: float
+	if spec.has("w"):
+		w = spec.w
+		h = w * tex_size.y / tex_size.x
+	else:
+		h = spec.get("h", 100.0)
+		w = h * tex_size.x / tex_size.y
+	var at: Vector2 = sl.pos * Shop4.SIZE
+	if spec.get("center", false):
+		at.y += h / 2.0
+	return Rect2(at.x - w / 2.0, at.y - h, w, h)
 
 
 ## 슬롯 전부 [{id, kind, pos}]. 의자 슬롯 id는 chair_<자리 번호>

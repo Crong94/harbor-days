@@ -1683,14 +1683,31 @@ func _test_shop_decor() -> void:
 	d.seat_bonus = comfort
 	_eq(d.patience_of(0), DiningLogic.PATIENCE + 5.0, "편한 의자 자리는 더 참음")
 	_eq(d.patience_of(99), DiningLogic.PATIENCE, "모르는 자리는 기본")
-	_eq(ShopDecor.item_in(decor, "table"), "", "3안은 바 슬롯 없음 (바탕에 그려짐)")
-	_eq(ShopDecor.slots().filter(func(s): return s.kind == "lamp").size(), 0, "3안은 천장 등이 바탕에 그려져 있음")
+	_eq(ShopDecor.item_in(decor, "table"), "", "4안은 바 슬롯 없음 (Shop4 낱장)")
+	_eq(ShopDecor.slots().filter(func(s): return s.kind == "lamp").size(), 0, "4안은 천장 등을 Shop4가 그림")
 	for sl in ShopDecor.slots():
 		_eq(sl.pos.x >= 0.0 and sl.pos.x <= 1.0 and sl.pos.y >= 0.0 and sl.pos.y <= 1.0, true, "%s 자리는 배경 안" % sl.id)
 	for k in ShopDecor.SHOP_KINDS:
 		_eq(ShopDecor.slots().any(func(s): return s.kind == k), true, "상점 종류 %s는 자리가 있음" % k)
 	for k in ShopDecor.DRAWN_KINDS:
 		_eq(ShopDecor.SHOP_KINDS.has(k), true, "그리는 종류 %s는 상점에 있음" % k)
+	# 4안 자리: 그리는 종류는 모두 순서(key)가 있고, 손님 서빙 자리와 겹치지 않는다
+	for sl in ShopDecor.EXTRA_SLOTS:
+		_eq(sl.has("key"), true, "%s 그리는 순서" % sl.id)
+		var big := ""
+		for id in ShopDecor.items_of(sl.kind):
+			if not ShopDecor.art_of(id).is_empty() and ArtSlot.has_art(ShopDecor.art_of(id)):
+				big = ShopDecor.art_of(id)
+		if big.is_empty():
+			continue
+		var r := ShopDecor.draw_rect(sl, (load(ArtSlot.art_path(big)) as Texture2D).get_size())
+		for i in DiningLogic.SPOTS.size():
+			var sp: Vector2 = DiningLogic.SPOTS[i] * Shop4.SIZE
+			_eq(r.has_point(sp), false, "%s 자리가 %d번 서빙 자리를 막지 않음" % [sl.id, i])
+	var wr := ShopDecor.draw_rect({"kind": "wall", "pos": Vector2(0.5, 0.5)}, Vector2(100, 200))
+	_eq(wr.get_center().y, 0.5 * Shop4.SIZE.y, "벽 장식은 가운데 기준")
+	var pr := ShopDecor.draw_rect({"kind": "plant", "pos": Vector2(0.5, 0.5)}, Vector2(100, 200))
+	_eq([pr.end.y, pr.size.y], [0.5 * Shop4.SIZE.y, 112.0], "화분은 아래 가운데 기준, 높이 112")
 	# 저장된다
 	var gs = load("res://scripts/autoload/game_state.gd").new()
 	_eq(SaveGame.fields(gs).has("shop_decor") and SaveGame.fields(gs).has("owned_decor"), true, "가구는 저장됨")
