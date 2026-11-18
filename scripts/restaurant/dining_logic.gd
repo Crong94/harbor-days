@@ -137,14 +137,16 @@ var _fry_rng := RandomNumberGenerator.new()
 var events: Array = [] # 화면 연출용 한 번짜리 알림 {type, ...}
 
 
-## 오늘 손님 명단. 날짜로 정해져서 같은 날은 늘 같다
-func setup(day: int, inv: Array, names: Array) -> void:
+## 오늘 손님 명단. 날짜로 정해져서 같은 날은 늘 같다.
+## visitors: 저녁 버스로 오는 외지 손님 수 (Bus.visitors). 마지막 무리로 늦게 온다
+func setup(day: int, inv: Array, names: Array, visitors := 0) -> void:
 	inventory = inv
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("영업-%d" % day)
 	_rng.seed = hash("자리-%d" % day)
 	_fry_rng.seed = hash("튀김-%d" % day)
-	var n := rng.randi_range(GUESTS_MIN, GUESTS_MAX)
+	var locals := rng.randi_range(GUESTS_MIN, GUESTS_MAX)
+	var n := locals + maxi(0, visitors)
 	schedule.clear()
 	var last := OPEN_SECONDS * LAST_ARRIVAL
 	var groups: Array = []
@@ -153,11 +155,16 @@ func setup(day: int, inv: Array, names: Array) -> void:
 		var g := mini(left, rng.randi_range(1, GROUP_MAX))
 		groups.append(g)
 		left -= g
+	var who := 0 # 몇 번째 손님인지. locals 뒤는 버스 손님
 	for gi in groups.size():
 		var t0 := 2.0 + (last - 6.0) * gi / maxf(1.0, groups.size() - 1.0) + rng.randf_range(-4.0, 4.0)
 		for k in int(groups[gi]):
 			var t := t0 + k * rng.randf_range(0.8, 1.6)
-			schedule.append({"t": clampf(t, 1.0, last), "name": names[rng.randi() % names.size()] if not names.is_empty() else "손님"})
+			var name: String = names[rng.randi() % names.size()] if not names.is_empty() else "손님"
+			if who >= locals:
+				name = Bus.VISITOR_NAMES[who % Bus.VISITOR_NAMES.size()]
+			schedule.append({"t": clampf(t, 1.0, last), "name": name})
+			who += 1
 	schedule.sort_custom(func(a, b): return a.t < b.t)
 	player = HALL_HOME if helper_kitchen else COOK_SPOT
 

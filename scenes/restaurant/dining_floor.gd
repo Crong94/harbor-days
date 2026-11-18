@@ -103,7 +103,7 @@ func start(day: int, inventory: Array) -> void:
 	logic.helper_serve = StaffDB.in_role(GameState.staff, "serve") != ""
 	logic.helper_kitchen = true # 요리는 세라가 늘 맡는다
 	logic.fry = GameState.flags.has("recipe_fish_fry")
-	logic.setup(day, inventory, DayFlow.GUESTS)
+	logic.setup(day, inventory, DayFlow.GUESTS, Bus.visitors(GameState.reputation, day))
 	logic.place_staff()
 	logic.seat_bonus = ShopDecor.seat_comfort(GameState.shop_decor)
 	_staff.clear()

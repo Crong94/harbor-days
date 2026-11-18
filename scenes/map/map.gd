@@ -7,6 +7,7 @@ extends Control
 
 const PIN_DOT := 14.0 # 잠긴 장소 점 크기
 const SERVICE_SCENE := "res://scenes/restaurant/service.tscn"
+const TOWN_SCENE := "res://scenes/town/town_market.tscn"
 ## 지도 높이를 화면 높이의 몇 배로 보여 줄지
 const MAP_SCREENS := 1.2
 ## 이만큼 움직여야 끌기로 본다 (그보다 적으면 탭)
@@ -374,6 +375,33 @@ func _build_top_bar() -> void:
 	UiKit.outlined(town, 10)
 	town.position = Vector2(26, GameHeader.BOTTOM + 8.0)
 	add_child(town)
+	_build_compass()
+
+
+## 방위표: 지도 위가 북, 오른쪽이 동쪽 바다. 그림(ui_compass)이 오면 그림으로, 없으면 글자 네 개만
+const COMPASS := 92.0
+func _build_compass() -> void:
+	var box := Control.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.position = Vector2(30, GameHeader.BOTTOM + 66.0)
+	box.size = Vector2(COMPASS, COMPASS)
+	add_child(box)
+	if ArtSlot.has_art("ui_compass"):
+		var tex := TextureRect.new()
+		tex.texture = load(ArtSlot.art_path("ui_compass"))
+		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(tex)
+		return
+	var c := COMPASS * 0.5
+	for d in [["북", Vector2(0, -1), UiKit.CORAL], ["동", Vector2(1, 0), UiKit.FOAM], ["남", Vector2(0, 1), UiKit.FOAM], ["서", Vector2(-1, 0), UiKit.FOAM]]:
+		var l := UiKit.text(d[0], "label", d[2], HORIZONTAL_ALIGNMENT_CENTER)
+		UiKit.outlined(l, 8)
+		l.size = Vector2(40, 34)
+		l.position = Vector2(c, c) + d[1] * (c - 14.0) - l.size * 0.5
+		box.add_child(l)
 
 
 func _refresh_hud() -> void:
@@ -451,6 +479,21 @@ func _select(id: String) -> void:
 				elif DayFlow.can_open_shop(arrive, false):
 					_action = "open"
 					_go_btn.text = "가게 열기" if arrive >= DayFlow.SHOP_OPEN else "가게 열기 (저녁 6시로)"
+		"bus":
+			var dep := Bus.next_departure(arrive)
+			var come := Bus.visitors(GameState.reputation, GameState.day)
+			var note := "
+오늘 저녁 버스로 외지 손님이 %d명쯤 와요." % come if come > 0 and not GameState.opened_today else ""
+			if dep < 0:
+				_sheet_desc.text = "읍내 가는 버스는 오늘 끝났어요. 아침 8시에 첫차가 와요." + note
+			elif GameState.money < Bus.FARE:
+				_action = ""
+				_go_btn.text = "차비가 모자라요"
+				_sheet_desc.text = "읍내 장터까지 %d분, 차비 %s." % [Bus.RIDE, GameState.format_won(Bus.FARE)] + note
+			else:
+				_action = "bus"
+				_go_btn.text = "%s 버스 타기" % Bus.clock(dep)
+				_sheet_desc.text = "읍내 장터까지 %d분, 차비 %s. 돌아오는 버스는 오전 10시, 오후 1시, 4시, 7시예요." % [Bus.RIDE, GameState.format_won(Bus.FARE)] + note
 		"home":
 			if GameState.opened_today or GameState.time_minutes >= DayFlow.SHOP_CLOSE:
 				_action = "sleep"
@@ -480,6 +523,13 @@ func _travel() -> void:
 	_close_sheet()
 	if _action == "open":
 		UiKit.go_to(self, SERVICE_SCENE)
+		return
+	if _action == "bus":
+		# 정류장에서 버스를 기다렸다가 타고 읍내로 (차비는 탈 때 낸다)
+		GameState.spend(Bus.FARE)
+		GameState.time_minutes = Bus.next_departure(GameState.time_minutes) + Bus.RIDE
+		Sound.play_sfx("step")
+		UiKit.go_to(self, TOWN_SCENE)
 		return
 	if _action == "sleep":
 		GameState.end_day()

@@ -216,15 +216,17 @@ func harvest_crop(index: int) -> String:
 
 
 ## 미끼를 산다. 문제가 없으면 빈 문자열, 있으면 안내 문구를 돌려준다.
-func buy_bait(id: String) -> String:
+## price를 주면 그 값으로 산다 (읍내 도매, Bus.bait_price)
+func buy_bait(id: String, price := -1) -> String:
 	if not BaitDB.BAITS.has(id):
 		return "없는 물건이에요."
 	var b := BaitDB.bait(id)
 	if b.amount < 0:
 		return "창고에 많이 있어요."
-	if money < b.price:
+	var cost: int = int(b.price) if price < 0 else price
+	if money < cost:
 		return "돈이 모자라요."
-	spend(b.price)
+	spend(cost)
 	baits[id] = int(baits.get(id, 0)) + int(b.amount)
 	return ""
 
@@ -298,12 +300,12 @@ func store_catch(entry: Dictionary) -> Dictionary:
 
 
 ## 아이스박스의 그 생선(entry)을 수산시장에 판다. 받은 돈, 없으면 0
-func sell_fish(entry: Dictionary) -> int:
+func sell_fish(entry: Dictionary, price := -1) -> int:
 	var i := inventory.find(entry)
 	if i < 0:
 		return 0
 	inventory.remove_at(i)
-	var got := Market.price(entry.id, entry.size)
+	var got := Market.price(entry.id, entry.size) if price < 0 else price
 	earn(got)
 	return got
 

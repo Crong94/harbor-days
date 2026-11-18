@@ -47,6 +47,7 @@ func _init() -> void:
 	_test_seated()
 	_test_decor_shop()
 	_test_sundeok_art()
+	_test_bus()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -1909,3 +1910,60 @@ func _test_decor_shop() -> void:
 		var art := ShopDecor.art_of(id)
 		if not art.is_empty():
 			_eq(ArtSlot.has_art(art), true, "%s 그림" % id)
+
+
+## 버스와 읍내 장터, 옆마을 손님 (2026-11-18)
+func _test_bus() -> void:
+	_eq(Bus.next_departure(7 * 60), 8 * 60, "아침 7시면 8시 첫차")
+	_eq(Bus.next_departure(8 * 60), 8 * 60, "딱 8시면 그 차를 탄다")
+	_eq(Bus.next_departure(8 * 60 + 1), 11 * 60, "8시를 놓치면 11시")
+	_eq(Bus.next_departure(17 * 60 + 5), -1, "막차 뒤엔 없음")
+	_eq(Bus.returns_after(8 * 60 + Bus.RIDE), [10 * 60, 13 * 60, 16 * 60, 19 * 60], "첫차로 오면 네 대 다 남음")
+	_eq(Bus.returns_after(17 * 60 + Bus.RIDE), [19 * 60], "막차로 오면 돌아갈 버스 하나")
+	for t in Bus.TO_TOWN:
+		_eq(Bus.returns_after(int(t) + Bus.RIDE).is_empty(), false, "읍내에 갇히지 않음 %d" % t)
+	_eq(Bus.TO_VILLAGE[-1] + Bus.RIDE < DayFlow.SHOP_CLOSE, true, "막차로 와도 가게 닫기 전")
+	_eq(Bus.clock(8 * 60 + 5), "08:05", "시각 글자")
+	_eq(Bus.fish_price("bolak", 20.0) > Market.price("bolak", 20.0), true, "읍내 도매상이 시장보다 조금 비쌈")
+	_eq(Bus.fish_price("bolak", 20.0) < DayFlow.dish_price("bolak", 20.0) - DayFlow.DISH_COST + Bus.FARE, true, "흔한 고기는 여전히 식당이 나음 (차비 감안)")
+	_eq(Bus.bait_price("worm") < int(BaitDB.bait("worm").price), true, "읍내 미끼가 쌈")
+	_eq(Bus.visitors(0, 5), 0, "평판 0이면 외지 손님 없음")
+	_eq(Bus.visitors(Bus.VISIT_STEP - 1, 5), 0, "평판이 모자라면 없음")
+	var most := 0
+	for d in 30:
+		var v := Bus.visitors(9999, d)
+		_eq(v >= Bus.VISIT_MAX - 1 and v <= Bus.VISIT_MAX, true, "평판 높으면 %d~%d명" % [Bus.VISIT_MAX - 1, Bus.VISIT_MAX])
+		most = maxi(most, v)
+	_eq(most, Bus.VISIT_MAX, "가끔 꽉 차게 옴")
+	# GameState 값 바꿔 사고팔기
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	var money0: int = gs.money
+	gs.money = 50000
+	var before: int = gs.bait_count("worm")
+	_eq(gs.buy_bait("worm", Bus.bait_price("worm")), "", "도매값으로 미끼 삼")
+	_eq(gs.money, 50000 - Bus.bait_price("worm"), "도매값만큼 나감")
+	_eq(gs.bait_count("worm"), before + int(BaitDB.bait("worm").amount), "묶음 수만큼 늘어남")
+	var e := {"id": "bolak", "size": 20.0, "day": gs.day}
+	gs.inventory.append(e)
+	var m1: int = gs.money
+	_eq(gs.sell_fish(e, Bus.fish_price("bolak", 20.0)), Bus.fish_price("bolak", 20.0), "읍내 값으로 팖")
+	_eq(gs.money, m1 + Bus.fish_price("bolak", 20.0), "돈이 들어옴")
+	gs.money = money0
+	gs.free()
+	# 영업: 외지 손님은 명단 끝에 붙고 버스 손님 이름이다
+	var a := DiningLogic.new()
+	a.setup(7, [], DayFlow.GUESTS)
+	var b := DiningLogic.new()
+	b.setup(7, [], DayFlow.GUESTS, 2)
+	_eq(b.schedule.size(), a.schedule.size() + 2, "외지 손님 두 명 더")
+	var names_a := a.schedule.map(func(x): return x.name)
+	var c := DiningLogic.new()
+	c.setup(7, [], DayFlow.GUESTS, 0)
+	_eq(c.schedule.map(func(x): return x.name), names_a, "외지 손님 0이면 예전 명단 그대로")
+	var bus_guests := b.schedule.filter(func(x): return x.name in Bus.VISITOR_NAMES)
+	_eq(bus_guests.size(), 2, "버스 손님 이름 둘")
+	var last_local := 0.0
+	for x in b.schedule:
+		if not x.name in Bus.VISITOR_NAMES:
+			last_local = maxf(last_local, x.t)
+	_eq(bus_guests.all(func(x): return x.t >= last_local - 8.0), true, "버스 손님은 늦게 온다")
