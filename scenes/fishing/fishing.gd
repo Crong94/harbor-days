@@ -213,6 +213,9 @@ func _ready() -> void:
 	_bg.art_view = ART_VIEW
 	_bg.sun_art = "sun"
 	_bg.art_schedule = Spots.schedule(spot, SeaBackdrop.FISHING_SCHEDULE) # 밤, 새벽, 아침, 저녁 그림을 시각에 따라 이어 붙인다 (낚시터마다)
+	var sun := Spots.sun_of(spot, SeaBackdrop.FISHING_SCHEDULE, _bg.art_schedule)
+	_bg.sun_low = sun[0]
+	_bg.sun_clip = sun[1]
 	_bg.water_band = Vector2(WATER_TOP_Y, WATER_BOTTOM_Y)
 	_bg.minutes = minutes
 	_world.add_child(_bg)

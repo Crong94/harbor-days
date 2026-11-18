@@ -20,6 +20,8 @@ const SPOTS := {
 		"fish": {"ureok": 2.6, "ssombaengi": 1.8, "noraemi": 1.5, "gamseongdom": 4.0, "bolak": 0.8, "mangsang": 0.35, "hakgongchi": 0.3},
 		"intro": "검은여 갯바위. 물이 빠진 틈에 드러난 검은 바위 끝.",
 		"bg_prefix": "bg_fishing_rocks_", # 그림 요청 중 (밤, 새벽, 아침, 저녁 _v). 없으면 방파제 그림
+		# 해: 산 없이 탁 트인 수평선(그림 세로 0.344)의 해돋이 빛 자리(가로 0.515)에서 떠오른다. 그림이 있을 때만
+		"sun_low": Vector2(0.515, 0.36), "sun_clip": 0.344,
 	},
 }
 
@@ -46,6 +48,14 @@ static func schedule(spot: String, base: Array) -> Array:
 			return base
 		out.append([e[0], id])
 	return out
+
+
+## 해가 떠오르는 자리와 수평선 자르기 [sun_low, sun_clip]. 그 낚시터 그림을 쓰지 않으면(schedule이 방파제 그림표) 방파제 값
+static func sun_of(spot: String, base: Array, sched: Array) -> Array:
+	var sp := get_spot(spot)
+	if sched == base or not sp.has("sun_low"):
+		return [SeaBackdrop.SUN_LOW, -1.0]
+	return [sp.sun_low, float(sp.sun_clip)]
 
 
 ## 지도 장소 id → 낚시터 id. 낚시터가 아니면 방파제
