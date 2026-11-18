@@ -61,7 +61,7 @@ const LIST := {
 	},
 	"hall": {
 		"name": "마을회관", "pos": Vector2(0.329, 0.459), "unlock": "hall_open",
-		"scene": "", "desc": "게시판과 마을 의뢰",
+		"scene": "res://scenes/village/hall.tscn", "desc": "게시판에 붙은 마을 의뢰를 들어준다",
 	},
 	"school": {
 		"name": "물빛분교", "pos": Vector2(0.555, 0.488), "unlock": "met_haesol",

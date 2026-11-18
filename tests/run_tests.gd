@@ -48,6 +48,7 @@ func _init() -> void:
 	_test_decor_shop()
 	_test_sundeok_art()
 	_test_bus()
+	_test_board()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -1967,3 +1968,64 @@ func _test_bus() -> void:
 		if not x.name in Bus.VISITOR_NAMES:
 			last_local = maxf(last_local, x.t)
 	_eq(bus_guests.all(func(x): return x.t >= last_local - 8.0), true, "버스 손님은 늦게 온다")
+
+
+## 마을회관 의뢰 게시판 (2026-11-18)
+func _test_board() -> void:
+	_eq(Board.posted_on(10), Board.posted_on(10), "같은 날은 같은 의뢰")
+	var total := 0
+	var eggs_before := 0
+	for d in range(2, 60):
+		var ps := Board.posted_on(d)
+		_eq(ps.size() >= 1 and ps.size() <= 2, true, "하루 1~2장 %d" % d)
+		total += ps.size()
+		for p in ps:
+			_eq(p.reward >= Board.MIN_REWARD, true, "사례금 최소 %s" % p.id)
+			_eq(p.item != "egg", true, "닭장 전엔 달걀 의뢰 없음 %s" % p.id)
+			_eq(Board.item_name(p.kind, p.item).is_empty(), false, "물건 이름 %s" % p.id)
+			_eq(p.text.contains("%"), false, "쪽지 글 완성 %s" % p.id)
+			_eq(p.text.contains("—") or p.text.contains("ㅡ"), false, "줄표 없음 %s" % p.id)
+	var with_egg := 0
+	for d in range(2, 60):
+		for p in Board.posted_on(d, true):
+			if p.item == "egg":
+				with_egg += 1
+	_eq(with_egg > 0, true, "닭장 열리면 달걀 의뢰도 나옴")
+	_eq(Board.thing_text("fish", "bolak", 2), "볼락 두 마리", "생선 세는 말")
+	_eq(Board.thing_text("produce", "egg", 3), "달걀 세 알", "달걀 세는 말")
+	_eq(Board.thing_text("produce", "daepa", 3), "대파 세 단", "대파 세는 말")
+	# 붙어 있는 기간
+	var flags := {}
+	var p0: Dictionary = Board.posted_on(10)[0]
+	_eq(Board.open_on(10, flags).has(p0), true, "붙은 날 보임")
+	_eq(Board.open_on(12, flags).has(p0), true, "사흘째까지 보임")
+	_eq(Board.open_on(13, flags).has(p0), false, "나흘째엔 떨어짐")
+	_eq(Board.days_left(p0, 12), 0, "사흘째가 마지막 날")
+	_eq(Board.open_on(1, flags).is_empty(), true, "첫날엔 의뢰 없음")
+	# 갖다주기
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	var fp := {"id": "t-0", "day": 10, "who": "박만수", "kind": "fish", "item": "bolak", "count": 2, "text": "", "reward": 9000}
+	gs.inventory = [{"id": "bolak", "size": 20.0, "day": 10}, {"id": "noraemi", "size": 25.0, "day": 10}]
+	_eq(Board.can_deliver(fp, gs.inventory, gs.produce), false, "볼락 한 마리로는 못 줌")
+	_eq(Board.deliver(fp, gs), 0, "모자라면 안 줌")
+	gs.inventory.append({"id": "bolak", "size": 25.0, "day": 9})
+	var m0: int = gs.money
+	var r0: int = gs.reputation
+	_eq(Board.deliver(fp, gs), 9000, "볼락 두 마리 갖다줌")
+	_eq(gs.money, m0 + 9000, "사례금 받음")
+	_eq(gs.reputation, r0 + Board.REP, "평판 오름")
+	_eq(gs.inventory.size(), 1, "볼락 두 마리 빠짐")
+	_eq(gs.inventory[0].id, "noraemi", "다른 생선은 그대로")
+	_eq(Board.deliver(fp, gs), 0, "한 번만 들어줌")
+	var pp := {"id": "t-1", "day": 10, "who": "복자네 밥집", "kind": "produce", "item": "daepa", "count": 3, "text": "", "reward": 4000}
+	gs.produce = {"daepa": 3}
+	_eq(Board.deliver(pp, gs), 4000, "대파 세 단 갖다줌")
+	_eq(gs.produce.has("daepa"), false, "다 쓰면 목록에서 빠짐")
+	gs.flags["bd_" + p0.id] = true
+	_eq(Board.open_on(10, gs.flags).has(p0), false, "들어준 의뢰는 떨어짐")
+	gs.free()
+	# 이장 첫 만남이 회관을 연다
+	var ev: Array = Story.EVENTS.filter(func(e): return e.id == "taesik_first")
+	_eq(ev.size(), 1, "이장 첫 만남 사건")
+	_eq("hall_open" in ev[0].set, true, "회관이 열림")
+	_eq(Locations.get_loc("hall").scene, "res://scenes/village/hall.tscn", "회관 화면 연결")
