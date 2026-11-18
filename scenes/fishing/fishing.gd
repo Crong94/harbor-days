@@ -154,6 +154,7 @@ var _last_run := 0
 var _last_jumps := 0
 var _last_beat := 0 # 어종 박자 진동 (FishingLogic.beat_ticks)
 var _hole_seen := false
+var _last_fight_pop: Label
 var _hint_sticky := false # 실패 안내를 READY에서도 남겨 두는지
 var _was_countering := false
 var _tutor_fight_shown := false
@@ -480,7 +481,7 @@ func _watch_fight_events(delta: float) -> void:
 			_kick(0.3)
 			for i in 6:
 				_splashes.append({"t": 0.0, "off": Vector2(randf_range(-30, 30), randf_range(-14, 4))})
-			_pop_text("바늘털이! 계속 감아요", UiKit.SUN, _above_fish_mark(34), 34, true)
+			_fight_pop("바늘털이! 계속 감아요", UiKit.SUN, _above_fish_mark(34), 34, true)
 	if logic.run_dir != 0 and _last_run == 0:
 		Sound.play_sfx("surge", 0.1, -4.0)
 		Haptics.play("surge")
@@ -488,16 +489,18 @@ func _watch_fight_events(delta: float) -> void:
 		_haptic_pull = 0.25
 		if logic.run_count == 1 and logic.habit() == "dive":
 			_kick(0.6)
-			_pop_text("바위로 파고들어요!", UiKit.CORAL, _above_fish_mark(34), 34, true)
+			_fight_pop("바위로 파고들어요!", UiKit.CORAL, _above_fish_mark(34), 34, true)
 		elif logic.run_count == 1 and logic.habit() == "long":
-			_pop_text("길게 차고 나가요!", UiKit.CORAL, _above_fish_mark(32), 32, true)
+			_fight_pop("길게 차고 나가요!", UiKit.CORAL, _above_fish_mark(32), 32, true)
 		elif logic.run_count == 1 and logic.habit() == "side":
-			_pop_text("몸을 눕혀 버텨요!", UiKit.CORAL, _above_fish_mark(32), 32, true)
+			_fight_pop("몸을 눕혀 버텨요!", UiKit.CORAL, _above_fish_mark(32), 32, true)
+		elif not logic.hole_dived or _hole_seen:
+			_fight_pop("힘겨루기!", UiKit.SUN, _above_fish_mark(32), 32, true)
 	if logic.hole_dived and not _hole_seen:
 		_hole_seen = true
 		_kick(0.6)
 		Haptics.play("surge")
-		_pop_text("바위틈으로 처박아요!", UiKit.CORAL, _above_fish_mark(34), 34, true)
+		_fight_pop("바위틈으로 처박아요!", UiKit.CORAL, _above_fish_mark(34), 34, true)
 	_last_run = logic.run_dir
 	if logic.countering and not _was_countering:
 		Sound.play_sfx("tick", 0.05)
@@ -506,7 +509,7 @@ func _watch_fight_events(delta: float) -> void:
 	if logic.exhausted and not _was_exhausted:
 		Sound.play_sfx("pop")
 		Haptics.play("exhausted")
-		_pop_text("지쳤어요!", UiKit.LEAF, _above_fish_mark(44), 44)
+		_fight_pop("지쳤어요!", UiKit.LEAF, _above_fish_mark(44), 44)
 	_was_exhausted = logic.exhausted
 
 	# 장력 위험: 들어가는 순간 소리, 있는 동안 짧은 진동을 빠르게 반복
@@ -973,7 +976,14 @@ func _update_prompt() -> void:
 
 ## 판정 글자가 튀어 올랐다가 사라진다 (스티커처럼 굵은 외곽선).
 ## big이면 작게 시작해 크게 부풀었다가 자리 잡고, 살짝 기울었다가 바로 선다 (PERFECT, NICE CAST, 지금!)
-func _pop_text(t: String, color: Color, at: Vector2, px := 40, big := false) -> void:
+## 줄다리기 중 글 (버릇, 지쳤어요). 한 번에 하나만: 새 글이 뜨면 앞 글은 바로 지운다 (2026-11-19 사용자: 글자가 겹침)
+func _fight_pop(t: String, color: Color, at: Vector2, px := 40, big := false) -> void:
+	if is_instance_valid(_last_fight_pop):
+		_last_fight_pop.queue_free()
+	_last_fight_pop = _pop_text(t, color, at, px, big)
+
+
+func _pop_text(t: String, color: Color, at: Vector2, px := 40, big := false) -> Label:
 	var l := UiKit.text(t, "h1", color, HORIZONTAL_ALIGNMENT_CENTER)
 	l.add_theme_font_size_override("font_size", px)
 	UiKit.outlined(l, 14 if big else 12)
@@ -997,6 +1007,7 @@ func _pop_text(t: String, color: Color, at: Vector2, px := 40, big := false) -> 
 	tw.chain().tween_property(l, "position:y", l.position.y - 44.0, 0.4).set_trans(Tween.TRANS_SINE)
 	tw.parallel().tween_property(l, "modulate:a", 0.0, 0.4)
 	tw.chain().tween_callback(l.queue_free)
+	return l
 
 
 # ─── 미끼 고르기 ───────────────────────────────────
@@ -1770,11 +1781,21 @@ func _draw_tension_gauge() -> void:
 	var cy: float = y_of.call(_gauge_t)
 	var zone := FightView.gauge_zone(_gauge_t)
 	var knob_col: Color = {"slack": UiKit.SKY, "good": UiKit.LEAF, "drag": UiKit.SUN, "danger": UiKit.CORAL}[zone]
-	_hud_draw.draw_style_box(UiKit.chunky(knob_col, 9, 0, 2), Rect2(r.position.x - 10, cy - 9, r.size.x + 20, 18))
+	# 손잡이는 막대 안에만 (2026-11-19 사용자: 막대 밖으로 삐져나옴)
+	cy = clampf(cy, r.position.y + 9.0, r.end.y - 9.0)
+	_hud_draw.draw_style_box(UiKit.chunky(knob_col, 9, 0, 2), Rect2(r.position.x + 1, cy - 9, r.size.x - 2, 18))
 	var font := UiKit.font("cute")
 	var label := "장력"
-	_hud_draw.draw_string_outline(font, Vector2(r.position.x - 6, r.position.y - 14), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, 8, UiKit.OUTLINE)
-	_hud_draw.draw_string(font, Vector2(r.position.x - 6, r.position.y - 14), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, UiKit.FOAM)
+	# 힘겨루기 (물고기가 차고 나가는 중): 막대 테두리가 숨 쉬듯 빛나고 글이 바뀐다. 반대로 잘 버티면 연두
+	if logic.run_dir != 0 and not logic.exhausted:
+		var tug: Color = UiKit.LEAF if logic.countering else UiKit.SUN
+		var a := 0.55 + 0.45 * sin(_t * 9.0)
+		_hud_draw.draw_style_box(UiKit.box(Color.TRANSPARENT, 26, Color(tug, a), 5, 0), r.grow(6))
+		label = "버텨요" if logic.countering else "힘겨루기"
+	var lw := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+	var lp := Vector2(minf(r.get_center().x - lw / 2.0, size.x - lw - 10.0), r.position.y - 16)
+	_hud_draw.draw_string_outline(font, lp, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, 8, UiKit.OUTLINE)
+	_hud_draw.draw_string(font, lp, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, UiKit.FOAM)
 	# 드랙이 줄을 내주는 중: 게이지 아래에 짧게 알린다
 	if logic.drag_slip:
 		var t := "드르륵"

@@ -46,6 +46,8 @@ const SIDE_KEEP := 0.8 # side: 앞서 간 쪽으로 다시 차고 나갈 확률
 const SIDE_REEL := 0.7 # side: 몸을 눕혀 버티는 동안 덜 끌려온다
 const HOLE_AT := 0.3 # hole: 이 거리 안으로 들어오면 한 번 바위틈으로 처박는다
 const HOLE_HP := 0.3 # hole: 처박을 때 되살아나는 체력
+const LONG_POWER := 1.2 # long(감성돔): 차고 나가는 힘. 힘겨루기 장력을 낮출 때 감성돔 난이도는 그대로 두려고 올림
+const REST_MULT := 1.7 # 차고 나간 뒤 쉬는 시간 배율 (2026-11-19 사용자: 힘겨루기가 너무 자주 나온다)
 const BEAT_BASE := 3.1 # 당기는 힘이 오르내리는 박자 (FishDB beat가 없을 때)
 const JUMP_CHANCE := 0.45
 const JUMP_TIME := 0.7
@@ -69,7 +71,7 @@ const FAIL_SKIP_AFTER := 0.45 # 실패 안내가 뜬 뒤 이만큼 지나면 눌
 ## 장력 오르는 속도 (2026-11-10 낮춤. 사람 반응 0.35초를 넣은 tools/fight_balance.gd로 맞췄다)
 const TENSION_REEL := 0.12 # 누르고 감을 때 기본
 const TENSION_PULL := 0.24 # 물고기가 당기는 힘만큼 더
-const TENSION_RUN_HELD := 0.42 # 차고 나가는데 그대로 감을 때
+const TENSION_RUN_HELD := 0.3 # 차고 나가는데 그대로 감을 때 (2026-11-19 0.42에서 낮춤: 힘겨루기 동안 장력이 천천히 오르게)
 const TENSION_RUN_FREE := 0.12 # 차고 나가는데 손을 뗐을 때
 ## 장력 구간: 이보다 낮으면 느슨함(파랑, 감는 힘이 덜 들어간다), DANGER부터 위험(빨강). 그 사이가 알맞음(초록)
 const TENSION_SLACK := 0.2
@@ -444,6 +446,7 @@ func _update_reel(dt: float, held: bool) -> void:
 							_run_time *= 0.5
 						"long":
 							_run_time *= 1.5
+							_run_power *= LONG_POWER
 						"tap":
 							_run_time *= 0.45 # 볼락: 짧고 가볍게 툭툭
 							_run_power *= 0.75
@@ -454,7 +457,7 @@ func _update_reel(dt: float, held: bool) -> void:
 			_run_time -= dt
 			if _run_time <= 0.0:
 				run_dir = 0
-				_rest_time = rng.randf_range(0.9, 2.0) * (1.3 - s * 0.5) / easy
+				_rest_time = rng.randf_range(0.9, 2.0) * (1.3 - s * 0.5) / easy * REST_MULT
 				if hb == "shake":
 					_rest_time *= 0.45 # 노래미: 짧게 자주 처박는다
 				elif hb == "tap":
@@ -463,7 +466,7 @@ func _update_reel(dt: float, held: bool) -> void:
 	countering = run_dir != 0 and held and steer * run_dir <= -COUNTER_STEER
 	if run_dir != 0 and not countering:
 		fish_x = clampf(fish_x + run_dir * 0.9 * dt, -1.0, 1.0)
-		escape += (0.12 + s * 0.22) * easy * dt
+		escape += (0.2 + s * 0.3) * easy * dt # 힘겨루기가 드문 만큼 한 번 한 번이 중요하다 (11-19 0.12+s*0.22에서 올림)
 	else:
 		fish_x = move_toward(fish_x, 0.0, (0.9 if countering else 0.35) * dt)
 		escape = maxf(0.0, escape - (0.45 if countering else 0.2) * dt)
