@@ -51,6 +51,7 @@ func _init() -> void:
 	_test_board()
 	_test_quests()
 	_test_kits()
+	_test_service_plan()
 	_test_shop4()
 	_test_spots()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
@@ -2192,7 +2193,7 @@ func _test_spots() -> void:
 	_eq(some >= 20, true, "한 달 중 3분의 2 넘는 날은 갯바위 낚시 시간이 있음 (%d일)" % some)
 	_eq(Spots.times_text([[6 * 60, 7 * 60 + 30]]), "06:00~07:30", "시간 글자")
 	_eq(Spots.schedule("breakwater", SeaBackdrop.FISHING_SCHEDULE), SeaBackdrop.FISHING_SCHEDULE, "방파제 배경표 그대로")
-	_eq(Spots.schedule("rocks", SeaBackdrop.FISHING_SCHEDULE), SeaBackdrop.FISHING_SCHEDULE, "갯바위 그림이 없으면 방파제 배경표")
+	_eq(Spots.schedule("rocks", SeaBackdrop.FISHING_SCHEDULE)[0][1], "bg_fishing_rocks_night_v", "갯바위 그림 네 장이 다 있으면 갯바위 배경표 (11-19)")
 	# 만수 이야기가 갯바위를 연다
 	var ev: Array = Story.EVENTS.filter(func(e): return e.id == "mansu_rocks")
 	_eq(ev.size(), 1, "만수 갯바위 사건")
@@ -2330,4 +2331,63 @@ func _test_kits() -> void:
 	_eq(gs.haul_traps().size(), had, "방파제에서 걷기")
 	_eq(gs.inventory.size(), had, "걷은 고기는 아이스박스로")
 	_eq(gs.trap_fish.size(), 0, "통발 비움")
+	gs.free()
+
+
+## 영업 개편: 메뉴판, 값 수준, 손님 종류, 정산 줄 (11-19)
+func _test_service_plan() -> void:
+	_eq(ServicePlan.dish_options("bolak", {}), ["grill"], "배운 게 없으면 구이뿐")
+	var fl := {"recipe_fish_fry": true, "menu_maeuntang": true, "menu_jorim": true}
+	_eq(ServicePlan.dish_options("ureok", fl), ["grill", "fry", "jorim", "maeuntang"], "우럭은 매운탕까지")
+	_eq(ServicePlan.dish_options("bolak", fl).has("maeuntang"), false, "볼락은 매운탕 안 됨")
+	var plan := {"price": "mid", "dishes": {}}
+	_eq(ServicePlan.next_dish(plan, "ureok", fl), "fry", "누르면 다음 요리")
+	_eq(ServicePlan.dish_for(plan, "ureok", {}), "grill", "못 내는 요리면 구이")
+	var st := ServicePlan.settle("gourmet", 10000, "good", true)
+	_eq(st.heart, false, "미식가는 노릇노릇해야 하트")
+	_eq(int(ServicePlan.settle("gourmet", 10000, "perfect", true).price) > 10000, true, "미식가 만족하면 웃돈")
+	_eq(int(ServicePlan.settle("hurry", 10000, "good", true).price) > 10000, true, "급한 손님 빨리 받으면 웃돈")
+	_eq(int(ServicePlan.settle("hurry", 10000, "good", false).price), 10000, "늦으면 웃돈 없음")
+	# 손님 종류: 단골 이름이 들어간다
+	var sch := []
+	for i in 10:
+		sch.append({"t": float(i), "name": "손님"})
+	ServicePlan.assign_kinds(sch, ["최순덕"], 5)
+	_eq(sch.filter(func(x): return x.kind == "regular").size(), 1, "단골 한 명")
+	_eq(sch.filter(func(x): return x.name == "최순덕").size(), 1, "단골 이름")
+	# 영업 규칙에 넣기: 비싸게면 값이 오르고 덜 참는다
+	var l := DiningLogic.new()
+	l.plan = {"price": "high", "dishes": {"bolak": "fry"}}
+	l.flags = {"recipe_fish_fry": true}
+	l.price_mult = 1.2
+	l.patience_mult = 0.85
+	l.extra_guests = -2
+	var inv := []
+	for i in 12:
+		inv.append({"id": "bolak", "size": 20.0, "day": 5})
+	l.setup(5, inv, ["손님"])
+	_eq(l.schedule.all(func(x): return x.has("kind")), true, "모든 손님에 종류")
+	l.time = 999.0
+	l._arrive()
+	var g: Dictionary = l.guests[0]
+	_eq(g.dish, "fry", "메뉴판대로 튀김")
+	_eq(int(g.price) >= DiningLogic.dish_price_of("bolak", 20.0, "fry"), true, "비싸게면 값이 오름")
+	_eq(float(g.patience) < l.patience_of(g.seat) * 1.4, true, "참는 시간이 정해짐")
+	# 화난 이유
+	l.guests[0].state = DiningLogic.GuestState.SEATED
+	l._leave_angry(0)
+	_eq(l.angry_list[0].reason, "kitchen", "굽는 중에 가면 주방 탓")
+	var lines := ServicePlan.ledger_lines({"served": [{"heart": true, "dish": "fry", "kind": "normal", "guest": "손님"}], "angry_list": l.angry_list})
+	_eq(lines[0].contains("하트 1"), true, "정산: 하트")
+	_eq(lines.any(func(x): return x.contains("튀김")), true, "정산: 인기 요리")
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.inventory = []
+	for i in 12:
+		gs.inventory.append({"id": "bolak", "size": 20.0, "day": 5})
+	gs.service_plan = {}
+	_eq(ServicePlan.plan_of(gs).price, "mid", "처음 메뉴판은 보통 값")
+	_eq(ServicePlan.forecast(gs).fish, 12, "낼 생선 수")
+	gs.friendship = {"최순덕": 25}
+	gs.day = 3
+	_eq(ServicePlan.regulars(gs).size() <= 1, true, "하트 있는 사람만 단골")
 	gs.free()

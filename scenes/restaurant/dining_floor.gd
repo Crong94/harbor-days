@@ -109,6 +109,15 @@ func start(day: int, inventory: Array) -> void:
 	logic.menu = Menu.menu_list(GameState.flags)
 	logic.seafood = GameState.seafood # 새 메뉴 재료는 GameState에서 바로 빠진다
 	logic.today = GameState.day
+	# 영업 전 메뉴판 (ServicePlan): 값 수준, 생선마다 요리, 오늘 올 단골
+	var plan := ServicePlan.plan_of(GameState)
+	var pr := ServicePlan.price(plan.price)
+	logic.plan = plan
+	logic.flags = GameState.flags
+	logic.price_mult = float(pr.mult)
+	logic.patience_mult = float(pr.patience)
+	logic.extra_guests = int(pr.guests)
+	logic.regular_names = ServicePlan.regulars(GameState)
 	logic.setup(day, inventory, DayFlow.GUESTS, Bus.visitors(GameState.reputation, day))
 	logic.place_staff()
 	logic.seat_bonus = ShopDecor.seat_comfort(GameState.shop_decor)
@@ -403,7 +412,7 @@ func _process(delta: float) -> void:
 			finished.emit({"served": logic.served, "missed": logic.missed + logic.angry, "sales": logic.sales,
 				"side_sales": logic.side_sales, "sides": logic.served.filter(func(e): return e.side != "").size(),
 				"angry": logic.angry, "sold_out": logic.turned_away, "hearts": logic.served.filter(func(e): return e.heart).size(),
-				"burnt": logic.burnt, "perfect": logic.perfect})
+				"burnt": logic.burnt, "perfect": logic.perfect, "angry_list": logic.angry_list})
 	for p in _pops:
 		p.t += delta
 	_pops = _pops.filter(func(p): return p.t < 1.4)
@@ -494,7 +503,9 @@ func _handle_events() -> void:
 				Haptics.play("lost")
 				if _guests.has(gi):
 					_guests[gi].set_pose("sad")
-				_pop(_bubble_pos(gi) + Vector2(0, -30), "너무 늦어요", UiKit.PINK, false)
+				# 왜 화났는지 보여 준다: 접시가 나와 있었는데 안 날랐는지, 아직 굽는 중이었는지
+				var why := "접시가 나와 있었는데..." if e.get("reason", "") == "pass" else "너무 오래 걸려요"
+				_pop(_bubble_pos(gi) + Vector2(0, -30), why, UiKit.PINK, false)
 				_leave(gi, 0.9)
 			"left":
 				_seat_dish[logic.guests[e.guest].seat] = _dish_tex.get(e.guest)
@@ -615,6 +626,7 @@ func _draw_floor() -> void:
 	_draw_burner_ui(ci, font)
 	# 처음 한 번씩 화면 아래에 짧게 알려 준다
 	var hint_at := Vector2(size.x / 2.0, to_screen(Vector2(0.5, 0.975)).y)
+	_bottom_hint = _started and not _done and ((not logic.pass_dishes.is_empty() or logic.selected >= 0) and not _taught_take or not logic.dirty.is_empty() and not _taught_clear)
 	if _done or not _started:
 		pass
 	elif not logic.pass_dishes.is_empty() and not _taught_take and logic.selected < 0:
@@ -644,7 +656,13 @@ func _draw_floor() -> void:
 		if g.state != DiningLogic.GuestState.SEATED:
 			continue
 		var p := _bubble_pos(gi)
-		var left: float = 1.0 - float(g.wait) / logic.patience_of(g.seat)
+		var left: float = 1.0 - float(g.wait) / float(g.get("patience", logic.patience_of(g.seat)))
+		# 손님 종류 이름표 (급해요, 미식가, 단골 이름)
+		var tag: String = ServicePlan.KINDS.get(g.get("kind", "normal"), {}).get("tag", "")
+		if g.get("kind", "") == "regular":
+			tag = Friends.person(g.name).get("call", g.name)
+		if not tag.is_empty():
+			_caption_small(ci, font, p + Vector2(0, -44.0), tag, UiKit.SUN if g.get("kind", "") == "regular" else UiKit.FOAM)
 		var col := UiKit.LEAF if left > 0.5 else (UiKit.SUN if left > 0.2 else UiKit.DANGER)
 		var r := 26.0
 		var carried := gi == logic.holding or gi == logic.helper_dish or logic._dish_reserved(gi)
@@ -680,6 +698,9 @@ func _draw_floor() -> void:
 			_heart(ci, Vector2(x - 22.0, at.y - 10.0), 12.0, Color(UiKit.CORAL, a))
 	if logic.time_left() <= 0.0 and not _done:
 		_caption(ci, font, Vector2(size.x / 2.0, to_screen(Vector2(0.5, 0.24)).y), "마감! 남은 손님만 받아요")
+	elif _started and not _done and not _bottom_hint:
+		# 지금 할 일 한 줄 (처음 배우는 아래 안내가 떠 있을 때는 겹치지 않게 숨긴다) (흐름이 헷갈리지 않게)
+		_caption(ci, font, Vector2(size.x / 2.0, to_screen(Vector2(0.5, 0.0)).y + 150.0), ServicePlan.hint(logic))
 
 
 ## 세라가 접시를 담았다: 바 쪽으로 갔다 돌아오고, 돌아오면 결과에 따라 반응
@@ -910,3 +931,14 @@ func _ellipse(ci: Control, c: Vector2, r: float, col: Color, width: float) -> vo
 	ci.draw_set_transform(c, 0.0, Vector2(1.0, 0.4))
 	ci.draw_arc(Vector2.ZERO, r, 0.0, TAU, 32, col, width / 0.4 * 0.5, true)
 	ci.draw_set_transform_matrix(Transform2D.IDENTITY)
+
+
+var _bottom_hint := false
+
+
+## 작은 이름표 글자 (손님 종류)
+func _caption_small(ci: Control, font: Font, at: Vector2, t: String, col: Color) -> void:
+	var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
+	var x := clampf(at.x - w / 2.0, 6.0, size.x - w - 6.0)
+	ci.draw_string_outline(font, Vector2(x, at.y), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 7, UiKit.OUTLINE)
+	ci.draw_string(font, Vector2(x, at.y), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, col)

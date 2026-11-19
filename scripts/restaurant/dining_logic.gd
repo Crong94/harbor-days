@@ -142,6 +142,14 @@ var _fry_rng := RandomNumberGenerator.new()
 var menu: Array = []
 var seafood := {}
 var today := 0
+## 영업 개편 (ServicePlan, 11-19): setup 전에 넣는다. plan이 비면 예전 규칙(손님이 메뉴를 고른다)
+var plan := {}
+var flags := {}
+var price_mult := 1.0
+var patience_mult := 1.0
+var extra_guests := 0
+var regular_names: Array = []
+var angry_list: Array = [] # 화나서 간 손님 {"guest", "kind", "reason"}
 var events: Array = [] # 화면 연출용 한 번짜리 알림 {type, ...}
 
 
@@ -153,7 +161,7 @@ func setup(day: int, inv: Array, names: Array, visitors := 0) -> void:
 	rng.seed = hash("영업-%d" % day)
 	_rng.seed = hash("자리-%d" % day)
 	_fry_rng.seed = hash("튀김-%d" % day)
-	var locals := rng.randi_range(GUESTS_MIN, GUESTS_MAX)
+	var locals := maxi(1, rng.randi_range(GUESTS_MIN, GUESTS_MAX) + extra_guests)
 	var n := locals + maxi(0, visitors)
 	schedule.clear()
 	var last := OPEN_SECONDS * LAST_ARRIVAL
@@ -174,6 +182,7 @@ func setup(day: int, inv: Array, names: Array, visitors := 0) -> void:
 			schedule.append({"t": clampf(t, 1.0, last), "name": name})
 			who += 1
 	schedule.sort_custom(func(a, b): return a.t < b.t)
+	ServicePlan.assign_kinds(schedule, regular_names, day)
 	player = HALL_HOME if helper_kitchen else COOK_SPOT
 
 
@@ -609,8 +618,13 @@ static func pay(price: int, waited: float) -> int:
 func _serve(gi: int, by_player: bool) -> void:
 	var g: Dictionary = guests[gi]
 	var q: String = g.get("quality", "good")
-	var price := pay(int(roundf(g.price * float(QUALITY_PRICE.get(q, 1.0)) / 500.0) * 500.0), g.wait)
-	var heart: bool = g.wait <= PATIENCE * QUICK and q != "burnt"
+	var pat := float(g.get("patience", PATIENCE))
+	var quick: bool = g.wait <= pat * QUICK
+	var price := pay(int(roundf(g.price * float(QUALITY_PRICE.get(q, 1.0)) / 500.0) * 500.0), g.wait * PATIENCE / pat)
+	var kind: String = g.get("kind", "normal")
+	var st := ServicePlan.settle(kind, price, q, quick)
+	price = int(st.price)
+	var heart: bool = st.heart
 	var side := Sides.take(pantry, reserve)
 	var extra := Sides.bonus(side)
 	price += extra
@@ -619,7 +633,7 @@ func _serve(gi: int, by_player: bool) -> void:
 	g.paid = price
 	sales += price
 	served.append({"guest": g.name, "fish": g.fish, "size": g.size, "price": price, "heart": heart, "side": side, "quality": q,
-		"dish": g.get("dish", "grill")})
+		"dish": g.get("dish", "grill"), "kind": kind})
 	events.append({"type": "served", "guest": gi, "heart": heart, "price": price, "side": side, "quality": q, "helper": not by_player})
 
 
@@ -677,14 +691,27 @@ func _arrive() -> void:
 		var e: Dictionary = inventory[fi]
 		inventory.remove_at(fi)
 		var seat: int = seats[_rng.randi() % seats.size()]
-		var dish := Menu.pick(menu, e, today, pantry, seafood, _fry_rng)
-		if dish.is_empty():
-			dish = "fry" if fry and _fry_rng.randf() < FRY_SHARE else "grill"
+		var dish := ""
+		if not plan.is_empty():
+			# 메뉴판에 적은 대로 낸다. 새 메뉴 재료가 떨어졌거나 회인데 오늘 잡은 고기가 아니면 구이로
+			dish = ServicePlan.dish_for(plan, e.id, flags)
+			if Menu.RECIPES.has(dish):
+				var fresh_ok: bool = not Menu.recipe(dish).get("fresh", false) or int(e.get("day", today)) == today
+				if Menu.can_make(dish, pantry, seafood) and fresh_ok:
+					Menu.take(dish, pantry, seafood)
+				else:
+					dish = "grill"
 		else:
-			Menu.take(dish, pantry, seafood)
+			dish = Menu.pick(menu, e, today, pantry, seafood, _fry_rng)
+			if dish.is_empty():
+				dish = "fry" if fry and _fry_rng.randf() < FRY_SHARE else "grill"
+			else:
+				Menu.take(dish, pantry, seafood)
+		var kind: String = s.get("kind", "normal")
 		var g := {
 			"name": s.name, "seat": seat, "fish": e.id, "size": e.size, "entry": e, "dish": dish,
-			"price": dish_price_of(e.id, e.size, dish), "state": GuestState.WALKING,
+			"price": int(roundf(dish_price_of(e.id, e.size, dish) * price_mult / 500.0) * 500.0), "state": GuestState.WALKING,
+			"kind": kind, "patience": patience_of(seat) * patience_mult * float(ServicePlan.KINDS[kind].patience),
 			"wait": 0.0, "eat": 0.0, "cooked": false, "quality": "",
 			"pos": ENTRANCE, "path": entry_path(seat), "dir": Vector2.UP,
 		}
@@ -718,7 +745,7 @@ func _wait(dt: float) -> void:
 		match g.state:
 			GuestState.SEATED:
 				g.wait += dt
-				if g.wait >= patience_of(g.seat):
+				if g.wait >= float(g.get("patience", patience_of(g.seat))):
 					_leave_angry(gi)
 			GuestState.EATING:
 				g.eat += dt
@@ -733,7 +760,10 @@ func _leave_angry(gi: int) -> void:
 	var g: Dictionary = guests[gi]
 	g.state = GuestState.LEFT
 	angry += 1
-	events.append({"type": "angry", "guest": gi})
+	# 왜 화났는지: 접시가 나와 있었는데 안 날랐나(pass), 아직 굽는 중이었나(kitchen)
+	var reason := "pass" if pass_dishes.has(gi) or holding == gi else "kitchen"
+	angry_list.append({"guest": g.name, "kind": g.get("kind", "normal"), "reason": reason})
+	events.append({"type": "angry", "guest": gi, "reason": reason})
 	if queue.has(gi):
 		queue.erase(gi)
 		inventory.append(g.entry)

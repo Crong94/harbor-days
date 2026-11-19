@@ -133,7 +133,10 @@ func _reserve_special() -> void:
 func _on_dialogue_finished() -> void:
 	match step:
 		Step.INTRO:
-			_serve_regulars()
+			if GameState.inventory.is_empty():
+				_serve_regulars()
+			else:
+				_open_plan() # 영업 전 오늘 메뉴판 (ServicePlan)
 		Step.SPECIAL_TALK:
 			_start_cooking()
 		Step.SPECIAL_DONE:
@@ -155,6 +158,10 @@ func _on_floor_finished(r: Dictionary) -> void:
 		GameState.spend(wage_paid)
 	GameState.earn(int(r.sales))
 	_pay_dish_cost(r.served.size())
+	# 단골을 대접하면 더 친해진다 (ServicePlan regular)
+	for x in r.served:
+		if x.get("kind", "") == "regular" and Friends.PEOPLE.has(x.guest):
+			GameState.friendship[x.guest] = mini(int(GameState.friendship.get(x.guest, 0)) + int(ServicePlan.KINDS.regular.friend), Friends.HEART * Friends.MAX_HEARTS)
 	rep_change += r.served.size() * DayFlow.REP_SERVED + int(r.missed) * DayFlow.REP_MISS + int(r.get("hearts", 0))
 	if int(r.get("angry", 0)) > 0:
 		GameState.note("손님 %d명이 기다리다 그냥 갔다. 다 구운 접시는 얼른 날라야지." % r.angry, 2)
@@ -347,6 +354,8 @@ func _show_ledger() -> void:
 		c.queue_free()
 	var served: int = result.get("served", []).size()
 	_ledger_rows.add_child(_row("보통 손님", "%d명" % served, "+" + GameState.format_won(int(result.get("sales", 0))), UiKit.SEA))
+	for line in ServicePlan.ledger_lines(result):
+		_ledger_rows.add_child(UiKit.paragraph(line, "caption", UiKit.INK_SOFT))
 	if special_price > 0:
 		var note := "직접 구운 한 접시" + ((" + " + Sides.name_of(special_side)) if special_side != "" else "")
 		_ledger_rows.add_child(_row(special.name, note, "+" + GameState.format_won(special_price), UiKit.SEA))
@@ -467,7 +476,7 @@ func _build_ledger() -> void:
 	v.add_child(UiKit.text("오늘 장부", "h1", UiKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	_ledger_rows = UiKit.vbox(UiKit.SPACE_SM)
 	v.add_child(_ledger_rows)
-	v.add_child(UiKit.text("밤 낚시를 가면 내일 새벽엔 늦잠을 자요", "caption", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UiKit.text("밤 낚시를 가면 내일은 늦잠을 자서 아침 낚시가 짧아요", "caption", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
 	var row := UiKit.hbox(UiKit.SPACE_MD)
 	var sleep_btn := UiKit.action("집에 가서 자기", "secondary")
 	sleep_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -654,3 +663,79 @@ func _row(key: String, note: String, amount: String, color: Color, strong := fal
 	if not amount.is_empty():
 		h.add_child(UiKit.text(amount, "h2" if strong else "title", color))
 	return h
+
+
+# ─── 영업 전 오늘 메뉴판 (ServicePlan, 11-19) ─────────────────
+
+var _plan_panel: Control
+var _plan_body: VBoxContainer
+
+
+func _open_plan() -> void:
+	step = Step.REGULARS
+	if _plan_panel == null:
+		_plan_panel = Control.new()
+		_plan_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		add_child(_plan_panel)
+		_plan_panel.add_child(UiKit.scrim(0.5))
+		var center := CenterContainer.new()
+		center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_plan_panel.add_child(center)
+		var panel := UiKit.paper_panel(28)
+		panel.custom_minimum_size = Vector2(640, 0)
+		center.add_child(panel)
+		_plan_body = UiKit.vbox(UiKit.SPACE_MD)
+		panel.add_child(_plan_body)
+	_fill_plan()
+	_plan_panel.show()
+	UiKit.fade_in(_plan_panel, 0.3)
+
+
+func _fill_plan() -> void:
+	for c in _plan_body.get_children():
+		c.queue_free()
+	var plan := ServicePlan.plan_of(GameState)
+	_plan_body.add_child(UiKit.text("오늘 메뉴판", "h1", UiKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+	var fc := ServicePlan.forecast(GameState)
+	_plan_body.add_child(UiKit.paragraph("손님 %d~%d명 예상 · 낼 생선 %d마리. %s" % [fc.guests[0], fc.guests[1], fc.fish, fc.note], "body", UiKit.INK_SOFT))
+	var regs := ServicePlan.regulars(GameState)
+	if not regs.is_empty():
+		_plan_body.add_child(UiKit.paragraph("오늘 올 것 같은 단골: " + ", ".join(PackedStringArray(regs.map(func(n): return Friends.person(n).call))), "body", UiKit.CORAL_DEEP))
+	_plan_body.add_child(UiKit.text("값", "title", UiKit.INK))
+	var row := UiKit.hbox(UiKit.SPACE_SM)
+	for lv in ServicePlan.PRICE_ORDER:
+		var b := UiKit.action(ServicePlan.PRICES[lv].name, "sun" if plan.price == lv else "secondary", true)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.pressed.connect(func():
+			plan.price = lv
+			Sound.play_sfx("tap")
+			_fill_plan())
+		row.add_child(b)
+	_plan_body.add_child(row)
+	_plan_body.add_child(UiKit.paragraph(ServicePlan.PRICES[plan.price].desc, "caption", UiKit.INK_SOFT))
+	_plan_body.add_child(UiKit.text("생선마다 낼 요리 (누르면 바뀌어요)", "title", UiKit.INK))
+	var seen := {}
+	for e in GameState.inventory:
+		if seen.has(e.id) or DayFlow.dish_price(e.id, e.size) > DayFlow.REGULAR_MAX:
+			continue
+		seen[e.id] = true
+		var n: int = GameState.inventory.filter(func(x): return x.id == e.id).size()
+		var fid: String = e.id
+		var d := ServicePlan.dish_for(plan, fid, GameState.flags)
+		var extra := ""
+		if Menu.RECIPES.has(d):
+			extra = " · 재료 " + Menu.needs_text(d)
+		var b2 := UiKit.action("%s %d마리 → %s%s" % [FishDB.get_fish(fid).name, n, ServicePlan.dish_name(d), extra], "secondary", true)
+		b2.disabled = ServicePlan.dish_options(fid, GameState.flags).size() <= 1
+		b2.pressed.connect(func():
+			ServicePlan.next_dish(plan, fid, GameState.flags)
+			Sound.play_sfx("tap")
+			_fill_plan())
+		_plan_body.add_child(b2)
+	if ServicePlan.dish_options("bolak", GameState.flags).size() <= 1:
+		_plan_body.add_child(UiKit.paragraph("마을 사람에게 요리를 배우면 구이 말고 다른 요리도 낼 수 있어요", "caption", UiKit.INK_MUTED))
+	var go := UiKit.action("문 열기", "primary")
+	go.pressed.connect(func():
+		_plan_panel.hide()
+		_serve_regulars())
+	_plan_body.add_child(go)
