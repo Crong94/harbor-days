@@ -56,6 +56,9 @@ const ITEMS := {
 	"wall_none": {"kind": "wall", "name": "빈 벽", "price": 0},
 	"wall_menu": {"kind": "wall", "name": "손글씨 차림표", "price": 10000},
 	"wall_fish": {"kind": "wall", "name": "물고기 탁본", "price": 40000},
+	# 11-19 그림 세션 (드라이브 오늘 그림): 벽걸이 구명 튜브, 작은 탁본 액자
+	"deco_wall_lifering": {"kind": "wall", "name": "구명 튜브", "price": 25000},
+	"deco_wall_fish_takbon": {"kind": "wall", "name": "탁본 액자", "price": 30000},
 	"plant_none": {"kind": "plant", "name": "빈 자리", "price": 0},
 	"plant_pot": {"kind": "plant", "name": "화분", "price": 20000},
 }
