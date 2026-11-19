@@ -99,11 +99,11 @@ func _ready() -> void:
 	UiKit.fade_in(self, 0.6)
 	var n := GameState.inventory.size() + (1 if not special_fish.is_empty() else 0)
 	var lines := [{"speaker": "", "text": "저녁 여섯 시. {shop} 문을 열었다."}]
-	if not GameState.has_flag("sera_joined"):
-		# 요리사 세라가 처음 오는 날 (Story.SERA_ARRIVES)
-		lines.append_array(Story.SERA_ARRIVES)
+	if not GameState.has_flag("sera_first_shift"):
+		# 세라와 처음 여는 저녁 장사 (Story.SERA_FIRST_SHIFT). 세라는 첫날 아침에 만났다 (first_guest)
+		lines.append_array(Story.SERA_FIRST_SHIFT)
+		GameState.flags["sera_first_shift"] = true
 		GameState.flags["sera_joined"] = true
-		GameState.note("순덕 할머니 손녀 세라가 주방을 맡았다. 나는 고기 잡고 손님 받는다.", 9)
 	if n == 0:
 		lines.append({"speaker": "{player}", "text": "아이스박스가 텅 비었네. 오늘은 팔 게 없다."})
 	else:
@@ -202,25 +202,34 @@ func _special_arrives() -> void:
 	_dialogue.play([
 		{"speaker": "", "text": "문에 단 종이 딸랑 울렸다. %s다." % Orders.call_name(special.name)},
 		{"speaker": special.name, "text": ask},
-		{"speaker": "{player}", "text": "%s 좋은 걸로 하나 남겨 뒀어요. 바로 구워 드릴게요." % fname},
-		{"speaker": "{player}", "text": "세라야, 이건 간을 내가 볼게."},
-		{"speaker": "최세라", "text": "불은 제가 볼게요. 사장님이 됐다 하면 바로 내릴게요."},
+		{"speaker": "{player}", "text": "%s 좋은 걸로 하나 남겨 뒀어요. 금방 나와요." % fname},
+		{"speaker": "{player}", "text": "세라 씨, 이건 특별히 부탁해요."},
+		{"speaker": "최세라", "face": "smile", "text": "맡겨요. 사장님이 잡아 온 거니까 제일 맛있게 할게요."},
 	])
 
 
+## 특별 손님 한 접시는 세라가 굽는다 (11-19 사용자: 주인공은 요리에 소질이 없다). 별은 주인공이 잡아 온 생선으로 정해진다:
+## 기본 하나 + 손님이 원한 생선(또는 아침에 주문을 채워 보냄) + 오늘 잡은 싱싱한 생선
 func _start_cooking() -> void:
 	step = Step.COOK
 	_recipe = Catalog.recipe(FishDB.get_fish(special_fish.id).get("grill", "bollak-gui"))
-	cook.setup(_recipe)
 	_cook_title.text = _recipe.get("name", "생선구이")
-	UiKit.set_chip(_cook_step, "1 / 2 간 맞추기")
+	UiKit.set_chip(_cook_step, "세라가 굽는 중")
 	_cook_art.set_art("kitchen/grill", "화로")
-	_cook_hint.text = "꾹 누르면 %s을 뿌려요. 적당하다 싶을 때 손을 떼요" % Catalog.flavor(cook.flavor).get("tool", "소금")
+	_cook_hint.text = "세라가 불 앞에 섰어요. 잠깐만 기다려요"
 	_stars.hide()
-	_gauge.show()
+	_gauge.hide()
 	_cook_panel.show()
 	UiKit.fade_in(_cook_panel, 0.3)
-	_guest.hide() # 굽는 동안은 화로만
+	_guest.hide()
+	Sound.play_sfx("sizzle", 0.05, -6.0)
+	var tw := create_tween()
+	tw.tween_interval(1.8)
+	tw.tween_callback(_special_served)
+
+
+static func special_stars(wanted: bool, order_done: bool, fresh: bool) -> int:
+	return 1 + int(wanted or order_done) + int(fresh)
 
 
 func _on_phase_changed() -> void:
@@ -248,7 +257,7 @@ func _pay_dish_cost(plates: int) -> void:
 
 func _special_served() -> void:
 	step = Step.SPECIAL_DONE
-	var st := cook.stars()
+	var st := special_stars(special_fish.id == special.fish, GameState.order_done, int(special_fish.get("day", GameState.day)) == GameState.day)
 	Sound.play_sfx("good" if st >= 3 else "okay")
 	Haptics.play("catch" if st >= 3 else "hook")
 	_cook_art.set_art(Catalog.dish_art(_recipe.get("id", "")), _recipe.get("name", "생선구이"))
@@ -265,9 +274,9 @@ func _special_served() -> void:
 	_pay_dish_cost(1)
 	var who := Orders.call_name(special.name)
 	if st >= 3:
-		GameState.note("%s 내 생선구이를 먹고 또 오겠다고 했다." % Josa.attach(who, "이/가"), 3)
+		GameState.note("%s 세라가 구운 생선을 먹고 또 오겠다고 했다." % Josa.attach(who, "이/가"), 3)
 	elif st <= 1:
-		GameState.note("%s 아쉬운 얼굴로 돌아갔다. 불 앞에서 더 참아야겠다." % Josa.attach(who, "이/가"), 2)
+		GameState.note("%s 아쉬운 얼굴로 돌아갔다. 원하는 생선을 싱싱할 때 잡아 와야겠다." % Josa.attach(who, "이/가"), 2)
 	rep_change += st
 	_header.refresh()
 	if not _guest.guest_id.is_empty():
@@ -304,8 +313,8 @@ func _guest_leaves() -> void:
 # ─── 입력 (굽기) ────────────────────────────────────
 
 func _unhandled_input(event: InputEvent) -> void:
-	if step != Step.COOK or cook.phase == CookingLogic.Phase.DONE:
-		return
+	if true:
+		return # 특별 손님도 세라가 굽는다 (11-19). 손으로 굽는 입력은 받지 않는다
 	var pressed := false
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		pressed = event.pressed
@@ -327,8 +336,8 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	if step == Step.REGULARS:
 		_header.set_minutes(_floor.clock_minutes())
-	if step != Step.COOK:
-		return
+	if true:
+		return # 손으로 굽는 판은 쓰지 않는다 (11-19)
 	var before := cook.phase
 	cook.update(delta, _held)
 	if cook.phase != before:

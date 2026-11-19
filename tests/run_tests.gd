@@ -52,6 +52,7 @@ func _init() -> void:
 	_test_quests()
 	_test_kits()
 	_test_service_plan()
+	_test_tide_times()
 	_test_shop4()
 	_test_spots()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
@@ -1932,7 +1933,7 @@ func _test_staff() -> void:
 	_eq(ArtSlot.has_art(StaffDB.COOK.sd_react), true, "요리사 세라 반응 그림")
 	StaffDB.fire(staff, "yeoul")
 	_eq([StaffDB.is_hired(staff, "yeoul"), StaffDB.wages(staff)], [false, 0], "그만두면 일당도 빠짐")
-	_eq(Story.SERA_ARRIVES.size() > 3, true, "세라가 오는 이야기")
+	_eq(Story.SERA_FIRST_SHIFT.size() > 3, true, "세라와 첫 저녁 장사 이야기")
 	_eq(StaffDB.hire(staff, "없는사람"), false, "없는 알바는 못 뽑음")
 	for id in StaffDB.LIST:
 		_eq(ArtSlot.has_art(StaffDB.LIST[id].art), true, "%s 그림" % id)
@@ -2393,3 +2394,14 @@ func _test_service_plan() -> void:
 	gs.day = 3
 	_eq(ServicePlan.regulars(gs).size() <= 1, true, "하트 있는 사람만 단골")
 	gs.free()
+
+
+## 하루 서랍의 간조·만조 시각 (11-19)
+func _test_tide_times() -> void:
+	for d in range(1, 30):
+		var t := Tide.today_times(d)
+		_eq(t.low.size() >= 1 and t.low.size() <= 2, true, "%d일 간조 한두 번" % d)
+		_eq(t.high.size() >= 1 and t.high.size() <= 2, true, "%d일 만조 한두 번" % d)
+		for m in t.low:
+			_eq(Spots.rocks_until(d, int(m)) >= 0, true, "%d일 간조엔 갯바위 물이 빠져 있음" % d)
+	_eq(Tide.times_text(1).begins_with("간조 03:00"), true, "첫날 간조 03:00")

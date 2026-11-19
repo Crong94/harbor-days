@@ -103,6 +103,7 @@ static func _sea(gs: Object, day: int, m: int) -> Array:
 	return [
 		{"text": "%s · %s%s" % [info.weather_name, info.tide, " · 물때 좋음" if info.tide_good else ""], "state": "", "tone": "good" if info.tide_good else "info", "target": ""},
 		{"text": "잘 무는 고기: %s" % names, "state": "", "tone": "info", "target": ""},
+		{"text": Tide.times_text(day), "state": "", "tone": "info", "target": ""},
 	] + _peaks(gs, day)
 
 

@@ -1,6 +1,6 @@
 extends Control
-## 메뉴 개발 (세로, 11-19). 낮에 식당 주방에서 배운 요리를 시험해 메뉴판에 올린다. 규칙은 Menu.
-## 시험 조리: 생선 한 마리와 재료를 쓴다. 바늘이 막대 위를 오가고 "간 보기"를 눌러 초록 칸에 멈춘다. 세 번 중 두 번이면 성공.
+## 메뉴 개발 (세로, 11-19). 낮에 식당에서 배워 온 요리법을 세라에게 전하고, 세라가 시험해 메뉴판에 올린다. 규칙은 Menu.
+## 주인공은 요리에 소질이 없어서(사용자 11-19) 재료를 구해 오고 맛만 본다. 생선 한 마리와 재료를 쓰고 한 시간이 걸린다.
 ## 그림: 식당 낮 배경 bg_shop_inside_day, 요리 dish/<id>
 ##
 ## 구성: 맨 위 헤더 / 제목과 나가기 / 종이 시트(배운 요리 목록 → 고르면 시험 조리판)
@@ -84,7 +84,7 @@ func _show_list() -> void:
 	_lab.hide()
 	_list.get_parent().show()
 	_title.text = "배운 요리"
-	_say.text = "마을 사람에게 배운 요리를 시험해 봐요. 성공하면 저녁 메뉴판에 올라가요. 한 번에 한 시간 걸려요"
+	_say.text = "배워 온 요리법을 세라에게 전해요. 재료를 주면 세라가 한 시간 동안 시험해서 메뉴판에 올려요"
 	for c in _list.get_children():
 		c.queue_free()
 	var ids: Array = Menu.RECIPES.keys().filter(func(id): return Menu.learned(GameState.flags, id))
@@ -127,7 +127,7 @@ func _recipe_card(id: String) -> PanelContainer:
 		h.add_child(UiKit.status_tag("메뉴판", UiKit.GOLD_SOFT, UiKit.GOLD_DARK, Vector2(124, 52)))
 	else:
 		var ok := not _fish_for(id).is_empty() and Menu.can_make(id, GameState.produce, GameState.seafood) and GameState.time_minutes + Menu.LAB_MINUTES <= DayFlow.SHOP_OPEN
-		var b := UiKit.game_button("시험 조리", UiKit.CORAL_DEEP, Vector2(132, 52), 19)
+		var b := UiKit.game_button("세라에게", UiKit.CORAL_DEEP, Vector2(132, 52), 19)
 		b.disabled = not ok
 		b.pressed.connect(_start.bind(id))
 		h.add_child(b)
@@ -140,6 +140,16 @@ func _start(id: String) -> void:
 	GameState.inventory.erase(fish)
 	Menu.take(id, GameState.produce, GameState.seafood)
 	GameState.time_minutes += Menu.LAB_MINUTES
+	# 세라가 시험한다 (간 맞추기 판 없이 바로 메뉴판에)
+	var nm: String = Menu.recipe(id).name
+	GameState.flags["menu_" + id] = true
+	GameState.note("세라가 %s 메뉴판에 올렸다." % Josa.attach(nm, "을/를"), 3)
+	Sound.play_sfx("newfish")
+	_title.text = "%s 시험 조리" % nm
+	_say.text = "세라: \"%s 할 만하네요. 오늘 저녁부터 내 볼게요.\" 메뉴판에 올라갔어요. 영업 전에 메뉴판에서 고를 수 있어요" % nm
+	_header.refresh()
+	_show_list_keep_say()
+	return
 	_targets = Menu.targets(GameState.day, id)
 	_try = 0
 	_hits = 0
@@ -217,3 +227,10 @@ func _taste() -> void:
 		var back := UiKit.action("목록으로", "secondary")
 		back.pressed.connect(_show_list)
 		_lab.add_child(back)
+
+
+## 목록을 다시 채우되 위 안내 글은 그대로 둔다
+func _show_list_keep_say() -> void:
+	var keep := _say.text
+	_show_list()
+	_say.text = keep

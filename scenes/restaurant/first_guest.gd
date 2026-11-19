@@ -1,5 +1,7 @@
 extends Control
-## 챕터 2 〈첫 번째 손님〉. 새벽에 잡은 볼락을 소금구이로 굽고, 최순덕이 첫 손님으로 온다.
+## 챕터 2 〈첫 번째 손님〉. 새벽에 잡은 볼락을 구워 보려다 망치고, 연기를 보고 들어온 최순덕과 손녀 최세라를 만난다.
+## 세라가 대신 구워 순덕이 첫 손님이 되고, 주인공(잡고 나르기)과 세라(불 앞)가 식당을 같이 하기로 한다.
+## 2026-11-19 사용자: 주인공은 요리에 소질이 없다. 서빙만 하다가 갑자기 간을 보는 건 부자연스럽다 → 손으로 굽는 판(CookingLogic)은 쓰지 않는다
 ## 기획서 6장 챕터 2 끝부분. 요리 규칙은 CookingLogic, 이 스크립트는 이야기 순서와 화면 표시만 맡는다.
 ##
 ## 그림: 식당 4안 낮 판 (Shop4View: shop4/bg_day 위에 가구와 소품, 없으면 bg_shop_hall_day), 순덕 초상화 npc_sundeok (사용자에게 받음. 없으면 그림 자리만 보인다)
@@ -88,10 +90,18 @@ func _ready() -> void:
 
 	Sound.play_bgm("town")
 	UiKit.fade_in(self, 0.8)
+	var fname: String = FishDB.get_fish(_fish.id).name
 	_dialogue.play([
 		{"speaker": "", "text": "아침 일곱 시 반. {shop}."},
 		{"speaker": "{player}", "text": "문은 열었는데 팔 게 이것뿐이네."},
-		{"speaker": "{player}", "text": "%s 한 마리. 소금 뿌려서 구워 보자." % FishDB.get_fish(_fish.id).name},
+		{"speaker": "{player}", "text": "%s 한 마리. 소금 뿌려서 구워 보자." % fname},
+		{"speaker": "", "text": "석쇠에 올리자마자 연기가 확 피어오른다. 소금은 한쪽에 몰렸고 껍질이 석쇠에 들러붙었다."},
+		{"speaker": "{player}", "face": "sad", "text": "어, 어어... 이거 왜 이래."},
+		{"speaker": "", "text": "문에 단 종이 울렸다. 지팡이를 짚은 할머니와 빨간 고글을 머리에 얹은 젊은 여자가 들어온다."},
+		{"speaker": "할머니", "text": "불이 켜져 있길래 와 봤더니 연기가 자욱하구먼. 여기 문 연 거 몇 년 만이여."},
+		{"speaker": "젊은 여자", "text": "사장님, 불 너무 세요. 잠깐 비켜 봐요."},
+		{"speaker": "", "text": "여자는 소매를 걷더니 불을 줄이고 들러붙은 껍질을 살살 떼어 냈다. 손끝으로 소금을 고루 뿌린다."},
+		{"speaker": "할머니", "face": "smile", "text": "우리 손녀 세라여. 부산 횟집 주방에서 오 년 있다가 내려와서 놀고 있어."},
 	])
 
 
@@ -149,7 +159,10 @@ func _process(delta: float) -> void:
 func _on_dialogue_finished() -> void:
 	match step:
 		Step.INTRO:
-			_start_cooking()
+			# 세라가 대신 굽는다 (손으로 굽는 판 없음)
+			cook.seasoning = "good"
+			cook.cooking = "good"
+			_served()
 		Step.SERVED:
 			_guest_arrives()
 		Step.GUEST:
@@ -195,8 +208,9 @@ func _served() -> void:
 		"burnt": "껍질이 까맣게 탔다.",
 	}
 	_dialogue.play([
-		{"speaker": "", "text": grill_line.get(cook.cooking, "")},
-		{"speaker": "{player}", "text": "처음 치고는... 나쁘지 않은데?"},
+		{"speaker": "", "text": "몇 분 뒤. " + grill_line.get(cook.cooking, "")},
+		{"speaker": "{player}", "text": "같은 생선인데 완전히 다르네요."},
+		{"speaker": "최세라", "face": "smile", "text": "생선은 불이 반이에요. 나머지 반은 얼마나 싱싱하냐고요."},
 	])
 
 
@@ -217,10 +231,8 @@ func _guest_arrives() -> void:
 		"burnt": "껍데기는 좀 탔고.",
 	}
 	var lines := [
-		{"speaker": "", "text": "그때 문에 단 종이 울렸다. 지팡이를 짚은 할머니가 들어왔다."},
-		{"speaker": "할머니", "text": "불이 켜져 있길래. 여기 문 연 거 몇 년 만이여."},
-		{"speaker": "{player}", "text": "아, 어서 오세요. 오늘은 볼락구이 하나밖에 없는데요."},
-		{"speaker": "할머니", "face": "smile", "text": "그거면 됐어. 밥이나 한 그릇 줘."},
+		{"speaker": "{player}", "text": "할머니, 오늘은 이거 하나밖에 없는데 드시고 가세요."},
+		{"speaker": "최순덕", "face": "smile", "text": "그거면 됐어. 밥이나 한 그릇 줘."},
 		{"speaker": "", "text": "할머니는 천천히 볼락 살을 발라 밥 위에 얹었다."},
 		{"speaker": "최순덕", "face": "smile" if cook.stars() >= 3 else "sad", "text": (taste.get(cook.seasoning, "") + " " + cooked.get(cook.cooking, "")).strip_edges()},
 		{"speaker": "최순덕", "face": "smile", "text": "따뜻한 밥 먹으니 좋구먼." if cook.stars() >= 3 else "그래도 따뜻한 밥 먹으니 좋구먼."},
@@ -228,8 +240,13 @@ func _guest_arrives() -> void:
 		{"speaker": "", "text": "순덕은 계산을 마치고 나가다 간판을 올려다봤다."},
 		{"speaker": "최순덕", "face": "smile", "text": "{shop|이/가}라... 이름 좋네. 오래 가라고."},
 		{"speaker": "최순덕", "text": "근데 총각. 생선은 잡는 사람 굽는 사람 따로 있는 기라."},
-		{"speaker": "최순덕", "face": "smile", "text": "우리 손녀가 부산 횟집 주방에 있다 내려와서 놀고 있어. 내일 저녁에 보낼 테니 부려 먹어."},
-		{"speaker": "{player}", "face": "smile", "text": "정말요? 감사합니다, 할머니."},
+		{"speaker": "{player}", "face": "sad", "text": "저는 잡는 쪽인가 봐요. 굽는 건 영 소질이 없네요."},
+		{"speaker": "최세라", "text": "낚시는 잘해요? 이 볼락 눈 보니까 새벽에 바로 잡은 거던데."},
+		{"speaker": "{player}", "face": "smile", "text": "그건 자신 있어요. 매일 방파제에 나가요."},
+		{"speaker": "최세라", "face": "smile", "text": "그럼 이렇게 해요. 사장님은 고기 잡아 오고 손님 받아요. 불 앞은 제가 볼게요."},
+		{"speaker": "{player}", "text": "월급을 드릴 형편이 아직 아닌데요."},
+		{"speaker": "최세라", "text": "알아요. 장사 되면 그때 나눠요. 저도 바다 보면서 불 앞에 서 보고 싶었어요."},
+		{"speaker": "최순덕", "face": "smile", "text": "잘 됐네. 둘이 손발 맞춰 봐."},
 		# 맥락 (11-19): 다음 날부터 붙는 주문 쪽지와 메인 이야기 〈마을에 인사하기〉가 여기서 시작된다
 		{"speaker": "최순덕", "text": "그라고 먹고 싶은 거 생기믄 가게 문에 쪽지 붙여 둘게. 잡아 오믄 저녁에 먹으러 오꾸마."},
 		{"speaker": "최순덕", "face": "smile", "text": "내일부턴 마을 사람들한테 얼굴도 좀 비추고. 장사는 인심이여."},
@@ -238,6 +255,8 @@ func _guest_arrives() -> void:
 	GameState.note("순덕 할머니가 첫 손님으로 왔다. 이 정도면 해볼 만하겠는데?", 9)
 	GameState.spend(FIRST_COST)
 	GameState.flags["met_sundeok"] = true
+	GameState.flags["sera_joined"] = true # 세라와 식당을 같이 하기로 했다 (예전엔 둘째 날 저녁에 왔다)
+	GameState.note("세라와 식당을 같이 하기로 했다. 나는 잡고 나르고, 세라는 굽는다.", 9)
 	_dialogue.play(lines)
 
 

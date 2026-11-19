@@ -66,3 +66,27 @@ static func fishing_peaks(day: int) -> Array:
 	for s in DayFlow.FISHING_SLOTS:
 		out.append_array(peak_times(day, int(s[2]), int(s[3])))
 	return out
+
+
+## 그날 0~24시 안의 간조와 만조 시각 {"low": [분...], "high": [분...]}
+static func today_times(day: int) -> Dictionary:
+	var low := []
+	var high := []
+	for d in [day - 1, day]:
+		for t in Spots.low_tides(d):
+			var lt: int = int(t) + (d - day) * 24 * 60
+			var ht: int = lt + Spots.TIDE_CYCLE / 2
+			if lt >= 0 and lt < 24 * 60 and not lt in low:
+				low.append(lt)
+			if ht >= 0 and ht < 24 * 60 and not ht in high:
+				high.append(ht)
+	low.sort()
+	high.sort()
+	return {"low": low, "high": high}
+
+
+## "간조 03:00, 15:25 · 만조 09:12, 21:37"
+static func times_text(day: int) -> String:
+	var t := today_times(day)
+	var f := func(a: Array) -> String: return ", ".join(PackedStringArray(a.map(func(m): return "%02d:%02d" % [int(m) / 60, int(m) % 60])))
+	return "간조 %s · 만조 %s" % [f.call(t.low), f.call(t.high)]
