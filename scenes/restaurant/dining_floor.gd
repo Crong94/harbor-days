@@ -744,12 +744,19 @@ func _draw_cook(ci: Control) -> void:
 		if _sera_react > 0.0 and react != "" and _has_sheet(react):
 			_draw_cell(ci, react, 3, _sera_react_cell, to_screen(_sera_pos), CHAR_H * 1.05, false)
 			return
+		var grid: bool = StaffDB.COOK.get("grid", false)
 		if sera_moving() and walk != "" and _has_sheet(walk):
 			var wc := GuestSD.walk_cell(_sera_dir, _t)
+			if grid:
+				_draw_grid(ci, walk, wc, to_screen(_sera_pos), SERA_BODY_H, wc >= 4 and _sera_dir.x < 0.0)
+				return
 			var feet := to_screen(_sera_pos) + Vector2(0, SERA_WALK_H * 107.0 / 724.0 - CHAR_H * 1.05 * 27.0 / 887.0)
 			_draw_cell(ci, walk, 8, wc, feet, SERA_WALK_H, wc >= 4 and _sera_dir.x < 0.0)
 			return
 		if cook != "" and _has_sheet(cook):
+			if grid:
+				_draw_grid(ci, cook, _sera_cook_cell(), at, SERA_BODY_H, false)
+				return
 			var cell := (1 + int(_t * 4.0) % 2) if not logic.cooking.is_empty() else 0
 			_draw_cell(ci, cook, 4, cell, at, CHAR_H * 1.05, false)
 		return
@@ -942,3 +949,57 @@ func _caption_small(ci: Control, font: Font, at: Vector2, t: String, col: Color)
 	var x := clampf(at.x - w / 2.0, 6.0, size.x - w - 6.0)
 	ci.draw_string_outline(font, Vector2(x, at.y), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 7, UiKit.OUTLINE)
 	ci.draw_string(font, Vector2(x, at.y), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, col)
+
+
+# ─── 세라 v2 격자 시트 (11-19) ─────────────────────────
+
+## 세라 몸 높이 (발끝에서 머리끝까지 화면 px). 예전 시트와 같은 키
+const SERA_BODY_H := CHAR_H * 1.05 * 0.946
+## 조리 칸 차례: 굽는 동안 올리기 → 뒤집기 → 흔들기 둘 → 소금 → 흔들기 둘. 다 익은 접시가 있으면 담기 → 내밀기. 쉴 땐 기다리기
+const SERA_COOK_LOOP := [0, 1, 2, 3, 2, 3, 4, 2, 3]
+
+
+func _sera_cook_cell() -> int:
+	if logic.cooking.is_empty():
+		return 7
+	for c in logic.cooking:
+		if DiningLogic.doneness(c) >= 1.0:
+			return 5 if int(_t * 2.0) % 2 == 0 else 6
+	return SERA_COOK_LOOP[int(_t * 2.5) % SERA_COOK_LOOP.size()]
+
+
+static var _grid_cache := {}
+
+
+## 격자 시트(4열 2줄) 칸마다 그림이 차지하는 영역 (알파로 잰다)
+static func _grid_info(path: String) -> Dictionary:
+	if _grid_cache.has(path):
+		return _grid_cache[path]
+	var tex: Texture2D = load("res://assets/art/%s.png" % path)
+	var img := tex.get_image()
+	if img.is_compressed():
+		img.decompress()
+	var cw := img.get_width() / 4
+	var chh := img.get_height() / 2
+	var boxes := []
+	var tallest := 1.0
+	for i in 8:
+		var r := Rect2i((i % 4) * cw, (i / 4) * chh, cw, chh)
+		var u := img.get_region(r).get_used_rect()
+		boxes.append(Rect2(r.position + u.position, u.size))
+		tallest = maxf(tallest, float(u.size.y))
+	var e := {"tex": tex, "boxes": boxes, "tallest": tallest}
+	_grid_cache[path] = e
+	return e
+
+
+## 격자 칸 i의 그림을 발끝이 feet에 오게 그린다. body_h: 가장 큰 칸의 키가 이 높이가 되게 줄인다
+func _draw_grid(ci: Control, path: String, i: int, feet: Vector2, body_h: float, flip: bool) -> void:
+	var e := _grid_info(path)
+	var box: Rect2 = e.boxes[clampi(i, 0, 7)]
+	var k: float = body_h / float(e.tallest)
+	var w := box.size.x * k
+	var h := box.size.y * k
+	ci.draw_set_transform(feet, 0.0, Vector2(-1.0 if flip else 1.0, 1.0))
+	ci.draw_texture_rect_region(e.tex, Rect2(-w / 2.0, -h, w, h), box)
+	ci.draw_set_transform_matrix(Transform2D.IDENTITY)
