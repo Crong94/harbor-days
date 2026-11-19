@@ -749,27 +749,29 @@ func _test_header() -> void:
 
 
 func _test_day_flow() -> void:
-	# 시간대: 아침 05~09, 밤 21~23:30 (11-19 하루 두 번으로 줄임)
-	_eq(DayFlow.FISHING_SLOTS.size(), 2, "낚시 시간대는 아침과 밤 두 개")
-	_eq(DayFlow.fishing_slot(5 * 60).get("id", ""), "morning", "05:00 아침 낚시")
-	_eq(DayFlow.fishing_slot(8 * 60).get("id", ""), "morning", "08:00도 아침 낚시")
-	_eq(DayFlow.can_fish(9 * 60), false, "9시부터는 낚시 못 함")
-	_eq(DayFlow.can_fish(12 * 60), false, "한낮엔 낚시 못 함")
-	_eq(DayFlow.can_fish(19 * 60), false, "영업 시간엔 낚시 못 함")
+	# 시간대 (11-19 저녁): 낮 낚시 06~17시 사이 하루 한 번 세 시간, 밤 21~23:30
+	_eq(DayFlow.FISHING_SLOTS.size(), 2, "낚시 시간대는 낮과 밤 두 개")
+	_eq(DayFlow.fishing_slot(6 * 60).get("id", ""), "day", "06:00 낮 낚시")
+	_eq(DayFlow.can_fish(13 * 60), true, "한낮에도 낚시")
+	_eq(DayFlow.can_fish(13 * 60, true), false, "낮 낚시는 하루 한 번")
+	_eq(DayFlow.can_fish(22 * 60, true), true, "밤 낚시는 따로")
+	_eq(DayFlow.can_fish(17 * 60), false, "17시부터는 영업 준비")
+	_eq(DayFlow.can_fish(5 * 60), false, "새벽 5시는 아직")
 	_eq(DayFlow.fishing_slot(22 * 60).get("id", ""), "night", "22:00 밤 낚시")
-	_eq(DayFlow.fishing_end(6 * 60), 9 * 60, "아침 낚시는 9시에 끝")
-	_eq(DayFlow.fishing_end(7 * 60), 9 * 60, "늦잠 잔 날도 9시에 끝")
+	_eq(DayFlow.fishing_end(6 * 60), 9 * 60, "낮 낚시는 세 시간")
+	_eq(DayFlow.fishing_end(15 * 60), 17 * 60, "늦게 가면 17시에 끝")
+	_eq(DayFlow.fishing_end(22 * 60), 23 * 60 + 30, "밤 낚시는 23:30까지")
 	# 밤 낚시하면 늦잠
-	_eq(DayFlow.wake_time(false), 5 * 60, "보통은 새벽 5시 기상")
-	_eq(DayFlow.wake_time(true), 7 * 60, "밤 낚시 뒤엔 7시 기상 (아침 낚시 두 시간 줄어듦)")
+	_eq(DayFlow.wake_time(false), 6 * 60, "보통은 아침 6시 기상")
+	_eq(DayFlow.wake_time(true), 8 * 60, "밤 낚시 뒤엔 8시 기상")
 	var gs = load("res://scripts/autoload/game_state.gd").new()
 	gs.night_fished = true
 	gs.opened_today = true
 	gs.end_day()
-	_eq(gs.time_minutes, 7 * 60, "end_day: 밤 낚시 다음 날 늦잠")
+	_eq(gs.time_minutes, 8 * 60, "end_day: 밤 낚시 다음 날 늦잠")
 	_eq(gs.night_fished or gs.opened_today, false, "end_day: 하루 표시 초기화")
 	gs.end_day()
-	_eq(gs.time_minutes, 5 * 60, "end_day: 그다음 날은 새벽 5시")
+	_eq(gs.time_minutes, 6 * 60, "end_day: 그다음 날은 아침 6시")
 	gs.free()
 	# 가게
 	_eq(DayFlow.can_open_shop(12 * 60, false), true, "낮에도 가게 열기(18시로 건너뜀)")
@@ -802,9 +804,9 @@ func _test_day_flow() -> void:
 	_eq(DayFlow.special_guest(1).is_empty(), true, "첫날 특별 손님 없음")
 	_eq(DayFlow.special_guest(2).get("name", ""), Orders.of(2).customer, "특별 손님은 주문서 낸 사람")
 	# 안내
-	_eq(DayFlow.next_hint(5 * 60, false).contains("아침 낚시"), true, "아침 안내")
-	_eq(DayFlow.next_hint(13 * 60, false).contains("저녁 6시"), true, "낮 안내: 가게 여는 시각")
-	_eq(DayFlow.next_hint(13 * 60, false).contains("마을"), true, "낮 안내: 마을 일")
+	_eq(DayFlow.next_hint(7 * 60, false).contains("낮 낚시"), true, "아침 안내: 낮 낚시 한 번")
+	_eq(DayFlow.next_hint(13 * 60, false, true).contains("저녁 6시"), true, "낮 낚시를 했으면: 가게 여는 시각")
+	_eq(DayFlow.next_hint(13 * 60, false, true).contains("마을"), true, "낮 안내: 마을 일")
 	_eq(DayFlow.next_hint(21 * 60 + 30, true).contains("늦잠"), true, "밤 낚시 안내")
 
 
@@ -1089,7 +1091,7 @@ func _test_brief() -> void:
 	_eq(names, ["지금 할 일", "메인 이야기", "오늘의 바다", "아침 소식"], "서랍 분류 (만난 사람이 없으면 오늘 부탁 없음)")
 	var todo: Array = b.sections[0].rows
 	_eq(todo[0].target, "breakwater", "아침 6시엔 먼저 낚시")
-	_eq(todo[0].state, "~9:00", "낚시 끝 시각")
+	_eq(todo[0].state, "~17:00", "낮 낚시 마감 시각")
 	_eq(todo.any(func(r): return r.target == "market"), true, "시장 열려 있으면 팔기")
 	_eq(todo.any(func(r): return r.target == "shop"), true, "저녁 장사")
 	_eq(todo.any(func(r): return r.target == "home"), false, "아침엔 자러 가지 않음")

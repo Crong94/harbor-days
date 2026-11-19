@@ -51,10 +51,10 @@ static func _stats(gs: Object) -> Array:
 static func _todo(gs: Object, day: int, m: int) -> Array:
 	var rows: Array = []
 	var slot := DayFlow.fishing_slot(m)
-	if not slot.is_empty() and slot.id != "night":
-		rows.append({"text": "%s · 방파제" % slot.name, "state": "~%s" % _hm(slot.end), "tone": "gold", "target": "breakwater"})
-	elif m < DayFlow.FISHING_SLOTS[DayFlow.MORNING][2]:
-		rows.append({"text": "아침 낚시 · 방파제", "state": "5:00~", "tone": "info", "target": "breakwater"})
+	if not slot.is_empty() and slot.id == "day" and not gs.day_fished:
+		rows.append({"text": "낮 낚시 한 번 (세 시간) · 방파제", "state": "~%s" % _hm(slot.end), "tone": "gold", "target": "breakwater"})
+	elif m < DayFlow.FISHING_SLOTS[DayFlow.DAY][2]:
+		rows.append({"text": "낮 낚시 · 방파제", "state": "6:00~", "tone": "info", "target": "breakwater"})
 	var spoil: int = gs.spoiling_tonight().size()
 	if not gs.inventory.is_empty() and Market.is_open(m):
 		var t := "수산시장에서 비싼 고기 팔기"

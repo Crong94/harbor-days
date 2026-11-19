@@ -106,7 +106,7 @@ func _ready() -> void:
 		GameState.flags["map_drag_hint"] = true
 		_show_toast.call_deferred("지도를 끌어서 마을을 둘러봐요")
 	else:
-		_show_toast.call_deferred(DayFlow.next_hint(GameState.time_minutes, GameState.opened_today))
+		_show_toast.call_deferred(DayFlow.next_hint(GameState.time_minutes, GameState.opened_today, GameState.day_fished))
 	_show_notices.call_deferred(2.6)
 
 
@@ -437,14 +437,14 @@ func _select(id: String) -> void:
 	var arrive := GameState.time_minutes + travel
 	match id:
 		"breakwater":
-			if not DayFlow.can_fish(arrive) and not Story.pending(id, GameState.day, arrive, GameState.flags).is_empty():
+			if not DayFlow.can_fish(arrive, GameState.day_fished) and not Story.pending(id, GameState.day, arrive, GameState.flags).is_empty():
 				_action = "talk" # 낚시 시간은 아니지만 기다리는 사람이 있다 (해솔이 낚시 같은 이야기). 이야기만 보고 지도로
 				_go_btn.text = "들어가기" if here else "가기"
-			elif not DayFlow.can_fish(arrive):
+			elif not DayFlow.can_fish(arrive, GameState.day_fished):
 				_action = ""
-				_go_btn.text = "지금은 낚시 시간이 아니에요"
+				_go_btn.text = "오늘 낮 낚시는 했어요" if GameState.day_fished and DayFlow.can_fish(arrive) else "지금은 낚시 시간이 아니에요"
 				_sheet_desc.text = GameState.line(loc.desc) + "
-아침 5시~9시, 밤 9시~11시 반에 낚시할 수 있어요. 낮에는 마을 일을 해요."
+낮 낚시는 아침 6시~오후 5시 사이 하루 한 번(세 시간), 밤 낚시는 9시~11시 반이에요."
 		"flat":
 			var ft := Flat.open_times(GameState.day)
 			var fwhen := "오늘 물 빠지는 때: " + Spots.times_text(ft) if not ft.is_empty() else "오늘은 낮에 물이 안 빠져요."
@@ -458,9 +458,9 @@ func _select(id: String) -> void:
 		"rocks":
 			var times := Spots.rocks_fishing_times(GameState.day)
 			var when := "오늘 물 빠지는 낚시 시간: " + Spots.times_text(times) if not times.is_empty() else "오늘은 낚시 시간에 물이 안 빠져요."
-			if not Spots.can_fish_rocks(GameState.day, arrive):
+			if not Spots.can_fish_rocks(GameState.day, arrive, GameState.day_fished):
 				_action = ""
-				_go_btn.text = "지금은 물이 차 있어요" if DayFlow.can_fish(arrive) else "지금은 낚시 시간이 아니에요"
+				_go_btn.text = "지금은 물이 차 있어요" if DayFlow.can_fish(arrive, GameState.day_fished) else ("오늘 낮 낚시는 했어요" if GameState.day_fished and DayFlow.can_fish(arrive) else "지금은 낚시 시간이 아니에요")
 			else:
 				_go_btn.text = "들어가기" if here else "가기 (물 들어오는 %s)" % Bus.clock(Spots.rocks_end(GameState.day, arrive))
 			_sheet_desc.text = GameState.line(loc.desc) + "

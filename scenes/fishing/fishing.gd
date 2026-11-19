@@ -1443,7 +1443,8 @@ func _leave() -> void:
 		GameState.end_day()
 		UiKit.go_to(self, FREE_NEXT)
 	else:
-		GameState.current_location = "breakwater"
+		GameState.day_fished = true # 낮 낚시는 하루 한 번
+		GameState.current_location = "breakwater" if spot == "breakwater" else spot
 		UiKit.go_to(self, FREE_NEXT)
 
 

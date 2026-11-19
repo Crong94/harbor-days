@@ -1,26 +1,29 @@
 class_name DayFlow
 extends RefCounted
-## 하루 흐름 규칙 (2026-11-10 사용자 결정, 2026-11-19 낚시를 하루 두 번으로 줄임)
-##   아침 낚시 05:00~09:00 → 낮(낚시 없음: 시장, 텃밭, 마을 이야기, 의뢰) → 저녁 영업 18:00~ → 밤 낚시 21:00~23:30(선택) → 잠
-##   예전에는 새벽, 아침, 낮(아무 때나), 밤 네 번 낚시할 수 있어서 하루 내내 낚시만 하게 됐다 (사용자: 너무 많다).
-##   이제 낚시는 아침 한 번이 기본이고 밤은 고르는 것. 낮은 마을에서 보내는 시간이다
-##   밤 낚시를 하면 늦잠을 자서 다음 날 아침 낚시가 두 시간 줄어든다 (07:00에 일어난다)
+## 하루 흐름 규칙 (2026-11-10 사용자 결정, 2026-11-19 두 번 고침)
+##   06:00 기상 → 낮 낚시 한 번(06:00~17:00 사이 아무 때나, DAY_SESSION분) + 마을 일 → 저녁 영업 18:00~ → 밤 낚시 21:00~23:30(선택) → 잠
+##   11-19 아침: 새벽, 아침, 낮, 밤 네 번이 너무 많다 → 아침 05~09 한 번과 밤으로 줄임
+##   11-19 저녁: 그러자 09~21시가 텅 빈다(사용자: "시간이 너무 뜬다, 꼭 새벽 5시부터 안 해도 된다")
+##   → 낮 낚시는 하루 한 번만, 언제 갈지는 고른다. 새벽 볼락, 물때 집중 시간(Tide), 갯바위 간조에 맞춰 가는 재미
+##   밤 낚시를 하면 늦잠을 자서 다음 날 08:00에 일어난다
 ##   식당 재료는 직접 낚은 생선만 쓴다
 ## 저녁 영업은 섞어서: 보통 손님은 아이스박스 생선으로 알아서 팔리고, 단골·특별 손님 한 명은 직접 요리한다
 ## 장면이 아닌 규칙만 담아 헤드리스로 시험한다.
 
-const WAKE_EARLY := 5 * 60
-const WAKE_LATE := 7 * 60 # 밤 낚시 다음 날 (늦잠)
+const WAKE_EARLY := 6 * 60
+const WAKE_LATE := 8 * 60 # 밤 낚시 다음 날 (늦잠)
+## 낮 낚시 한 번의 길이 (분)
+const DAY_SESSION := 180
 const SHOP_OPEN := 18 * 60
 const SHOP_CLOSE := 21 * 60
 const SLEEP_AT := 23 * 60 + 30
 
 ## 낚시할 수 있는 시간대: [id, 이름, 시작, 끝]
 const FISHING_SLOTS := [
-	["morning", "아침 낚시", 5 * 60, 9 * 60],
+	["day", "낮 낚시", 6 * 60, 17 * 60],
 	["night", "밤 낚시", 21 * 60, 23 * 60 + 30],
 ]
-const MORNING := 0
+const DAY := 0
 const NIGHT := 1
 
 ## 보통 손님 수 (요일마다 조금씩 다르다)
@@ -52,14 +55,22 @@ static func fishing_slot(minutes: int) -> Dictionary:
 	return {}
 
 
-static func can_fish(minutes: int) -> bool:
-	return not fishing_slot(minutes).is_empty()
+## day_fished: 오늘 낮 낚시를 이미 했나 (낮 낚시는 하루 한 번)
+static func can_fish(minutes: int, day_fished := false) -> bool:
+	var s := fishing_slot(minutes)
+	if s.is_empty():
+		return false
+	return not (s.id == "day" and day_fished)
 
 
-## 이 시각에 시작한 낚시가 끝나는 시각
+## 이 시각에 시작한 낚시가 끝나는 시각 (낮은 DAY_SESSION분 뒤, 늦어도 17시)
 static func fishing_end(minutes: int) -> int:
 	var s := fishing_slot(minutes)
-	return s.end if not s.is_empty() else minutes
+	if s.is_empty():
+		return minutes
+	if s.id == "day":
+		return mini(minutes + DAY_SESSION, int(s.end))
+	return s.end
 
 
 ## 가게를 열 수 있는가 (열기 전이면 18시로 건너뛴다)
@@ -68,18 +79,18 @@ static func can_open_shop(minutes: int, opened_today: bool) -> bool:
 
 
 ## 다음 할 일 안내 (지도 위 알림)
-static func next_hint(minutes: int, opened_today: bool) -> String:
+static func next_hint(minutes: int, opened_today: bool, day_fished := false) -> String:
 	var s := fishing_slot(minutes)
-	if not s.is_empty() and s.id != "night":
-		return "%s 시간이에요. 방파제로 가 볼까요?" % s.name
+	if not s.is_empty() and s.id == "day" and not day_fished:
+		return "낮 낚시는 하루 한 번, 세 시간이에요. 언제 갈지 골라요"
 	if not opened_today and minutes < SHOP_CLOSE:
 		if minutes < SHOP_OPEN:
 			return "낮에는 마을을 돌아봐요. 저녁 6시에 식당 문을 열어요"
 		return "가게 열 시간이에요. 식당으로 가요"
 	if not s.is_empty():
 		return "밤 낚시를 하면 내일은 늦잠을 자요"
-	if minutes < FISHING_SLOTS[MORNING][2]:
-		return "아침 5시부터 방파제에서 낚시할 수 있어요"
+	if minutes < FISHING_SLOTS[DAY][2]:
+		return "아침 6시부터 방파제에서 낚시할 수 있어요"
 	if minutes >= SHOP_CLOSE and minutes < FISHING_SLOTS[NIGHT][2]:
 		return "밤 9시부터 밤 낚시를 할 수 있어요. 아니면 집에서 쉬어요"
 	return "오늘은 푹 쉬어요"

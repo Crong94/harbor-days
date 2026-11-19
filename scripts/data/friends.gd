@@ -21,7 +21,7 @@ const PEOPLE := {
 		"love": ["fish:bolak"], "like": ["produce:daepa", "produce:mu", "produce:egg"],
 		"lines": ["또 왔어? 들어와 앉아.", "{player|이/가} 오니까 집이 훤하네.", "{player|아/야}. 니는 우리 손주나 마찬가지여."],
 		"teach": {2: "jorim"}},
-	"박만수": {"call": "만수 할아버지", "place": "breakwater", "met": "met_mansu", "time": [5 * 60, 9 * 60],
+	"박만수": {"call": "만수 할아버지", "place": "breakwater", "met": "met_mansu", "time": [6 * 60, 12 * 60],
 		"love": ["fish:gamseongdom"], "like": ["fish:ureok", "fish:noraemi", "sea:nakji"],
 		"lines": ["...뭘 이런 걸 다.", "오늘 물 좋다. 너도 앉아라.", "니는 바다 냄새가 나기 시작했다."],
 		"teach": {2: "maeuntang"}},

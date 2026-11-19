@@ -90,6 +90,7 @@ var spent_today := 0
 ## 하루 흐름 (DayFlow). 오늘 가게를 열었는지, 밤 낚시를 했는지(했으면 내일 늦잠), 식당 평판
 var opened_today := false
 var night_fished := false
+var day_fished := false # 오늘 낮 낚시를 했나 (하루 한 번, DayFlow)
 var reputation := 0
 ## 식당 가구와 장식 (ShopDecor). 놓은 것 {슬롯 id: 물건 id}, 산 것 [물건 id]
 var shop_decor := {}
@@ -430,6 +431,7 @@ func end_day(wake_minutes := -1) -> void:
 	time_minutes = wake_minutes if wake_minutes >= 0 else DayFlow.wake_time(night_fished)
 	opened_today = false
 	night_fished = false
+	day_fished = false
 	caught_today.clear()
 	order_filled = 0
 	order_done = false

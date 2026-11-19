@@ -96,8 +96,8 @@ static func rocks_until(day: int, minutes: int) -> int:
 
 
 ## 갯바위에서 지금 낚시할 수 있는지 (물이 빠졌고 낚시 시간대)
-static func can_fish_rocks(day: int, minutes: int) -> bool:
-	return rocks_until(day, minutes) >= 0 and DayFlow.can_fish(minutes)
+static func can_fish_rocks(day: int, minutes: int, day_fished := false) -> bool:
+	return rocks_until(day, minutes) >= 0 and DayFlow.can_fish(minutes, day_fished)
 
 
 ## 갯바위 낚시가 끝나는 시각 (물이 들어오거나 시간대가 끝나는 것 중 먼저)
