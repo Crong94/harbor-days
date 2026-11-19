@@ -24,6 +24,7 @@ var _tab_buttons := {}
 
 
 func _ready() -> void:
+	GameState.flags["met_junho"] = true # 준호를 만났다 (주문, 게시판에 준호가 나온다)
 	var base := ColorRect.new()
 	base.color = UiKit.WOOD_DARK
 	base.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

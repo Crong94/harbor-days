@@ -12,7 +12,7 @@ extends RefCounted
 
 const EVENTS := [
 	{
-		"id": "mansu_mend", "note": "방파제 노인은 박만수 할아버지였다. 견제하는 법을 배웠다.", "place": "breakwater", "day": 2, "needs": ["first_guest_done"], "time": [5 * 60, 11 * 60],
+		"id": "mansu_mend", "note": "방파제 노인은 박만수 할아버지였다. 견제하는 법을 배웠다.", "place": "breakwater", "day": 2, "needs": ["first_guest_done"], "time": [5 * 60, 9 * 60],
 		"set": ["met_mansu"],
 		"lines": [
 			{"speaker": "", "text": "방파제 끝에 어제 그 노인이 또 앉아 있다. 오늘은 혼자 막걸리 한 병을 옆에 두었다."},
@@ -64,7 +64,7 @@ const EVENTS := [
 		],
 	},
 	{
-		"id": "mansu_tide", "note": "만수 할아버지한테 물때를 배웠다. 감성돔 한 마리 올리면 갯바위에 데려가 준단다.", "place": "breakwater", "day": 5, "needs": ["met_mansu"], "time": [5 * 60, 11 * 60],
+		"id": "mansu_tide", "note": "만수 할아버지한테 물때를 배웠다. 감성돔 한 마리 올리면 갯바위에 데려가 준단다.", "place": "breakwater", "day": 5, "needs": ["met_mansu"], "time": [5 * 60, 9 * 60],
 		"set": ["learned_tide_talk"],
 		"lines": [
 			{"speaker": "박만수", "text": "니 물때 볼 줄 아나."},

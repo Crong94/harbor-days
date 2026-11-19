@@ -15,8 +15,8 @@ const DAYS := 62 # 3월 1일 ~ 5월 1일 (4월 1일, 5월 1일 고정비까지)
 
 ## 하는 사람 유형: 날마다 어느 시간대를 낚시하는가
 const PROFILES := {
-	"새벽만": ["dawn"],
-	"새벽+아침": ["dawn", "morning"],
+	"아침만": ["morning"],
+	"아침+밤": ["morning", "night"],
 }
 
 var _fight_rng := 0

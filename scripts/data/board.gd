@@ -19,13 +19,13 @@ const EGG_VALUE := 800
 
 ## who: 게시판에 적는 이름. lines: 쪽지 글 (%s 자리에 "볼락 두 마리" 같은 물건)
 const PEOPLE := [
-	{"who": "최순덕", "lines": ["제사상에 올릴 %s 구해 줄 사람.", "손주 오는데 %s 좀 있으면 좋겠네."]},
-	{"who": "박만수", "lines": ["%s. 술안주로 쓸 거다.", "%s 구함. 값은 넉넉히 쳐 준다."]},
-	{"who": "이준호", "lines": ["가게 손님 맛보기용 %s 구해요!", "단골 아저씨가 %s 찾으세요. 부탁드려요."]},
-	{"who": "경자상회", "lines": ["%s 가져오면 외상 하나 지워 줌.", "가게에 놓고 팔 %s 구합니다."]},
-	{"who": "복자네 밥집", "lines": ["점심 반찬에 쓸 %s 구해요.", "%s 급하게 필요해요. 복자."]},
-	{"who": "오용팔", "lines": ["도시 식당에서 %s 찾는다. 회관에 맡겨 줘.", "%s 모아 보내야 해서. 용팔."]},
-	{"who": "정태식 이장", "lines": ["경로당 잔치에 쓸 %s 구합니다.", "마을 회의 날 나눠 먹을 %s 부탁드립니다."]},
+	{"who": "최순덕", "met": "met_sundeok", "lines": ["제사상에 올릴 %s 구해 줄 사람.", "손주 오는데 %s 좀 있으면 좋겠네."]},
+	{"who": "박만수", "met": "met_mansu", "lines": ["%s. 술안주로 쓸 거다.", "%s 구함. 값은 넉넉히 쳐 준다."]},
+	{"who": "이준호", "met": "met_junho", "lines": ["가게 손님 맛보기용 %s 구해요!", "단골 아저씨가 %s 찾으세요. 부탁드려요."]},
+	{"who": "경자상회", "met": "met_kyungja", "lines": ["%s 가져오면 외상 하나 지워 줌.", "가게에 놓고 팔 %s 구합니다."]},
+	{"who": "복자네 밥집", "met": "met_bokja", "lines": ["점심 반찬에 쓸 %s 구해요.", "%s 급하게 필요해요. 복자."]},
+	{"who": "오용팔", "met": "met_yongpal", "lines": ["도시 식당에서 %s 찾는다. 회관에 맡겨 줘.", "%s 모아 보내야 해서. 용팔."]},
+	{"who": "정태식 이장", "met": "", "lines": ["경로당 잔치에 쓸 %s 구합니다.", "마을 회의 날 나눠 먹을 %s 부탁드립니다."]},
 ]
 
 ## [종류, id, 몇 개]. 달걀은 닭장이 열려야 나온다
@@ -35,7 +35,8 @@ const COUNT_WORD := ["", "한", "두", "세", "네", "다섯", "여섯"]
 
 
 ## 그날 새로 붙는 의뢰들 (1~2장). 회관이 열리기 전 날짜도 같은 규칙으로 만든다
-static func posted_on(day: int, coop_open := false) -> Array:
+## flags를 주면 아직 만나지 않은 사람 자리는 이장이 대신 붙인다 (모르는 사람이 갑자기 부탁하지 않게, 11-19)
+static func posted_on(day: int, coop_open := false, flags = null) -> Array:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("게시판-%d" % day)
 	var n := 2 if rng.randf() < 0.3 else 1
@@ -47,6 +48,8 @@ static func posted_on(day: int, coop_open := false) -> Array:
 			pi = (pi + 1) % PEOPLE.size()
 		used_people.append(pi)
 		var person: Dictionary = PEOPLE[pi]
+		if flags != null and not str(person.met).is_empty() and not flags.get(person.met, false):
+			person = PEOPLE[PEOPLE.size() - 1] # 정태식 이장
 		var produce := rng.randf() < 0.4
 		var pick: Array
 		if produce:
@@ -78,7 +81,7 @@ static func open_on(today: int, flags: Dictionary) -> Array:
 	for d in range(today - DAYS + 1, today + 1):
 		if d < 2:
 			continue
-		for p in posted_on(d, flags.get("coop_open", false)):
+		for p in posted_on(d, flags.get("coop_open", false), flags):
 			if not flags.get("bd_" + p.id, false):
 				out.append(p)
 	return out

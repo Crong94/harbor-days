@@ -49,6 +49,7 @@ func _init() -> void:
 	_test_sundeok_art()
 	_test_bus()
 	_test_board()
+	_test_quests()
 	_test_shop4()
 	_test_spots()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
@@ -452,6 +453,7 @@ func _test_sea_day() -> void:
 	_eq(Orders.matches(o, o.fish, o.min_cm - 1.0), false, "너무 작으면 안 받음")
 
 	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.flags = {"met_sundeok": true, "met_mansu": true, "met_junho": true, "met_kyungja": true, "met_bokja": true, "met_yongpal": true, "met_taesik": true}.duplicate()
 	gs.day = 3
 	gs.money = 0
 	var got := 0
@@ -493,7 +495,8 @@ func _test_locations() -> void:
 	_eq(Locations.travel_minutes("shop", "breakwater") > Locations.travel_minutes("shop", "tackle"), true, "방파제는 옆 가게보다 멀다")
 	_eq(Locations.is_visible("cave", {}), false, "숨은 장소는 열리기 전에 안 보임")
 	_eq(Locations.is_visible("cave", {"found_sea_cave": true}), true, "찾으면 숨은 장소가 보임")
-	_eq(Locations.is_visible("rocks", {}), true, "잠긴 보통 장소는 점으로 보임")
+	_eq(Locations.is_visible("rocks", {}), false, "잠긴 보통 장소도 지도에 안 보임 (점 없음)")
+	_eq(Locations.is_visible("rocks", {"learned_tide": true}), true, "열리면 보임")
 	_eq(Locations.travel_minutes("shop", "breakwater"), Locations.travel_minutes("breakwater", "shop"), "이동 시간 대칭")
 	_eq(Locations.travel_minutes("shop", "breakwater") % 5, 0, "5분 단위")
 	_eq(Locations.travel_minutes("shop", "island") > Locations.travel_minutes("shop", "rocks"), true, "섬은 배 시간 추가")
@@ -744,17 +747,19 @@ func _test_header() -> void:
 
 
 func _test_day_flow() -> void:
-	# 시간대: 새벽 05~07, 아침 07~11, 밤 21~23:30
-	_eq(DayFlow.fishing_slot(5 * 60).get("id", ""), "dawn", "05:00 새벽 낚시")
-	_eq(DayFlow.fishing_slot(7 * 60).get("id", ""), "morning", "07:00 아침 낚시")
+	# 시간대: 아침 05~09, 밤 21~23:30 (11-19 하루 두 번으로 줄임)
+	_eq(DayFlow.FISHING_SLOTS.size(), 2, "낚시 시간대는 아침과 밤 두 개")
+	_eq(DayFlow.fishing_slot(5 * 60).get("id", ""), "morning", "05:00 아침 낚시")
+	_eq(DayFlow.fishing_slot(8 * 60).get("id", ""), "morning", "08:00도 아침 낚시")
+	_eq(DayFlow.can_fish(9 * 60), false, "9시부터는 낚시 못 함")
 	_eq(DayFlow.can_fish(12 * 60), false, "한낮엔 낚시 못 함")
 	_eq(DayFlow.can_fish(19 * 60), false, "영업 시간엔 낚시 못 함")
 	_eq(DayFlow.fishing_slot(22 * 60).get("id", ""), "night", "22:00 밤 낚시")
-	_eq(DayFlow.fishing_end(6 * 60), 7 * 60, "새벽 낚시는 7시에 끝")
-	_eq(DayFlow.fishing_end(9 * 60), 11 * 60, "아침 낚시는 11시에 끝")
+	_eq(DayFlow.fishing_end(6 * 60), 9 * 60, "아침 낚시는 9시에 끝")
+	_eq(DayFlow.fishing_end(7 * 60), 9 * 60, "늦잠 잔 날도 9시에 끝")
 	# 밤 낚시하면 늦잠
 	_eq(DayFlow.wake_time(false), 5 * 60, "보통은 새벽 5시 기상")
-	_eq(DayFlow.wake_time(true), 7 * 60, "밤 낚시 뒤엔 7시 기상 (새벽 건너뜀)")
+	_eq(DayFlow.wake_time(true), 7 * 60, "밤 낚시 뒤엔 7시 기상 (아침 낚시 두 시간 줄어듦)")
 	var gs = load("res://scripts/autoload/game_state.gd").new()
 	gs.night_fished = true
 	gs.opened_today = true
@@ -795,8 +800,9 @@ func _test_day_flow() -> void:
 	_eq(DayFlow.special_guest(1).is_empty(), true, "첫날 특별 손님 없음")
 	_eq(DayFlow.special_guest(2).get("name", ""), Orders.of(2).customer, "특별 손님은 주문서 낸 사람")
 	# 안내
-	_eq(DayFlow.next_hint(5 * 60, false).contains("새벽 낚시"), true, "새벽 안내")
+	_eq(DayFlow.next_hint(5 * 60, false).contains("아침 낚시"), true, "아침 안내")
 	_eq(DayFlow.next_hint(13 * 60, false).contains("저녁 6시"), true, "낮 안내: 가게 여는 시각")
+	_eq(DayFlow.next_hint(13 * 60, false).contains("마을"), true, "낮 안내: 마을 일")
 	_eq(DayFlow.next_hint(21 * 60 + 30, true).contains("늦잠"), true, "밤 낚시 안내")
 
 
@@ -1009,6 +1015,7 @@ func _test_icebox() -> void:
 	# 주문을 다 채우면 그 생선을 보낸다 (저녁에 또 팔지 않게)
 	var o := Orders.of(3)
 	var g2 = load("res://scripts/autoload/game_state.gd").new()
+	g2.flags = {"met_sundeok": true, "met_mansu": true, "met_junho": true, "met_kyungja": true, "met_bokja": true, "met_yongpal": true, "met_taesik": true}.duplicate()
 	g2.day = 3
 	for i in o.count:
 		g2.store_catch({"id": o.fish, "size": o.min_cm + 1.0 + i})
@@ -1077,10 +1084,10 @@ func _test_brief() -> void:
 	_eq(b.stats[0].value, "42,000원", "맨 위 어제 번 돈")
 	_eq(b.stats[2].name, "고정비 D-1", "다음 달 고정비")
 	var names: Array = b.sections.map(func(s): return s.name)
-	_eq(names, ["지금 할 일", "오늘 주문", "오늘의 바다", "아침 소식"], "서랍 분류")
+	_eq(names, ["지금 할 일", "메인 이야기", "오늘의 바다", "아침 소식"], "서랍 분류 (만난 사람이 없으면 오늘 부탁 없음)")
 	var todo: Array = b.sections[0].rows
-	_eq(todo[0].target, "breakwater", "새벽 6시엔 먼저 낚시")
-	_eq(todo[0].state, "~7:00", "낚시 끝 시각")
+	_eq(todo[0].target, "breakwater", "아침 6시엔 먼저 낚시")
+	_eq(todo[0].state, "~9:00", "낚시 끝 시각")
 	_eq(todo.any(func(r): return r.target == "market"), true, "시장 열려 있으면 팔기")
 	_eq(todo.any(func(r): return r.target == "shop"), true, "저녁 장사")
 	_eq(todo.any(func(r): return r.target == "home"), false, "아침엔 자러 가지 않음")
@@ -1404,7 +1411,8 @@ func _test_journal() -> void:
 	_eq(gs.journal[0].line, "처음으로 볼락을 잡았다.", "오늘의 한 줄")
 	_eq(gs.notes_today.size(), 0, "다음 날 메모 비움")
 	# 주문을 채우면 메모가 남는다
-	var o := Orders.of(gs.day)
+	gs.flags["met_sundeok"] = true
+	var o: Dictionary = gs.today_order()
 	for i in o.count:
 		gs.offer_to_order(o.fish, o.min_cm + 1.0)
 	_eq(gs.notes_today.size(), 1, "주문 메모")
@@ -2072,8 +2080,8 @@ func _test_board() -> void:
 	_eq(Board.thing_text("fish", "bolak", 2), "볼락 두 마리", "생선 세는 말")
 	_eq(Board.thing_text("produce", "egg", 3), "달걀 세 알", "달걀 세는 말")
 	_eq(Board.thing_text("produce", "daepa", 3), "대파 세 단", "대파 세는 말")
-	# 붙어 있는 기간
-	var flags := {}
+	# 붙어 있는 기간 (모두 만난 뒤)
+	var flags := {"met_sundeok": true, "met_mansu": true, "met_junho": true, "met_kyungja": true, "met_bokja": true, "met_yongpal": true, "met_taesik": true}.duplicate()
 	var p0: Dictionary = Board.posted_on(10)[0]
 	_eq(Board.open_on(10, flags).has(p0), true, "붙은 날 보임")
 	_eq(Board.open_on(12, flags).has(p0), true, "사흘째까지 보임")
@@ -2194,3 +2202,60 @@ func _test_spots() -> void:
 	var a := FishingLogic.new()
 	a.spot = "rocks"
 	_eq(a.spot, "rocks", "낚시 규칙에 낚시터")
+
+
+## 이야기 목록: 메인, 서브, 오늘 부탁과 맥락 (11-19)
+func _test_quests() -> void:
+	# 주문과 게시판은 만난 사람만
+	_eq(Orders.of(5, {}), {}, "아무도 안 만났으면 주문 없음")
+	for d in range(2, 30):
+		_eq(Orders.of(d, {"met_sundeok": true}).get("customer", ""), "최순덕", "%d일: 순덕 할머니만 만났으면 순덕 할머니 주문" % d)
+	_eq(Orders.of(7).is_empty(), false, "flags 없이 부르면 예전처럼 아무나")
+	for d in range(9, 30):
+		for p in Board.posted_on(d, false, {"met_taesik": true}):
+			_eq(p.who, "정태식 이장", "%d일: 모르는 사람 자리는 이장이 붙임" % d)
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.day = 1
+	_eq(Quests.main_quest(gs).id, "main_first_guest", "첫날 메인: 첫 번째 손님")
+	gs.flags["first_guest_done"] = true
+	gs.flags["met_sundeok"] = true
+	gs.day = 2
+	var m: Dictionary = Quests.main_quest(gs)
+	_eq(m.id, "main_greet", "둘째 날 메인: 마을에 인사하기")
+	_eq(m.progress, "0/4", "인사 0/4")
+	_eq(m.target, "breakwater", "먼저 방파제 노인")
+	_eq(m.who, "순덕 할머니", "인사하라고 한 사람")
+	for f in ["met_mansu", "met_yongpal", "met_kyungja", "met_bokja"]:
+		gs.flags[f] = true
+	_eq(Quests.main_quest(gs).id, "main_first_month", "다 만나면 첫 달 버티기")
+	gs.day = 40
+	_eq(Quests.main_quest(gs).id, "main_wait", "첫 달이 지나면 1막 끝")
+	gs.arrears = 10000
+	_eq(Quests.main_quest(gs).goal.contains("밀린 돈"), true, "밀린 돈이 있으면 갚기")
+	gs.arrears = 0
+	# 서브: 부탁을 들은 뒤에만
+	var subs: Array = Quests.sub_quests(gs).map(func(q): return q.id)
+	_eq(subs, ["sub_sundeok"], "순덕 할머니 부탁만 (만수, 해솔은 아직 부탁 전)")
+	gs.flags["learned_tide_talk"] = true
+	gs.flags["hw_haesol"] = true
+	gs.flags["hw_lookout"] = true
+	subs = Quests.sub_quests(gs).map(func(q): return q.id)
+	_eq(subs, ["sub_sundeok", "sub_mansu", "sub_haesol"], "부탁을 들으면 생김")
+	var hs: Dictionary = Quests.sub_quests(gs)[2]
+	_eq(hs.progress, "1/3", "해솔 숙제 1/3")
+	_eq(hs.target, "market", "다음 자랑거리는 시장")
+	gs.flags["coop_open"] = true
+	gs.flags["learned_tide"] = true
+	_eq(Quests.sub_quests(gs).map(func(q): return q.id), ["sub_haesol"], "끝난 이야기는 사라짐")
+	# 오늘 부탁: 모든 줄에 누가와 왜
+	gs.flags["hall_open"] = true
+	gs.flags["met_taesik"] = true
+	gs.day = 12
+	var daily: Array = Quests.daily_quests(gs)
+	_eq(daily.size() >= 2, true, "주문 쪽지와 게시판 의뢰")
+	for q in Quests.active(gs):
+		_eq(q.who.is_empty() and q.kind != "main", false, "%s: 누가 부탁했는지 있음" % q.id)
+		_eq(q.why.is_empty(), false, "%s: 왜 하는지 있음" % q.id)
+	var names: Array = DayBrief.build(gs).sections.map(func(s): return s.name)
+	_eq(names.has("메인 이야기") and names.has("마을 사람 이야기") and names.has("오늘 부탁"), true, "서랍에 이야기 세 칸")
+	gs.free()

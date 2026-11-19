@@ -258,7 +258,19 @@ func _row(r: Dictionary) -> Control:
 	t.add_theme_font_size_override("font_size", 19)
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	h.add_child(t)
+	if str(r.get("why", "")).is_empty():
+		h.add_child(t)
+	else:
+		# 이야기 줄: 할 일 아래 작은 글씨로 누가 왜 부탁했는지
+		var col := UiKit.vbox(2)
+		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.add_child(t)
+		var w := UiKit.paragraph(r.why, "body", UiKit.NOTE_INK_SOFT)
+		w.add_theme_font_size_override("font_size", 15)
+		w.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.add_child(w)
+		h.add_child(col)
 	if not r.state.is_empty():
 		var st := UiKit.text(r.state, "number", TONE.gold if r.tone == "gold" else (TONE.bad if r.tone == "bad" else UiKit.NOTE_INK_SOFT))
 		st.add_theme_font_size_override("font_size", 19)

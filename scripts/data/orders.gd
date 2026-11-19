@@ -5,10 +5,12 @@ extends RefCounted
 ## 다 채우면 보상(돈)을 받는다. 같은 날짜는 언제나 같은 주문이 나온다.
 ##
 ## 대사는 템플릿({player}, {shop}). 화면에 띄울 때 GameState.line()으로 바꾼다.
+## 맥락 (11-19 사용자: 퀘스트가 갑자기 생긴다): 첫 손님 순덕 할머니가 "먹고 싶은 거 생기면 가게 문에 쪽지 붙여 둘게"라고
+## 말하고 간 다음 날부터 쪽지가 붙는다. 만난 사람(met 플래그)만 주문을 낸다. 아직 모르는 사람이 갑자기 주문하지 않게.
 
 ## call: 이야기 글에서 부르는 이름. react: 저녁에 직접 구운 접시를 먹고 하는 말 [별 3, 2, 1]
 const CUSTOMERS := [
-	{"name": "최순덕", "call": "순덕 할머니", "lines": [
+	{"name": "최순덕", "call": "순덕 할머니", "met": "met_sundeok", "lines": [
 		"{player|이/가} 굽는 %s 한번 더 먹고 싶네.",
 		"우리 영감이 %s 좋아했지. 몇 마리만 부탁해.",
 	], "react": [
@@ -16,7 +18,7 @@ const CUSTOMERS := [
 		"먹을 만하네. 다음엔 더 잘하겄지.",
 		"음... 그래도 따뜻한 밥은 고맙네.",
 	]},
-	{"name": "박만수", "call": "만수 할아버지", "lines": [
+	{"name": "박만수", "call": "만수 할아버지", "met": "met_mansu", "lines": [
 		"%s 잡아 와 봐라. 실력 좀 보자.",
 		"오늘 물때면 %s 나온다. 놓치지 말고.",
 	], "react": [
@@ -24,7 +26,7 @@ const CUSTOMERS := [
 		"먹을 만하다. 불 앞에서 조금 더 참아 봐라.",
 		"고기는 좋은데 굽는 게 아직이네.",
 	]},
-	{"name": "이준호", "call": "준호", "lines": [
+	{"name": "이준호", "call": "준호", "met": "met_junho", "lines": [
 		"형 %s 잡으면 사진 좀 찍어 줘요. 가게에 붙이게.",
 		"손님들이 %s 어디서 잡냐고 물어봐서요. 몇 마리만요.",
 	], "react": [
@@ -54,13 +56,23 @@ const POOL := [
 ]
 
 
-## 그날의 주문. 첫날(튜토리얼)은 주문이 없다.
-static func of(day: int) -> Dictionary:
+## 주문을 낼 수 있는 손님들. flags가 null이면 모두 (도구, 옛 테스트)
+static func customers_met(flags) -> Array:
+	if flags == null:
+		return CUSTOMERS
+	return CUSTOMERS.filter(func(c): return flags.get(c.met, false))
+
+
+## 그날의 주문. 첫날(튜토리얼)은 주문이 없다. flags를 주면 만난 사람 가운데서만 고른다
+static func of(day: int, flags = null) -> Dictionary:
 	if day <= 1:
+		return {}
+	var who := customers_met(flags)
+	if who.is_empty():
 		return {}
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("주문-%d" % day)
-	var c: Dictionary = CUSTOMERS[rng.randi() % CUSTOMERS.size()]
+	var c: Dictionary = who[rng.randi() % who.size()]
 	var p: Array = POOL[rng.randi() % POOL.size()]
 	var fish: String = p[0]
 	var f := FishDB.get_fish(fish)

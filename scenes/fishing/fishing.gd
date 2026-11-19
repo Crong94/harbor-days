@@ -2,7 +2,7 @@ extends Control
 ## 북쪽 방파제 찌낚시.
 ## 첫날(튜토리얼): 챕터 2 새벽 05:00~07:00, 첫 물고기는 볼락, 끝나면 〈첫 번째 손님〉 식당 장면으로 간다.
 ## 그 뒤(자유 낚시): 지도에서 들어온 시각의 낚시 시간대(DayFlow: 새벽, 아침, 밤)가 끝나거나 그만하기를 누르면 끝나고 지도로 돌아간다.
-## 밤 낚시를 마치면 잠자리에 들고 다음 날은 늦잠(새벽 낚시 건너뜀)
+## 밤 낚시를 마치면 잠자리에 들고 다음 날은 늦잠(아침 낚시가 두 시간 줄어든다)
 ## 규칙은 FishingLogic, 이 스크립트는 입력, 시간, 화면 표시만 맡는다.
 ##
 ## 조작 (휴대폰 기준, PC는 괄호)
@@ -1309,7 +1309,7 @@ func _leave() -> void:
 		GameState.current_location = "shop" # 잡은 볼락을 들고 식당으로 돌아간다
 		UiKit.go_to(self, TUTORIAL_NEXT)
 	elif night:
-		# 밤 낚시를 마치면 잔다. 내일은 늦잠 (새벽 낚시 건너뜀)
+		# 밤 낚시를 마치면 잔다. 내일은 늦잠 (아침 낚시가 두 시간 줄어든다)
 		GameState.night_fished = true
 		GameState.current_location = "home"
 		GameState.end_day()

@@ -83,7 +83,7 @@ assets/fonts      폰트
 docs              기획 문서
 scenes/title      타이틀
 scenes/prologue   사직서(플레이어명 입력), 간판(가게명 입력)
-scenes/fishing    방파제 찌낚시. 첫날은 새벽 튜토리얼(첫 물고기 볼락), 그 뒤는 아무 시간대 자유 낚시. 캐스팅 포인트, 챔질 PERFECT, 좌우 줄다리기, 미끼, 물때·날씨, 주문
+scenes/fishing    방파제 찌낚시. 첫날은 새벽 튜토리얼(첫 물고기 볼락), 그 뒤는 하루 두 번(아침 05~09, 밤 21~23:30 선택. scripts/data/day_flow.gd). 캐스팅 포인트, 챔질 PERFECT, 좌우 줄다리기, 미끼, 물때·날씨, 주문
 scenes/restaurant 〈첫 번째 손님〉 식당 장면 (볼락구이, 최순덕)
 scenes/shop       준호네 낚시방 (장비 구매, 장착)
 scenes/garden     우리 텃밭. 이랑 네 줄에 심고 거두기 (CropDB)
@@ -92,7 +92,7 @@ scenes/coop       닭장 (모이 주기, 달걀 줍기, 모이 사기). 규칙�
 scenes/map        마을 지도. 장소 선택, 이동 시간, 해금 (scripts/data/locations.gd)
 scripts/fishing   FishingLogic (낚시 규칙, 헤드리스 테스트 가능)
 scripts/cooking   CookingLogic (간 맞추기, 굽기 규칙)
-scripts/data      FishDB (어종 7종, 희귀도), GearDB (낚싯대·릴 10단계), BaitDB (미끼), SeaDay (물때·날씨), Orders (식당 주문), Locations (장소), CropDB (텃밭 네 칸과 작물 6종, docs/텃밭_설계.md), Catalog (바다 한 접시 어종 71종, 레시피 50개)
+scripts/data      FishDB (어종 7종, 희귀도), GearDB (낚싯대·릴 10단계), BaitDB (미끼), SeaDay (물때·날씨), Orders (식당 주문), Locations (장소), Quests (메인·서브·오늘 부탁 이야기 목록, 모든 줄에 누가와 왜), CropDB (텃밭 네 칸과 작물 6종, docs/텃밭_설계.md), Catalog (바다 한 접시 어종 71종, 레시피 50개)
 assets/art        사용자에게 받은 그림 (docs/그림_요청_목록.md). dish, cook_tool, kitchen, ingredient, gear_icon은 바다 한 접시에서 가져옴
 assets/art/sd     주인공 SD 동작 프레임 (back_01~12 낚시 뒷모습, front_01~12 앞모습)
 assets/audio      배경음악 bgm, 효과음 sfx (바다 한 접시에서 가져옴)

@@ -10,7 +10,8 @@ extends RefCounted
 ## - 남은 시간과 마감은 오른쪽에 짧게 (예: "~11:00", "D-3")
 ##
 ## gs는 GameState(또는 같은 변수를 가진 것). 돌려주는 값:
-## {"title", "stats": [{"name", "value", "tone"}], "sections": [{"name", "rows": [{"text", "state", "tone", "target"}]}]}
+## {"title", "stats": [{"name", "value", "tone"}], "sections": [{"name", "rows": [{"text", "state", "tone", "target", "why"(없을 수 있음)}]}]}
+## 이야기 칸 셋(메인, 마을 사람, 오늘 부탁)은 Quests가 만든다. why는 누가 왜 부탁했는지 한 줄 (11-19)
 ## tone: "gold" 챙길 것, "good" 잘 됨, "bad" 나쁨, "info" 그냥 정보. target: 지도 장소 id (없으면 "")
 
 
@@ -22,7 +23,9 @@ static func build(gs: Object) -> Dictionary:
 		"stats": _stats(gs),
 		"sections": [
 			{"name": "지금 할 일", "rows": _todo(gs, day, m)},
-			{"name": "오늘 주문", "rows": _order(gs, day)},
+			{"name": "메인 이야기", "rows": _quests(gs, "main")},
+			{"name": "마을 사람 이야기", "rows": _quests(gs, "sub")},
+			{"name": "오늘 부탁", "rows": _quests(gs, "daily")},
 			{"name": "오늘의 바다", "rows": _sea(day, m)},
 			{"name": "아침 소식", "rows": _news(gs)},
 		].filter(func(s): return not s.rows.is_empty()),
@@ -50,8 +53,8 @@ static func _todo(gs: Object, day: int, m: int) -> Array:
 	var slot := DayFlow.fishing_slot(m)
 	if not slot.is_empty() and slot.id != "night":
 		rows.append({"text": "%s · 방파제" % slot.name, "state": "~%s" % _hm(slot.end), "tone": "gold", "target": "breakwater"})
-	elif m < DayFlow.FISHING_SLOTS[0][2]:
-		rows.append({"text": "새벽 낚시 · 방파제", "state": "5:00~", "tone": "info", "target": "breakwater"})
+	elif m < DayFlow.FISHING_SLOTS[DayFlow.MORNING][2]:
+		rows.append({"text": "아침 낚시 · 방파제", "state": "5:00~", "tone": "info", "target": "breakwater"})
 	var spoil: int = gs.spoiling_tonight().size()
 	if not gs.inventory.is_empty() and Market.is_open(m):
 		var t := "수산시장에서 비싼 고기 팔기"
@@ -68,23 +71,23 @@ static func _todo(gs: Object, day: int, m: int) -> Array:
 		var n: int = gs.inventory.size()
 		var t2 := "저녁 장사 · 아이스박스 %d마리" % n if n > 0 else "저녁 장사 · 팔 생선이 없어요"
 		rows.append({"text": t2, "state": "18:00~", "tone": "gold" if n > 0 else "bad", "target": "shop"})
-	if m < DayFlow.FISHING_SLOTS[2][3] and (gs.opened_today or m >= DayFlow.SHOP_CLOSE):
+	if m < DayFlow.FISHING_SLOTS[DayFlow.NIGHT][3] and (gs.opened_today or m >= DayFlow.SHOP_CLOSE):
 		rows.append({"text": "밤 낚시 (내일은 늦잠)", "state": "21:00~", "tone": "info", "target": "breakwater"})
 	if gs.opened_today or m >= DayFlow.SHOP_CLOSE:
 		rows.append({"text": "집에 가서 자기", "state": "", "tone": "info", "target": "home"})
 	return rows
 
 
-## 오늘 주문 한 줄
-static func _order(gs: Object, day: int) -> Array:
-	var o := Orders.of(day)
-	if o.is_empty():
-		return []
-	var who := Orders.call_name(o.customer)
-	var text := "%s · %s %d마리" % [who, Orders.goal_text(o), o.count]
-	if gs.order_done:
-		return [{"text": text, "state": "보냄", "tone": "good", "target": ""}]
-	return [{"text": text + " · " + _won(o.reward), "state": "%d/%d" % [gs.order_filled, o.count], "tone": "gold", "target": "breakwater"}]
+## 이야기 한 갈래 (Quests). 메인과 서브는 "〈제목〉 할 일", 오늘 부탁은 "누가 · 할 일". 아래 작은 줄에 누가 왜
+static func _quests(gs: Object, kind: String) -> Array:
+	var rows: Array = []
+	for q in Quests.of_kind(gs, kind):
+		var done: bool = q.target.is_empty() and q.progress.is_empty()
+		var text: String = "%s · %s" % [q.who, q.goal] if kind == "daily" else "〈%s〉 %s" % [q.title, q.goal]
+		var why: String = q.why if kind == "daily" or q.who.is_empty() else "%s · %s" % [q.who, q.why]
+		rows.append({"text": gs.line(text) if gs.has_method("line") else text, "why": gs.line(why) if gs.has_method("line") else why,
+			"state": q.progress, "tone": "good" if done else "gold", "target": q.target})
+	return rows
 
 
 ## 날씨와 물때, 오늘 잘 무는 고기

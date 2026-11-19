@@ -111,7 +111,7 @@ func _ready() -> void:
 
 ## 특별 손님이 찾는 생선이 있으면 그걸, 없으면 가장 좋은 생선을 먼저 빼 둔다
 func _reserve_special() -> void:
-	special = DayFlow.special_guest(GameState.day)
+	special = DayFlow.special_guest(GameState.day, GameState.flags)
 	if special.is_empty() or GameState.inventory.is_empty():
 		return
 	special_fish = GameState.take_fish(special.fish)
@@ -378,7 +378,7 @@ func _show_ledger() -> void:
 
 
 func _go_night_fishing() -> void:
-	GameState.time_minutes = DayFlow.FISHING_SLOTS[2][2] # 21:00
+	GameState.time_minutes = DayFlow.FISHING_SLOTS[DayFlow.NIGHT][2] # 21:00
 	GameState.current_location = "breakwater"
 	UiKit.go_to(self, FISHING_SCENE, 0.8)
 

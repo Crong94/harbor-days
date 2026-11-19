@@ -5,7 +5,6 @@ extends Control
 ## 구성: 맨 위 공통 헤더(고정) / 끌어서 움직이는 지도와 핀 / 아래 종이 시트(장소 정보와 이동)
 ## 지도는 화면 높이의 MAP_SCREENS배 크기로 보여 준다. 처음에는 지금 있는 곳을 가운데에 둔다.
 
-const PIN_DOT := 14.0 # 잠긴 장소 점 크기
 const SERVICE_SCENE := "res://scenes/restaurant/service.tscn"
 const TOWN_SCENE := "res://scenes/town/town_market.tscn"
 ## 지도 높이를 화면 높이의 몇 배로 보여 줄지
@@ -277,7 +276,7 @@ func _rebuild_pins() -> void:
 	_pins.clear()
 	for id in Locations.LIST:
 		if not Locations.is_visible(id, GameState.flags):
-			continue # 숨은 장소
+			continue # 아직 못 가는 곳은 아무것도 띄우지 않는다 (11-19 사용자 요청. 예전엔 검은 점)
 		var p := _make_pin(id)
 		_pins[id] = p
 		_world.add_child(p)
@@ -286,15 +285,6 @@ func _rebuild_pins() -> void:
 
 func _make_pin(id: String) -> Control:
 	var loc := Locations.get_loc(id)
-	if not Locations.is_unlocked(id, GameState.flags):
-		# 아직 갈 수 없는 곳은 작은 점으로만
-		var dot := Panel.new()
-		dot.custom_minimum_size = Vector2(PIN_DOT, PIN_DOT)
-		dot.size = Vector2(PIN_DOT, PIN_DOT)
-		dot.add_theme_stylebox_override("panel", UiKit.box(Color(UiKit.NAVY_DEEP, 0.55), UiKit.RADIUS_PILL, Color(1, 1, 1, 0.5), 2, 0))
-		dot.tooltip_text = "아직 갈 수 없어요"
-		dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		return dot
 	var here := id == GameState.current_location
 	var b := Button.new()
 	b.text = ("● " if here else "") + GameState.line(loc.name)
@@ -378,33 +368,6 @@ func _build_top_bar() -> void:
 	UiKit.outlined(town, 10)
 	town.position = Vector2(26, GameHeader.BOTTOM + 8.0)
 	add_child(town)
-	_build_compass()
-
-
-## 방위표: 지도 위가 북, 오른쪽이 동쪽 바다. 그림(ui_compass)이 오면 그림으로, 없으면 글자 네 개만
-const COMPASS := 92.0
-func _build_compass() -> void:
-	var box := Control.new()
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.position = Vector2(30, GameHeader.BOTTOM + 66.0)
-	box.size = Vector2(COMPASS, COMPASS)
-	add_child(box)
-	if ArtSlot.has_art("ui_compass"):
-		var tex := TextureRect.new()
-		tex.texture = load(ArtSlot.art_path("ui_compass"))
-		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		box.add_child(tex)
-		return
-	var c := COMPASS * 0.5
-	for d in [["북", Vector2(0, -1), UiKit.CORAL], ["동", Vector2(1, 0), UiKit.FOAM], ["남", Vector2(0, 1), UiKit.FOAM], ["서", Vector2(-1, 0), UiKit.FOAM]]:
-		var l := UiKit.text(d[0], "label", d[2], HORIZONTAL_ALIGNMENT_CENTER)
-		UiKit.outlined(l, 8)
-		l.size = Vector2(40, 34)
-		l.position = Vector2(c, c) + d[1] * (c - 14.0) - l.size * 0.5
-		box.add_child(l)
 
 
 func _refresh_hud() -> void:
@@ -464,11 +427,14 @@ func _select(id: String) -> void:
 	var arrive := GameState.time_minutes + travel
 	match id:
 		"breakwater":
-			if not DayFlow.can_fish(arrive):
+			if not DayFlow.can_fish(arrive) and not Story.pending(id, GameState.day, arrive, GameState.flags).is_empty():
+				_action = "talk" # 낚시 시간은 아니지만 기다리는 사람이 있다 (해솔이 낚시 같은 이야기). 이야기만 보고 지도로
+				_go_btn.text = "들어가기" if here else "가기"
+			elif not DayFlow.can_fish(arrive):
 				_action = ""
 				_go_btn.text = "지금은 낚시 시간이 아니에요"
 				_sheet_desc.text = GameState.line(loc.desc) + "
-새벽 5시~11시, 밤 9시~11시 반에 낚시할 수 있어요."
+아침 5시~9시, 밤 9시~11시 반에 낚시할 수 있어요. 낮에는 마을 일을 해요."
 		"rocks":
 			var times := Spots.rocks_fishing_times(GameState.day)
 			var when := "오늘 물 빠지는 낚시 시간: " + Spots.times_text(times) if not times.is_empty() else "오늘은 낚시 시간에 물이 안 빠져요."
@@ -554,12 +520,21 @@ func _travel() -> void:
 		_show_notices.call_deferred(2.6)
 		return
 	# 이야기 사건이 있으면 지도 위 대사창으로 먼저 보여 주고 이어서 들어간다 (Story)
+	var talk_only := _action == "talk"
 	var ev := Story.pending(id, GameState.day, GameState.time_minutes, GameState.flags)
 	if not ev.is_empty():
 		_refresh_hud()
 		_play_story(ev.lines, func():
 			Story.finish(ev, GameState)
-			_enter(id))
+			if talk_only:
+				_refresh_hud()
+				_rebuild_pins()
+				_drawer.refresh_dot()
+			else:
+				_enter(id))
+		return
+	if talk_only:
+		_refresh_hud()
 		return
 	_enter(id)
 

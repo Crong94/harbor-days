@@ -249,7 +249,7 @@ func use_bait() -> void:
 
 ## 오늘 주문
 func today_order() -> Dictionary:
-	return Orders.of(day)
+	return Orders.of(day, flags)
 
 
 ## 잡은 물고기를 주문에 넣어 본다. 주문을 막 다 채웠으면 보상 금액, 아니면 0

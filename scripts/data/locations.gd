@@ -8,7 +8,7 @@ extends RefCounted
 ## 핀은 보통 pos 위에 서서 아래 끝이 pos를 가리킨다. "pin": "below"면 pos 아래에 매달린다 (위에 자리가 없을 때).
 ## unlock은 GameState.flags 이름이다. 빈 문자열이면 처음부터 열려 있다.
 ## 할 일이 아직 없는 곳(마을회관, 분교, 민박)은 그곳 이야기가 생길 때 켤 표시로 잠가 둔다 (hall_open, met_haesol, met_jiwoo)
-## "hidden": true인 곳은 열리기 전까지 지도에 점도 보이지 않는다 (숨은 장소).
+## 잠긴 곳은 열리기 전까지 지도에 아무것도 보이지 않는다. "hidden": true는 찾아야 열리는 숨은 장소 표시.
 
 const LIST := {
 	"shop": {
@@ -118,9 +118,9 @@ static func is_unlocked(id: String, flags: Dictionary) -> bool:
 	return cond.is_empty() or flags.get(cond, false)
 
 
-## 지도에 핀이나 점을 보여 줄지. 숨은 장소는 열리기 전까지 안 보인다.
+## 지도에 핀을 보여 줄지. 열린 곳만 보인다 (11-19 사용자 요청: 잠긴 곳 위 검은 점 없앰. 숨은 장소도 같다)
 static func is_visible(id: String, flags: Dictionary) -> bool:
-	return not get_loc(id).get("hidden", false) or is_unlocked(id, flags)
+	return is_unlocked(id, flags)
 
 
 ## 두 장소 사이 이동 시간(분). 5분 단위로 반올림한다.
