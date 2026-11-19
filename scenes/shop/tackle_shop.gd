@@ -4,7 +4,8 @@ extends Control
 ## 그림: 가게 내부 bg_tackle_shop (지금은 바다 한 접시의 임시 그림), 준호 초상화 npc_junho (사용자에게 받음)
 ##       장비 아이콘 gear_icon/* (바다 한 접시에서 가져옴, GearDB의 icon)
 ##
-## 구성: 위 유리 상단바 / 준호와 말풍선 / 아래 종이 시트(낚싯대·릴 탭과 상품 목록)
+## 구성: 위 유리 상단바 / 준호와 말풍선 / 아래 종이 시트(낚싯대·릴·미끼·도구 탭과 상품 목록)
+## 도구 탭(11-19, 여울 참고): 쿨러(아이스박스 칸 수)와 KitDB 도구 아홉 가지. 단계마다 하나씩 올려 산다
 
 const MAP_SCENE := "res://scenes/map/map.tscn"
 ## 상품 오른쪽 칸 크기 (사기, 장착, 쓰는 중, 잠김 모두 같다)
@@ -118,7 +119,7 @@ func _make_tabs() -> PanelContainer:
 	var track := UiKit.tab_track()
 	var h := UiKit.hbox(UiKit.SPACE_XS)
 	track.add_child(h)
-	for kind in [["rod", "낚싯대"], ["reel", "릴"], ["bait", "미끼"]]:
+	for kind in [["rod", "낚싯대"], ["reel", "릴"], ["bait", "미끼"], ["kit", "도구"]]:
 		var b := UiKit.tab_button(kind[1])
 		b.pressed.connect(func():
 			_tab = kind[0]
@@ -143,10 +144,14 @@ func _refresh() -> void:
 		for id in [GearDB.DEFAULT_REEL] + GearDB.shop_list("reel"):
 			var l: Dictionary = GearDB.REELS[id]
 			_list.add_child(_item_card("reel", id, l, ["감기 %d%%" % int(l.speed * 100), "드랙 +%d%%" % int(l.drag * 100)]))
-	else:
+	elif _tab == "bait":
 		for id in BaitDB.ORDER:
 			if BaitDB.bait(id).amount > 0:
 				_list.add_child(_bait_card(id))
+	else:
+		_list.add_child(_cooler_card())
+		for k in KitDB.KITS:
+			_list.add_child(_kit_card(k.id))
 
 
 func _item_card(kind: String, id: String, item: Dictionary, stats: Array) -> PanelContainer:
@@ -278,3 +283,86 @@ func _stat_text(t: String) -> Label:
 	l.add_theme_font_override("font", UiKit.font("bold"))
 	l.add_theme_font_size_override("font_size", 15)
 	return l
+
+
+## 도구 칸 하나: 그림, 이름(지금 단계), 지금 효과, 다음 단계 효과, 사기
+func _tool_card(icon: String, title: String, desc: String, now: String, next_text: String, price: int, on_buy: Callable) -> PanelContainer:
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", _card_box(false))
+	var h := UiKit.hbox(UiKit.SPACE_LG)
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	card.add_child(h)
+	var thumb := PanelContainer.new()
+	thumb.add_theme_stylebox_override("panel", UiKit.box(Color.WHITE, UiKit.RADIUS_MD, Color.TRANSPARENT, 0, 6))
+	thumb.custom_minimum_size = Vector2(92, 92)
+	var ic := UiKit.icon_rect(icon, 80)
+	if ic:
+		thumb.add_child(ic)
+	h.add_child(thumb)
+	var info := UiKit.vbox(UiKit.SPACE_XS)
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.add_child(UiKit.text(title, "title", UiKit.INK))
+	info.add_child(UiKit.paragraph(desc, "caption", UiKit.INK_SOFT))
+	if not now.is_empty():
+		info.add_child(_stat_text("지금: " + now))
+	if not next_text.is_empty():
+		var nl := UiKit.paragraph("다음: " + next_text, "caption", UiKit.NOTE_INK_SOFT)
+		info.add_child(nl)
+	h.add_child(info)
+	if price < 0:
+		h.add_child(UiKit.status_tag("다 갖춤", UiKit.GOLD_SOFT, UiKit.GOLD_DARK, SHOP_BTN))
+	else:
+		var buy := UiKit.game_button(GameState.format_won(price), UiKit.CORAL_DEEP, SHOP_BTN, 19)
+		buy.disabled = GameState.money < price
+		buy.pressed.connect(on_buy)
+		h.add_child(buy)
+	return card
+
+
+func _cooler_card() -> PanelContainer:
+	var cur := KitDB.cooler(GameState.cooler)
+	var has_next: bool = GameState.cooler + 1 < KitDB.COOLERS.size()
+	var nx: Dictionary = KitDB.cooler(GameState.cooler + 1) if has_next else {}
+	return _tool_card("kit/cooler", "쿨러 · %s" % cur.name, cur.desc, "아이스박스 %d칸" % GameState.icebox_size,
+		("%s · %d칸" % [nx.name, nx.size]) if has_next else "", int(nx.price) if has_next else -1,
+		func():
+			var err := GameState.buy_cooler()
+			if not err.is_empty():
+				Sound.play_sfx("bad", 0.0, -6.0)
+				_say("아이고 형, " + err)
+				return
+			Sound.play_sfx("sold")
+			_say("%s! 이제 %d마리까지 들어가요. 놓아줄 고민 덜 하시겠네요." % [KitDB.cooler(GameState.cooler).name, GameState.icebox_size])
+			_refresh())
+
+
+func _kit_card(id: String) -> PanelContainer:
+	var k := KitDB.kit(id)
+	var lv := KitDB.level(GameState.kits, id)
+	var nx := KitDB.next_level(GameState.kits, id)
+	var title: String = k.name if lv <= 0 else "%s · %s" % [k.name, k.levels[lv - 1][0]]
+	return _tool_card("kit/" + id, title, KIT_TALK.get(id, ""), KitDB.effect_text(id, lv),
+		("%s · %s" % [nx[0], KitDB.effect_text(id, lv + 1)]) if not nx.is_empty() else "", int(nx[1]) if not nx.is_empty() else -1,
+		func():
+			var err := GameState.buy_kit(id)
+			if not err.is_empty():
+				Sound.play_sfx("bad", 0.0, -6.0)
+				_say("아이고 형, " + err)
+				return
+			Sound.play_sfx("sold")
+			_say("%s 챙겨 드렸어요. %s." % [k.levels[KitDB.level(GameState.kits, id) - 1][0], KitDB.effect_text(id, KitDB.level(GameState.kits, id))])
+			_refresh())
+
+
+## 도구마다 준호가 붙인 한 줄 설명
+const KIT_TALK := {
+	"line": "줄이 좋으면 큰 놈이 차고 나가도 덜 불안해요.",
+	"hook": "바늘이 좋으면 줄이 좀 늘어져도 안 빠져요.",
+	"float": "찌가 예민하면 입질을 더 오래 볼 수 있어요.",
+	"tacklebox": "칸이 많으면 미끼를 더 챙겨 다닐 수 있죠.",
+	"net": "가까이 오면 뜰채로 바로 떠요. 발밑에서 놓치는 일이 줄어요.",
+	"lamp": "밤낚시엔 랜턴이 있어야 채비를 빨리 갈죠.",
+	"chair": "편하게 앉아 있어야 오래 버텨요. 입질도 더 자주 보고요.",
+	"boots": "비 오는 날 미끄럽지 않으면 자리 잡기가 쉬워요.",
+	"trap": "방파제에 걸어 두면 밤새 바위 고기가 들어가요. 다음 날 방파제 가시면 걷어요.",
+}

@@ -50,6 +50,7 @@ func _init() -> void:
 	_test_bus()
 	_test_board()
 	_test_quests()
+	_test_kits()
 	_test_shop4()
 	_test_spots()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
@@ -2258,4 +2259,75 @@ func _test_quests() -> void:
 		_eq(q.why.is_empty(), false, "%s: 왜 하는지 있음" % q.id)
 	var names: Array = DayBrief.build(gs).sections.map(func(s): return s.name)
 	_eq(names.has("메인 이야기") and names.has("마을 사람 이야기") and names.has("오늘 부탁"), true, "서랍에 이야기 세 칸")
+	gs.free()
+
+
+## 아이스박스 골라 놓아주기, 쿨러, 낚시방 도구, 통발 (11-19, 여울 참고)
+func _test_kits() -> void:
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.day = 5
+	gs.icebox_size = 2
+	gs.store_catch({"id": "bolak", "size": 20.0})
+	gs.store_catch({"id": "bolak", "size": 15.0})
+	_eq(gs.store_catch({"id": "ureok", "size": 30.0}, false), {}, "골라 놓아주기: 바로 놓아주지 않음")
+	_eq(gs.is_overfull(), true, "넘친 채로 둠")
+	_eq(gs.release_fish(gs.inventory[0]), true, "고른 고기 놓아주기")
+	_eq(gs.is_overfull(), false, "한 마리 놓아주면 들어감")
+	_eq(gs.release_fish({"id": "x", "size": 1.0}), false, "없는 고기는 못 놓아줌")
+	_eq(gs.store_catch({"id": "bolak", "size": 10.0}).is_empty(), false, "기본은 예전처럼 가장 싼 것을 놓아줌")
+	# 쿨러
+	gs.money = 1_000_000
+	gs.cooler = 0
+	gs.icebox_size = 10
+	_eq(gs.buy_cooler(), "", "쿨러 사기")
+	_eq(gs.icebox_size, KitDB.COOLERS[1].size, "칸 수가 늘어남")
+	gs.cooler = KitDB.COOLERS.size() - 1
+	_eq(gs.buy_cooler().is_empty(), false, "끝 단계면 더 못 삼")
+	# 도구
+	_eq(KitDB.level(gs.kits, "line"), 0, "처음엔 줄 없음")
+	_eq(gs.buy_kit("line"), "", "줄 사기")
+	_eq(gs.buy_kit("line"), "", "다음 단계 줄")
+	_eq(KitDB.level(gs.kits, "line"), 2, "줄 2단계")
+	_eq(KitDB.effect_text("line", 2), "장력이 5% 덜 오른다", "효과 글")
+	_eq(KitDB.effect_text("hook", 1), "줄이 느슨해도 0.15초 더 버틴다", "소수 효과 글")
+	for i in 4:
+		gs.buy_kit("chair")
+	_eq(gs.buy_kit("chair").is_empty(), false, "4단계 넘으면 못 삼")
+	var l := FishingLogic.new()
+	GearDB.apply(l, "rod_1", "reel_1")
+	var base_t := l.tension_mult
+	l.bite_mult = 1.0
+	KitDB.apply(l, {"line": 4, "net": 2, "chair": 1, "lamp": 1, "boots": 1}, false, "sunny")
+	_eq(l.tension_mult < base_t, true, "줄: 장력 덜 오름")
+	_eq(is_equal_approx(l.land_at, 0.07), true, "뜰채: 7%에서 떠 올림")
+	_eq(is_equal_approx(l.bite_mult, 1.04), true, "낮 맑은 날은 의자만")
+	l.bite_mult = 1.0
+	KitDB.apply(l, {"chair": 1, "lamp": 1, "boots": 1}, true, "rain")
+	_eq(is_equal_approx(l.bite_mult, 1.13), true, "밤 비 오는 날은 의자, 랜턴, 장화")
+	# 태클박스: 미끼 묶음이 더 들어감
+	gs.kits["tacklebox"] = 2
+	var before: int = maxi(gs.bait_count("worm"), 0)
+	gs.buy_bait("worm")
+	_eq(gs.bait_count("worm") - before, int(BaitDB.bait("worm").amount) + 4, "태클박스 2단계: 4개 더")
+	# 통발
+	_eq(KitDB.trap_night({}, 0, 3), [], "통발 없으면 빈손")
+	var total := 0
+	for d in range(1, 40):
+		var got := KitDB.trap_night({"trap": 3}, 0, d)
+		_eq(got.size() <= 2, true, "%d일: 통발 3단계는 두 마리까지" % d)
+		total += got.size()
+		for e in got:
+			_eq(KitDB.TRAP_POOL.has(e.id), true, "통발엔 바위 고기")
+	_eq(total > 20, true, "통발에 꾸준히 든다 (%d)" % total)
+	_eq(KitDB.trap_night({"trap": 3}, 2, 5), [], "이미 차 있으면 더 안 듦")
+	gs.kits = {"trap": 4}
+	gs.inventory = []
+	gs.icebox_size = 10
+	for i in 10:
+		gs.end_day()
+	_eq(gs.trap_fish.size() <= 2, true, "걷지 않으면 통발 자리만큼만 쌓임")
+	var had: int = gs.trap_fish.size()
+	_eq(gs.haul_traps().size(), had, "방파제에서 걷기")
+	_eq(gs.inventory.size(), had, "걷은 고기는 아이스박스로")
+	_eq(gs.trap_fish.size(), 0, "통발 비움")
 	gs.free()

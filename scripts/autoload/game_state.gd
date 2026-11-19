@@ -43,6 +43,10 @@ var caught_today: Array = []
 var inventory: Array = []
 ## 아이스박스에 넣을 수 있는 마리 수. 꽉 차면 가장 싼 고기를 놓아준다
 var icebox_size := 10
+## 낚시방 도구 (KitDB). cooler: 쿨러 단계(0부터, icebox_size를 정한다), kits: {도구 id: 단계}, trap_fish: 통발에 든 채 기다리는 고기
+var cooler := 0
+var kits := {}
+var trap_fish: Array = []
 ## 잡은 날을 포함해 생선이 버티는 날 수. 잡은 다음 날 저녁 장사까지 쓸 수 있다
 const FRESH_DAYS := 2
 ## 어종 도감: 어종 id → 가장 큰 기록(cm)
@@ -227,7 +231,7 @@ func buy_bait(id: String, price := -1) -> String:
 	if money < cost:
 		return "돈이 모자라요."
 	spend(cost)
-	baits[id] = int(baits.get(id, 0)) + int(b.amount)
+	baits[id] = int(baits.get(id, 0)) + int(b.amount) + int(KitDB.value(kits, "tacklebox"))
 	return ""
 
 
@@ -283,12 +287,13 @@ func _deliver_order(o: Dictionary) -> void:
 
 ## 잡은 생선을 아이스박스에 넣는다. 꽉 차 있으면 가장 싼 한 마리(방금 잡은 것일 수도 있다)를 놓아준다.
 ## 놓아준 생선을 돌려준다. 다 들어갔으면 빈 Dictionary
-func store_catch(entry: Dictionary) -> Dictionary:
+## auto_release가 false면 넘친 채로 두고 빈 Dictionary를 돌려준다. 낚시 화면이 놓아줄 고기를 고르게 한다 (is_overfull, release_fish)
+func store_catch(entry: Dictionary, auto_release := true) -> Dictionary:
 	var e := entry.duplicate()
 	if not e.has("day"):
 		e["day"] = day
 	inventory.append(e)
-	if inventory.size() <= icebox_size:
+	if inventory.size() <= icebox_size or not auto_release:
 		return {}
 	var low := 0
 	for i in inventory.size():
@@ -307,6 +312,55 @@ func sell_fish(entry: Dictionary, price := -1) -> int:
 	inventory.remove_at(i)
 	var got := Market.price(entry.id, entry.size) if price < 0 else price
 	earn(got)
+	return got
+
+
+## 아이스박스가 넘쳤는지 (놓아줄 고기를 골라야 한다)
+func is_overfull() -> bool:
+	return inventory.size() > icebox_size
+
+
+## 아이스박스의 그 생선을 바다에 놓아준다. 놓아줬으면 true
+func release_fish(entry: Dictionary) -> bool:
+	var i := inventory.find(entry)
+	if i < 0:
+		return false
+	inventory.remove_at(i)
+	return true
+
+
+## 쿨러를 다음 단계로 산다. 문제가 없으면 빈 문자열
+func buy_cooler() -> String:
+	if cooler + 1 >= KitDB.COOLERS.size():
+		return "더 큰 쿨러는 아직 없어요."
+	var c := KitDB.cooler(cooler + 1)
+	if money < int(c.price):
+		return "돈이 모자라요."
+	spend(int(c.price))
+	cooler += 1
+	icebox_size = int(c.size)
+	return ""
+
+
+## 도구를 다음 단계로 산다. 문제가 없으면 빈 문자열
+func buy_kit(id: String) -> String:
+	var nx := KitDB.next_level(kits, id)
+	if nx.is_empty():
+		return "이게 제일 좋은 거예요."
+	if money < int(nx[1]):
+		return "돈이 모자라요."
+	spend(int(nx[1]))
+	kits[id] = KitDB.level(kits, id) + 1
+	return ""
+
+
+## 방파제에 오면 통발을 걷는다: 든 고기를 아이스박스에 넣고(넘치면 화면이 고르게 한다) 넣은 것을 돌려준다
+func haul_traps() -> Array:
+	var got := trap_fish.duplicate()
+	trap_fish.clear()
+	for e in got:
+		store_catch(e, false)
+		caught_today.append(e)
 	return got
 
 
@@ -346,6 +400,10 @@ func end_day(wake_minutes := -1) -> void:
 		inventory = inventory.filter(func(e): return not spoiled.has(e))
 		_news("아이스박스에서 생선 %d마리가 상해서 버렸어요. 잡은 다음 날 저녁까지 팔아요" % spoiled.size())
 	Coop.next_day(self)
+	# 밤새 통발에 고기가 든다 (KitDB trap). 잡은 날은 다음 날로 친다
+	for t in KitDB.trap_night(kits, trap_fish.size(), day + 1):
+		t["day"] = day + 1
+		trap_fish.append(t)
 	day += 1
 	# 매달 1일은 대출, 월세, 공과금이 나가는 날 (Loan)
 	var r := Loan.settle(day, money, debt, monthly_repayment, arrears)

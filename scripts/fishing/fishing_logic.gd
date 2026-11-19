@@ -139,6 +139,7 @@ var reel_mult := 1.0 # 감는 속도
 var tension_mult := 1.0 # 장력이 오르는 정도 (작을수록 버티기 쉬움)
 var hook_bonus := 0.0 # 챔질 여유 (초)
 var slack_bonus := 0.0 # 느슨함을 버티는 추가 시간 (초)
+var land_at := 0.0 # 뜰채: 거리가 이만큼 남으면 바로 떠 올린다 (KitDB net)
 
 var rng := RandomNumberGenerator.new()
 
@@ -533,7 +534,7 @@ func _update_reel(dt: float, held: bool) -> void:
 		_fail("jumped" if jump_t > 0.0 else "escaped")
 	elif _slack_time >= (SLACK_LIMIT_FORGIVING if forgiving else SLACK_LIMIT) + slack_bonus:
 		_fail("slack")
-	elif distance <= 0.0:
+	elif distance <= land_at:
 		catch_count += 1
 		forgiving = false
 		run_dir = 0
