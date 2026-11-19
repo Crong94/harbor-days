@@ -53,6 +53,7 @@ func _init() -> void:
 	_test_kits()
 	_test_service_plan()
 	_test_tide_times()
+	_test_special_guest()
 	_test_shop4()
 	_test_spots()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
@@ -2405,3 +2406,24 @@ func _test_tide_times() -> void:
 		for m in t.low:
 			_eq(Spots.rocks_until(d, int(m)) >= 0, true, "%d일 간조엔 갯바위 물이 빠져 있음" % d)
 	_eq(Tide.times_text(1).begins_with("간조 03:00"), true, "첫날 간조 03:00")
+
+
+## 특별 손님 알아맞히기 대접 (11-19)
+func _test_special_guest() -> void:
+	_eq(SpecialGuest.styles_ok({}), ["grill"], "배운 게 없으면 구이만")
+	var ok := SpecialGuest.styles_ok({"recipe_fish_fry": true, "menu_maeuntang": true})
+	_eq(ok.has("fry") and ok.has("soup"), true, "튀김, 국물까지")
+	var w := SpecialGuest.want(5, "최순덕", "bolak", "rain", ["grill"])
+	_eq(w.style, "grill", "못 내는 갈래는 바라지 않음")
+	_eq(w.hints.size(), 3, "힌트 세 줄")
+	_eq(SpecialGuest.want(5, "최순덕", "bolak", "rain", ["grill"]), w, "같은 날 같은 손님은 같은 바람")
+	var w2 := SpecialGuest.want(7, "박만수", "ureok", "rain", ok)
+	_eq(w2.style in ok, true, "바라는 갈래는 낼 수 있는 것 안에서")
+	var perfect := SpecialGuest.score(w2, "ureok", SpecialGuest.STYLES[w2.style].dishes[0], w2.side)
+	_eq(perfect.perfect, true, "셋 다 맞히면 완벽")
+	_eq(perfect.stars, 3, "별 셋")
+	_eq(SpecialGuest.score(w2, "bolak", "grill" if w2.style != "grill" else "fry", "").stars, 1, "다 틀려도 별 하나")
+	_eq(SpecialGuest.review(w2, perfect).contains("딱"), true, "세라 칭찬")
+	_eq(SpecialGuest.next_tale({}, "최순덕").is_empty(), false, "사연 첫 토막")
+	_eq(SpecialGuest.next_tale({"tale_최순덕": 3}, "최순덕"), "", "다 들으면 끝")
+	_eq(SpecialGuest.style_of("jiri"), "soup", "맑은탕은 국물")

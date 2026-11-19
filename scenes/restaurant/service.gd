@@ -138,7 +138,7 @@ func _on_dialogue_finished() -> void:
 			else:
 				_open_plan() # 영업 전 오늘 메뉴판 (ServicePlan)
 		Step.SPECIAL_TALK:
-			_start_cooking()
+			_open_serve()
 		Step.SPECIAL_DONE:
 			_guest_leaves()
 			_show_ledger()
@@ -199,13 +199,16 @@ func _special_arrives() -> void:
 		ask = "%s 있나? 오늘은 그게 땡기네." % want_name
 	else:
 		ask = "%s 없나 보네. 그럼 있는 걸로 줘." % Josa.attach(want_name, "은/는")
-	_dialogue.play([
+	# 알아맞히기 대접 (SpecialGuest): 손님이 힌트 세 가지를 흘린다
+	_want = SpecialGuest.want(GameState.day, special.name, special.fish, SeaDay.of(GameState.day).weather, SpecialGuest.styles_ok(GameState.flags))
+	var talk := [
 		{"speaker": "", "text": "문에 단 종이 딸랑 울렸다. %s다." % Orders.call_name(special.name)},
 		{"speaker": special.name, "text": ask},
-		{"speaker": "{player}", "text": "%s 좋은 걸로 하나 남겨 뒀어요. 금방 나와요." % fname},
-		{"speaker": "{player}", "text": "세라 씨, 이건 특별히 부탁해요."},
-		{"speaker": "최세라", "face": "smile", "text": "맡겨요. 사장님이 잡아 온 거니까 제일 맛있게 할게요."},
-	])
+	]
+	for h in _want.hints.slice(1):
+		talk.append({"speaker": special.name, "text": h})
+	talk.append({"speaker": "최세라", "text": "사장님, 뭘로 해 드릴지 골라 줘요. 저는 불 앞에 있을게요."})
+	_dialogue.play(talk)
 
 
 ## 특별 손님 한 접시는 세라가 굽는다 (11-19 사용자: 주인공은 요리에 소질이 없다). 별은 주인공이 잡아 온 생선으로 정해진다:
@@ -257,18 +260,26 @@ func _pay_dish_cost(plates: int) -> void:
 
 func _special_served() -> void:
 	step = Step.SPECIAL_DONE
-	var st := special_stars(special_fish.id == special.fish, GameState.order_done, int(special_fish.get("day", GameState.day)) == GameState.day)
+	var sc := SpecialGuest.score(_want, special_fish.id, _pick_dish, _pick_side)
+	var st: int = sc.stars
 	Sound.play_sfx("good" if st >= 3 else "okay")
 	Haptics.play("catch" if st >= 3 else "hook")
-	_cook_art.set_art(Catalog.dish_art(_recipe.get("id", "")), _recipe.get("name", "생선구이"))
+	_cook_title.text = "%s %s" % [FishDB.get_fish(special_fish.id).name, ServicePlan.dish_name(_pick_dish)]
+	_cook_art.set_art(Catalog.dish_art(DiningLogic.dish_art_id(special_fish.id, _pick_dish)), _cook_title.text)
 	UiKit.set_chip(_cook_step, "완성")
 	_stars.text = "★".repeat(st) + "☆".repeat(3 - st)
 	_stars.show()
 	_gauge.hide()
-	_cook_hint.text = {3: "완벽해요", 2: "괜찮아요", 1: "아쉬워요"}.get(st, "")
+	_cook_hint.text = {3: "딱 맞혔어요", 2: "거의 맞혔어요", 1: "아쉬워요"}.get(st, "")
 	UiKit.pop_in(_cook_panel)
 	special_price = DayFlow.special_price(special_fish.id, special_fish.size, st)
-	special_side = Sides.take(GameState.produce, Sides.reserve_for(GameState))
+	if Menu.RECIPES.has(_pick_dish):
+		special_price = Menu.price(_pick_dish, special_price)
+	elif _pick_dish == "fry":
+		special_price = int(roundf(special_price * DiningLogic.FRY_PRICE / 500.0) * 500.0)
+	if sc.perfect:
+		special_price = int(roundf(special_price * SpecialGuest.PERFECT_TIP / 500.0) * 500.0)
+	special_side = _pick_side
 	special_price += Sides.bonus(special_side)
 	GameState.earn(special_price)
 	_pay_dish_cost(1)
@@ -284,10 +295,19 @@ func _special_served() -> void:
 		_guest.show()
 		UiKit.fade_in(_guest, 0.25)
 	var react: Array = Orders.customer(special.name).get("react", ["잘 먹었어요.", "잘 먹었어요.", "잘 먹었어요."])
-	_dialogue.play([
-		{"speaker": special.name, "text": react[clampi(3 - st, 0, 2)]},
-		{"speaker": "", "text": "%s %s을 내고 갔다." % [Josa.attach(Orders.call_name(special.name), "이/가"), GameState.format_won(special_price)]},
-	])
+	var after := [{"speaker": special.name, "text": react[clampi(3 - st, 0, 2)]}]
+	if sc.perfect:
+		# 셋 다 맞히면 더 친해지고 사연을 한 토막 들려준다
+		if Friends.PEOPLE.has(special.name):
+			GameState.friendship[special.name] = mini(int(GameState.friendship.get(special.name, 0)) + SpecialGuest.PERFECT_FRIEND, Friends.HEART * Friends.MAX_HEARTS)
+		var tale := SpecialGuest.next_tale(GameState.flags, special.name)
+		if not tale.is_empty():
+			after.append({"speaker": special.name, "text": tale})
+			GameState.flags["tale_" + special.name] = int(GameState.flags.get("tale_" + special.name, 0)) + 1
+			GameState.note("%s 옛날 얘기를 해 줬다." % Josa.attach(Orders.call_name(special.name), "이/가"), 4)
+	after.append({"speaker": "최세라", "text": SpecialGuest.review(_want, sc)})
+	after.append({"speaker": "", "text": "%s %s을 내고 갔다." % [Josa.attach(Orders.call_name(special.name), "이/가"), GameState.format_won(special_price)]})
+	_dialogue.play(after)
 
 
 ## 특별 손님 SD: 시트가 있는 사람만 서고, 그동안은 대화창 얼굴 그림을 띄우지 않는다
@@ -748,3 +768,106 @@ func _fill_plan() -> void:
 		_plan_panel.hide()
 		_serve_regulars())
 	_plan_body.add_child(go)
+
+
+# ─── 알아맞히기 대접 고르기 (SpecialGuest, 11-19) ─────────────
+
+var _want := {}
+var _pick_dish := "grill"
+var _pick_side := ""
+var _serve_panel: Control
+var _serve_body: VBoxContainer
+
+
+## 고를 수 있는 생선: 남겨 둔 한 마리와 아이스박스의 어종별 한 마리
+func _fish_choices() -> Array:
+	var out := [special_fish]
+	var seen := {special_fish.id: true}
+	for e in GameState.inventory:
+		if not seen.has(e.id):
+			seen[e.id] = true
+			out.append(e)
+	return out
+
+
+func _dish_choices(fish_id: String) -> Array:
+	return ServicePlan.dish_options(fish_id, GameState.flags).filter(func(d): return not Menu.RECIPES.has(d) or Menu.can_make(d, GameState.produce, GameState.seafood))
+
+
+func _open_serve() -> void:
+	_pick_dish = "grill"
+	_pick_side = ""
+	if _serve_panel == null:
+		_serve_panel = Control.new()
+		_serve_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		add_child(_serve_panel)
+		_serve_panel.add_child(UiKit.scrim(0.45))
+		var panel := UiKit.paper_panel(26)
+		panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+		panel.offset_left = 16
+		panel.offset_right = -16
+		panel.offset_bottom = -20
+		panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		_serve_panel.add_child(panel)
+		_serve_body = UiKit.vbox(UiKit.SPACE_MD)
+		panel.add_child(_serve_body)
+	_fill_serve()
+	_serve_panel.show()
+	UiKit.fade_in(_serve_panel, 0.3)
+
+
+func _fill_serve() -> void:
+	for c in _serve_body.get_children():
+		c.queue_free()
+	var who := Orders.call_name(special.name)
+	_serve_body.add_child(UiKit.text("%s께 낼 한 상" % who, "h2", UiKit.INK))
+	for h in _want.hints:
+		_serve_body.add_child(UiKit.paragraph("\"%s\"" % h, "caption", UiKit.INK_SOFT))
+	# 생선
+	var fishes := _fish_choices()
+	var fb := UiKit.action("생선: %s %.0fcm" % [FishDB.get_fish(special_fish.id).name, special_fish.size], "secondary", true)
+	fb.disabled = fishes.size() <= 1
+	fb.pressed.connect(func():
+		var i := fishes.find(special_fish)
+		var nx: Dictionary = fishes[(i + 1) % fishes.size()]
+		if nx != special_fish:
+			GameState.inventory.erase(nx)
+			GameState.inventory.append(special_fish)
+			special_fish = nx
+		if not _pick_dish in _dish_choices(special_fish.id):
+			_pick_dish = "grill"
+		Sound.play_sfx("tap")
+		_fill_serve())
+	_serve_body.add_child(fb)
+	# 요리
+	var dishes := _dish_choices(special_fish.id)
+	var db := UiKit.action("요리: %s" % ServicePlan.dish_name(_pick_dish), "secondary", true)
+	db.disabled = dishes.size() <= 1
+	db.pressed.connect(func():
+		_pick_dish = dishes[(dishes.find(_pick_dish) + 1) % dishes.size()]
+		Sound.play_sfx("tap")
+		_fill_serve())
+	_serve_body.add_child(db)
+	# 곁들임
+	var sides := [""]
+	for id in GameState.produce:
+		if int(GameState.produce[id]) > 0 and Sides.bonus(id) > 0:
+			sides.append(id)
+	var sb := UiKit.action("곁들임: %s" % (Sides.name_of(_pick_side) if _pick_side != "" else "없음"), "secondary", true)
+	sb.disabled = sides.size() <= 1
+	sb.pressed.connect(func():
+		_pick_side = sides[(sides.find(_pick_side) + 1) % sides.size()]
+		Sound.play_sfx("tap")
+		_fill_serve())
+	_serve_body.add_child(sb)
+	var go := UiKit.action("세라에게 주문", "primary")
+	go.pressed.connect(func():
+		_serve_panel.hide()
+		if Menu.RECIPES.has(_pick_dish):
+			Menu.take(_pick_dish, GameState.produce, GameState.seafood)
+		if _pick_side != "":
+			GameState.produce[_pick_side] = int(GameState.produce[_pick_side]) - 1
+			if int(GameState.produce[_pick_side]) <= 0:
+				GameState.produce.erase(_pick_side)
+		_start_cooking())
+	_serve_body.add_child(go)
