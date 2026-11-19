@@ -64,6 +64,8 @@ func _ready() -> void:
 	if bg:
 		if not has_inside:
 			bg.modulate = Color(0.62, 0.55, 0.72) # 외관을 저녁빛으로 눌러 임시 배경으로
+		else:
+			bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED # 영업 판(DiningFloor.floor_rect)과 같이 화면 안에 다 들어오게
 		add_child(bg)
 	add_child(UiKit.shade([[0.0, 0.45], [0.12, 0.0], [0.86, 0.0], [1.0, 0.4]], Color("1a1410")))
 

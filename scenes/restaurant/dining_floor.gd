@@ -20,6 +20,8 @@ const CHAR_H := 195.0
 const GUEST_H := CHAR_H
 ## 걷기 시트는 칸 위 여백이 커서 이만큼 키워 그린다 (GuestSD.WALK_SCALE과 같은 값)
 const SHEET_WALK_SCALE := 1.2
+## 서 있을 때 쓰는 걷기 시트 칸. 0번은 앞으로 한 발을 든 칸이라 늘 한 발을 들고 서 있는 것처럼 보였다 (11-19 사용자). 1번은 두 발이 땅에 닿는다
+const STAND_CELL := 1
 ## 앉은 시트 px → 배경 px (그림 세션 확인 그림의 K. 바른 자세 시트를 이 배율로 놓으면 의자 크기와 맞는다)
 const SEAT_K := 0.44
 const SEAT_LIFT := 30.0 # 앉은 그림이 없어 서 있는 그림으로 대신할 때 발을 자리보다 이만큼 위에
@@ -219,9 +221,10 @@ func _load_art(id: String) -> Texture2D:
 	return load(ArtSlot.art_path(id)) if ArtSlot.has_art(id) else null
 
 
-## 배경 그림 비율 → 화면 좌표 (배경은 비율 그대로 화면을 덮고, 넘치는 쪽은 가운데 기준으로 잘림)
+## 배경 그림 비율 → 화면 좌표. 배경은 비율 그대로 화면 안에 다 들어오게(폭에 맞춤) 가운데 놓는다.
+## 예전엔 화면을 덮게 키워서 세로가 긴 폰에서 양옆 자리와 화구가 잘렸다 (11-19 사용자). 남는 위아래는 어두운 바탕
 func floor_rect() -> Rect2:
-	var k := maxf(size.x / BG_SIZE.x, size.y / BG_SIZE.y)
+	var k := minf(size.x / BG_SIZE.x, size.y / BG_SIZE.y)
 	var s := BG_SIZE * k
 	return Rect2((size - s) / 2.0, s)
 
@@ -733,7 +736,7 @@ func _draw_cook(ci: Control) -> void:
 		# 주인공이 조리대 뒤에 서 있다. 굽는 중이면 살짝 들썩인다
 		var bob := absf(sin(_t * 6.0)) * 2.0 if not logic.cooking.is_empty() else 0.0
 		if _has_sheet("sd/walk"):
-			_draw_cell(ci, "sd/walk", 8, 0, at + Vector2(0, -bob), CHAR_H * SHEET_WALK_SCALE, false)
+			_draw_cell(ci, "sd/walk", 8, STAND_CELL, at + Vector2(0, -bob), CHAR_H * SHEET_WALK_SCALE, false)
 
 
 ## 화구 고리: 굽는 중(하늘색 차오름) → 노릇노릇(금빛, 지금 누르기) → 지나감(주황) → 타기 직전(빨강)
@@ -795,7 +798,7 @@ func _draw_player_walk(ci: Control) -> void:
 	var sheet := "sd/serve_walk" if logic.holding >= 0 or logic.carrying_dirty else "sd/walk"
 	if not _has_sheet(sheet):
 		return
-	var cell := GuestSD.walk_cell(logic.player_dir, _t) if moving else 0
+	var cell := GuestSD.walk_cell(logic.player_dir, _t) if moving else STAND_CELL
 	var flip := cell >= 4 and logic.player_dir.x < 0.0
 	_draw_cell(ci, sheet, 8, cell, pp, CHAR_H * SHEET_WALK_SCALE, flip)
 	if logic.holding >= 0:
