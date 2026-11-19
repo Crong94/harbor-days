@@ -147,6 +147,9 @@ static func deliver(p: Dictionary, gs) -> int:
 		if int(gs.produce[p.item]) <= 0:
 			gs.produce.erase(p.item)
 	gs.flags["bd_" + p.id] = true
-	gs.earn(int(p.reward))
+	var got := int(p.reward)
+	if gs.flags.get("app_taesik_done", false):
+		got = int(roundf(got * AppWork.BOARD_BONUS / 500.0) * 500.0) # 이장님 게시판 앱 (AppWork)
+	gs.earn(got)
 	gs.reputation += REP
-	return int(p.reward)
+	return got

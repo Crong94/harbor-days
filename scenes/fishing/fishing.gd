@@ -110,6 +110,7 @@ var _box_title: Label
 var _box_desc: Label
 var _box_list: VBoxContainer
 var _box_forced := false
+var _bite_base := 1.0 # 날씨, 도구까지 넣은 입질 배율. 여기에 물때(Tide)를 곱한다
 var _box_just: Dictionary = {} # 방금 잡은 고기 (목록에 표시)
 var _dialogue: DialogueBox
 
@@ -240,6 +241,7 @@ func _ready() -> void:
 	GearDB.apply(logic, GameState.equipped_rod, GameState.equipped_reel)
 	if not tutorial:
 		KitDB.apply(logic, GameState.kits, night, sea.weather)
+	_bite_base = logic.bite_mult
 	logic.new_point()
 	var fa := GearDB.float_art(GameState.equipped_rod)
 	_float_tex = load(ArtSlot.art_path(fa)) if ArtSlot.has_art(fa) else null
@@ -420,6 +422,8 @@ func _process(delta: float) -> void:
 		_last_state = logic.state
 
 	_header.set_minutes(minutes)
+	if not tutorial:
+		logic.bite_mult = _bite_base * Tide.bite(GameState.day, int(minutes)) # 정조엔 뜸하고 해뜰녘 물 흐를 때 잘 문다
 	var n := GameState.caught_today.size()
 	_header.set_badge("%d마리" % n if n > 0 else "")
 	# 화면은 지금 할 일만 보여 준다: 조용할 때는 주문과 오늘의 바다, 싸울 때는 판도 글자도 없이 낚싯대와 줄만
@@ -936,6 +940,7 @@ func _on_gear_changed() -> void:
 	if not tutorial:
 		logic.bite_mult = sea.bite
 		KitDB.apply(logic, GameState.kits, night, sea.weather)
+		_bite_base = logic.bite_mult
 	_player.set_gear(GameState.equipped_rod, GameState.equipped_reel)
 	var fa := GearDB.float_art(GameState.equipped_rod)
 	_float_tex = load(ArtSlot.art_path(fa)) if ArtSlot.has_art(fa) else null

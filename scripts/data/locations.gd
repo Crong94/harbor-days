@@ -71,6 +71,10 @@ const LIST := {
 		"name": "등대민박", "pos": Vector2(0.254, 0.198), "unlock": "met_jiwoo",
 		"scene": "", "desc": "방 다섯 개짜리 민박",
 	},
+	"flat": {
+		"name": "물빛 갯벌", "pos": Vector2(0.300, 0.770), "unlock": "flat_open",
+		"scene": "res://scenes/flat/flat.tscn", "desc": "물이 빠지면 드러나는 갯벌. 바지락, 동죽, 칠게, 가끔 낙지",
+	},
 	"rocks": {
 		"name": "검은여 갯바위", "pos": Vector2(0.749, 0.586), "unlock": "learned_tide",
 		"scene": "res://scenes/fishing/fishing.tscn", "desc": "물때를 알아야 들어갈 수 있는 중급 낚시터",

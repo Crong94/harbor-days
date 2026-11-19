@@ -138,6 +138,10 @@ const FRY_PRICE := 1.25
 const FRY_ART := "bungjangeo-twigim"
 var fry := false
 var _fry_rng := RandomNumberGenerator.new()
+## 새 메뉴 (Menu, 11-19): 메뉴판에 오른 요리 id들. 손님이 고르면 그 재료를 seafood와 pantry(채소)에서 쓴다
+var menu: Array = []
+var seafood := {}
+var today := 0
 var events: Array = [] # 화면 연출용 한 번짜리 알림 {type, ...}
 
 
@@ -572,6 +576,8 @@ func patience_of(seat: int) -> float:
 ## 한 접시 값: 구이는 DayFlow.dish_price, 튀김은 그보다 FRY_PRICE배
 static func dish_price_of(fish_id: String, size_cm: float, dish: String) -> int:
 	var base := DayFlow.dish_price(fish_id, size_cm)
+	if Menu.RECIPES.has(dish):
+		return Menu.price(dish, base)
 	if dish != "fry":
 		return base
 	return int(roundf(base * FRY_PRICE / 500.0) * 500.0)
@@ -586,6 +592,8 @@ func same_order(a: int, b: int) -> bool:
 static func dish_art_id(fish_id: String, dish: String) -> String:
 	if dish == "fry":
 		return FRY_ART
+	if Menu.RECIPES.has(dish):
+		return Menu.art(dish, fish_id)
 	return FishDB.get_fish(fish_id).get("grill", "bollak-gui")
 
 
@@ -669,7 +677,11 @@ func _arrive() -> void:
 		var e: Dictionary = inventory[fi]
 		inventory.remove_at(fi)
 		var seat: int = seats[_rng.randi() % seats.size()]
-		var dish := "fry" if fry and _fry_rng.randf() < FRY_SHARE else "grill"
+		var dish := Menu.pick(menu, e, today, pantry, seafood, _fry_rng)
+		if dish.is_empty():
+			dish = "fry" if fry and _fry_rng.randf() < FRY_SHARE else "grill"
+		else:
+			Menu.take(dish, pantry, seafood)
 		var g := {
 			"name": s.name, "seat": seat, "fish": e.id, "size": e.size, "entry": e, "dish": dish,
 			"price": dish_price_of(e.id, e.size, dish), "state": GuestState.WALKING,

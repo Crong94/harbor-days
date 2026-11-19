@@ -1189,8 +1189,8 @@ func _test_story() -> void:
 	# 해솔: 복자를 만난 뒤 엿새째 오후 밥집에서 처음 만나고, 분교가 열리고, 지도에 걷기 시작한다
 	var hf := {"met_bokja": true, "ev_bokja_diner": true}
 	_eq(Story.pending("diner", 6, 15 * 60, {}).get("id", ""), "bokja_diner", "복자를 먼저 만남")
-	_eq(Story.pending("diner", 5, 15 * 60, hf).is_empty(), true, "닷새째엔 해솔 없음")
-	_eq(Story.pending("diner", 6, 10 * 60, hf).is_empty(), true, "오전엔 학교 가서 없음")
+	_eq(Story.pending("diner", 5, 15 * 60, hf).get("id", ""), "bokja_flat", "닷새째엔 해솔 대신 복자가 갯벌 얘기")
+	_eq(Story.pending("diner", 6, 10 * 60, hf).get("id", "") != "haesol_first", true, "오전엔 학교 가서 없음")
 	_eq(Story.pending("diner", 6, 15 * 60, hf).get("id", ""), "haesol_first", "엿새째 오후 밥집에서 해솔")
 	_eq(Locations.is_unlocked("school", hf), false, "만나기 전엔 분교 잠김")
 	_eq(Walkers.active(15 * 60, hf).any(func(w): return w.id == "haesol"), false, "만나기 전엔 지도에 없음")

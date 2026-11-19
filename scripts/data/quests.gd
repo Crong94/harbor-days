@@ -121,6 +121,19 @@ static func sub_quests(gs: Object) -> Array:
 		out.append(_q("sub_haesol", "sub", "해솔이의 숙제", "해솔",
 			"\"우리 마을 자랑하기\" 숙제. 마을에 아이가 해솔이 하나라 도와줄 사람이 없다.",
 			goal, prog, target))
+	# 앱 만들기 (AppWork): 부탁을 들은 뒤부터 다 만들 때까지
+	for id in AppWork.APPS:
+		if AppWork.started(gs, id) and not AppWork.done(gs, id):
+			var ap := AppWork.app(id)
+			var today_done: bool = int(gs.app_day.get(id, -1)) == int(gs.day)
+			out.append(_q("sub_app_" + id, "sub", ap.title, Friends.person(ap.who).get("call", ap.who), ap.why,
+				"오늘은 했어요. 내일 이어서" if today_done else "앱 만들어 주기 · %s" % Locations.get_loc(ap.place).name,
+				"%d/%d" % [AppWork.stage(gs, id), ap.stages.size()], "" if today_done else ap.place))
+	# 새 메뉴 (Menu): 배운 요리는 시험 조리해서 메뉴판에 올린다
+	for id in Menu.to_test(gs.flags):
+		var r := Menu.recipe(id)
+		out.append(_q("sub_menu_" + id, "sub", "새 메뉴 " + str(r.name), Friends.person(r.who).get("call", r.who),
+			"\"%s\"" % str(r.tip), "낮에 식당에서 시험 조리 · %s" % Menu.needs_text(id), "", "shop"))
 	return out
 
 

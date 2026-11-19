@@ -26,7 +26,7 @@ static func build(gs: Object) -> Dictionary:
 			{"name": "메인 이야기", "rows": _quests(gs, "main")},
 			{"name": "마을 사람 이야기", "rows": _quests(gs, "sub")},
 			{"name": "오늘 부탁", "rows": _quests(gs, "daily")},
-			{"name": "오늘의 바다", "rows": _sea(day, m)},
+			{"name": "오늘의 바다", "rows": _sea(gs, day, m)},
 			{"name": "아침 소식", "rows": _news(gs)},
 		].filter(func(s): return not s.rows.is_empty()),
 	}
@@ -61,6 +61,11 @@ static func _todo(gs: Object, day: int, m: int) -> Array:
 		if spoil > 0:
 			t = "오늘 밤 상할 생선 %d마리 팔기" % spoil
 		rows.append({"text": t, "state": "~17:00", "tone": "gold" if spoil > 0 else "info", "target": "market"})
+	if gs.has_flag("flat_open"):
+		for t in Flat.open_times(day):
+			if m < int(t[1]):
+				rows.append({"text": "갯벌 캐기 · 물 빠짐", "state": "%s~%s" % [_hm(int(t[0])), _hm(int(t[1]))], "tone": "gold" if m >= int(t[0]) else "info", "target": "flat"})
+				break
 	var ready := 0
 	for slot_g in gs.garden:
 		if CropDB.stage(slot_g, day) == CropDB.READY:
@@ -91,14 +96,26 @@ static func _quests(gs: Object, kind: String) -> Array:
 
 
 ## 날씨와 물때, 오늘 잘 무는 고기
-static func _sea(day: int, m: int) -> Array:
+static func _sea(gs: Object, day: int, m: int) -> Array:
 	var info := SeaDay.of(day)
 	var best: Array = SeaDay.best_fish(info, FishingLogic.brightness_at(m), 2)
 	var names := ", ".join(PackedStringArray(best.map(func(id): return FishDB.get_fish(id).name)))
 	return [
 		{"text": "%s · %s%s" % [info.weather_name, info.tide, " · 물때 좋음" if info.tide_good else ""], "state": "", "tone": "good" if info.tide_good else "info", "target": ""},
 		{"text": "잘 무는 고기: %s" % names, "state": "", "tone": "info", "target": ""},
-	]
+	] + _peaks(gs, day)
+
+
+## 물때 집중 시간 (준호네 조황 앱을 만든 뒤에만 보인다. Tide)
+static func _peaks(gs: Object, day: int) -> Array:
+	if not gs.flags.get("app_junho_done", false):
+		return []
+	var parts := PackedStringArray()
+	for t in Tide.fishing_peaks(day):
+		parts.append("%s~%s" % [_hm(int(t[0])), _hm(int(t[1]))])
+	if parts.is_empty():
+		return [{"text": "조황 앱: 오늘 낚시 시간엔 집중 시간이 없어요", "state": "", "tone": "info", "target": ""}]
+	return [{"text": "조황 앱 집중 시간: " + ", ".join(parts), "state": "", "tone": "good", "target": "breakwater"}]
 
 
 static func _news(gs: Object) -> Array:

@@ -47,6 +47,14 @@ var icebox_size := 10
 var cooler := 0
 var kits := {}
 var trap_fish: Array = []
+## 갯벌에서 캔 것 {Flat id: 개수}
+var seafood := {}
+## 친밀도 {이름: 점수}, 마지막으로 선물한 날 {이름: 날} (Friends)
+var friendship := {}
+var gift_day := {}
+## 앱 만들기 {앱 id: 마친 단계}, 마지막으로 한 날 {앱 id: 날} (AppWork)
+var apps := {}
+var app_day := {}
 ## 잡은 날을 포함해 생선이 버티는 날 수. 잡은 다음 날 저녁 장사까지 쓸 수 있다
 const FRESH_DAYS := 2
 ## 어종 도감: 어종 id → 가장 큰 기록(cm)
@@ -188,7 +196,7 @@ func buy_gear(kind: String, id: String) -> String:
 		return "없는 물건이에요."
 	if id in owned:
 		return "이미 가지고 있어요."
-	var price: int = table[id].price
+	var price: int = AppWork.shop_price(flags, int(table[id].price))
 	if money < price:
 		return "돈이 모자라요."
 	spend(price)
@@ -227,7 +235,7 @@ func buy_bait(id: String, price := -1) -> String:
 	var b := BaitDB.bait(id)
 	if b.amount < 0:
 		return "창고에 많이 있어요."
-	var cost: int = int(b.price) if price < 0 else price
+	var cost: int = AppWork.shop_price(flags, int(b.price)) if price < 0 else price
 	if money < cost:
 		return "돈이 모자라요."
 	spend(cost)
@@ -334,9 +342,10 @@ func buy_cooler() -> String:
 	if cooler + 1 >= KitDB.COOLERS.size():
 		return "더 큰 쿨러는 아직 없어요."
 	var c := KitDB.cooler(cooler + 1)
-	if money < int(c.price):
+	var cprice := AppWork.shop_price(flags, int(c.price))
+	if money < cprice:
 		return "돈이 모자라요."
-	spend(int(c.price))
+	spend(cprice)
 	cooler += 1
 	icebox_size = int(c.size)
 	return ""
@@ -347,9 +356,10 @@ func buy_kit(id: String) -> String:
 	var nx := KitDB.next_level(kits, id)
 	if nx.is_empty():
 		return "이게 제일 좋은 거예요."
-	if money < int(nx[1]):
+	var kprice := AppWork.shop_price(flags, int(nx[1]))
+	if money < kprice:
 		return "돈이 모자라요."
-	spend(int(nx[1]))
+	spend(kprice)
 	kits[id] = KitDB.level(kits, id) + 1
 	return ""
 
