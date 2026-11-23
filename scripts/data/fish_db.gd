@@ -2,7 +2,8 @@ class_name FishDB
 extends RefCounted
 ## 북쪽 방파제 어종. 그림은 assets/art/fish_<id>.png (docs/물고기_그림_목록.md)
 ##
-## rarity: common 일반, rare 희귀, legend 전설
+## rarity: common 일반, rare 희귀, legend 전설. 남해 방파제에서 실제로 얼마나 흔한지로 정한다
+##   (학공치는 겨울에 떼로 몰려와 흔하다. 우럭은 방파제에선 볼락, 노래미보다 드물다. 감성돔은 꾼들이 노리는 귀한 고기)
 ## strength: 당기는 힘 0~1 (파이팅 체력과 줄다리기 세기)
 ## weight: 기본 출현 가중치
 ## night: 어두운 걸 좋아하는 정도 -1~1 (볼락은 밝아지면 숨고, 학공치는 낮에 수면 가까이 올라온다)
@@ -62,9 +63,9 @@ const FISH := {
 		"desc": "바위틈의 듬직한 대장. 한번 물면 바위로 파고들어서 처음 힘싸움이 세다.",
 	},
 	"hakgongchi": {
-		"name": "학공치", "rarity": "rare",
-		"min_cm": 15.0, "max_cm": 35.0, "strength": 0.25, "price": 7000, "stamina": 0.6,
-		"weight": 1.2, "night": -0.7, "zone": [0.7, 1.3, 1.1],
+		"name": "학공치", "rarity": "common",
+		"min_cm": 15.0, "max_cm": 35.0, "strength": 0.25, "price": 6000, "stamina": 0.6,
+		"weight": 2.5, "night": -0.7, "zone": [0.7, 1.3, 1.1],
 		"weather": {},
 		"beat": 8.5, "habit": "tap", "catalog": "hakgongchi", "grill": "hakgongchi-gui",
 		"desc": "바늘처럼 뾰족한 아래턱을 가진 은빛 물고기. 겨울에 방파제로 몰려와 수면 바로 아래를 떼 지어 다닌다. 몸이 가늘고 가벼워서 파르르 떨며 금방 끌려온다.",
