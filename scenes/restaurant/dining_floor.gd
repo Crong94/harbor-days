@@ -32,6 +32,19 @@ const SEAT_LIFT := 30.0 # 앉은 그림이 없어 서 있는 그림으로 대신
 const DISH := 50.0
 const NIGHT_DIM := Color(0.85, 0.85, 0.85)
 ## 화구 고리 (오른쪽 벽 옆모습 화구 둘 위, 누르는 자리)
+## 화구 위 조리 도구 (바다 한 접시 cook_tool 그림). 요리 갈래(SpecialGuest.style_of)마다 하나
+const COOK_TOOLS := {"grill": "cook_tool/grill", "fry": "cook_tool/fryer", "soup": "cook_tool/stockpot", "braise": "cook_tool/wok", "raw": "cook_tool/knife"}
+const COOK_TOOL_W := 72.0
+const COOK_TOOL_SINK := 14.0 # 도구 바닥을 화구 자리보다 이만큼 아래에
+var _tool_cache := {}
+
+
+func _tool_tex(style: String) -> Texture2D:
+	if not _tool_cache.has(style):
+		_tool_cache[style] = _load_art(COOK_TOOLS.get(style, COOK_TOOLS.grill))
+	return _tool_cache[style]
+
+
 ## 굽는 중 말풍선 (요리사 머리 위, 한 줄에 생선 하나와 익는 막대)
 const BUBBLE_W := 176.0
 const BUBBLE_ROW_H := 46.0
@@ -619,18 +632,30 @@ func _draw_floor() -> void:
 	var font := UiKit.font("cute")
 	_draw_cook(ci)
 	_draw_decor_items(ci, true) # 화구, 도구
-	# 화구 위 생선 (조리대 윗면에 작게)
+	# 화구 위 조리 도구: 요리법마다 맞는 도구 (구이 석쇠, 튀김 튀김솥, 국물 들통, 조림 웍, 회 칼).
+	# 구이만 석쇠 위에 생선이 보이고 익는 색이 든다. 나머지는 도구만 살짝 흔들리고, 익는 정도는 옆 말풍선이 알려 준다
 	for c in logic.cooking:
 		var bp := to_screen(DiningLogic.BURNERS[c.burner])
-		var ft: Texture2D = _fish_tex.get(logic.guests[c.guest].fish)
-		if ft:
-			var w := 44.0
-			var h := w * ft.get_height() / float(ft.get_width())
-			var jig := sin(_t * 14.0 + c.burner) * 1.2
-			var tint := Color(1, 1, 1).lerp(Color(0.85, 0.6, 0.35), clampf(DiningLogic.doneness(c), 0.0, 1.0))
-			if float(c.t) - float(c.total) > DiningLogic.GOLD:
-				tint = tint.lerp(Color(0.35, 0.25, 0.2), clampf((float(c.t) - float(c.total) - DiningLogic.GOLD) / (DiningLogic.BURN - DiningLogic.GOLD), 0.0, 1.0))
-			ci.draw_texture_rect(ft, Rect2(bp.x - w / 2.0, bp.y - h + jig, w, h), false, tint)
+		var g: Dictionary = logic.guests[c.guest]
+		var style := SpecialGuest.style_of(g.get("dish", "grill"))
+		var tool: Texture2D = _tool_tex(style)
+		var jig := sin(_t * (14.0 if style != "soup" else 6.0) + c.burner) * (1.2 if style != "braise" else 2.4)
+		var tint := Color(1, 1, 1).lerp(Color(0.85, 0.6, 0.35), clampf(DiningLogic.doneness(c), 0.0, 1.0))
+		if float(c.t) - float(c.total) > DiningLogic.GOLD:
+			tint = tint.lerp(Color(0.35, 0.25, 0.2), clampf((float(c.t) - float(c.total) - DiningLogic.GOLD) / (DiningLogic.BURN - DiningLogic.GOLD), 0.0, 1.0))
+		var top := bp.y
+		if tool:
+			var tw := COOK_TOOL_W
+			var th := tw * tool.get_height() / float(tool.get_width())
+			var tr := Rect2(bp.x - tw / 2.0, bp.y + COOK_TOOL_SINK - th + (jig if style != "grill" else 0.0), tw, th)
+			ci.draw_texture_rect(tool, tr, false)
+			top = tr.position.y + th * 0.18 # 석쇠 윗면
+		if style == "grill" or tool == null:
+			var ft: Texture2D = _fish_tex.get(g.fish)
+			if ft:
+				var w := 46.0
+				var h := w * ft.get_height() / float(ft.get_width())
+				ci.draw_texture_rect(ft, Rect2(bp.x - w / 2.0, top - h * 0.55 + jig, w, h), false, tint)
 	_draw_burner_ui(ci, font)
 	# 처음 한 번씩 화면 아래에 짧게 알려 준다
 	var hint_at := Vector2(size.x / 2.0, to_screen(Vector2(0.5, 0.975)).y)
