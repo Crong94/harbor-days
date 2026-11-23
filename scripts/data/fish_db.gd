@@ -16,7 +16,7 @@ extends RefCounted
 ## season_floor: 철이 아닐 때 출현 배율의 바닥. 달별 배율은 바다 한 접시 데이터(Catalog.month_factor)를 쓰고,
 ##   여름에도 방파제에서 잡히는 고기(노래미, 쏨뱅이, 망상어 등)가 아예 사라지지 않게 이 값 밑으로는 안 내린다.
 ##   학공치는 늦가을부터 봄까지 오는 겨울 고기라 여름엔 거의 없다 (기본 0.3)
-## habit: 줄다리기 버릇 (FishingLogic). dive 처음에 바위로 세게 파고듦, shake 짧고 잦게 처박음, long 길게 차고 나감, jump 바늘털이(농어처럼 수면 위로 뛰어 머리를 터는 고기용. 지금 7종에는 없음),
+## habit: 줄다리기 버릇 (FishingLogic). dive 처음에 바위로 세게 파고듦, shake 짧고 잦게 처박음, long 길게 차고 나감, jump 바늘털이(수면 위로 뛰어 머리를 턴다. 농어),
 ##   tap 짧고 가볍게 툭툭, side 몸을 눕혀 같은 쪽으로 버팀, hole 발밑에서 바위틈으로 처박음
 ## beat: 당기는 힘이 오르내리는 박자 (낚싯대 떨림과 진동). 클수록 잘게 툭툭, 작을수록 묵직하게
 
@@ -74,6 +74,14 @@ const FISH := {
 		"weather": {},
 		"beat": 8.5, "habit": "tap", "catalog": "hakgongchi", "grill": "hakgongchi-gui",
 		"desc": "바늘처럼 뾰족한 아래턱을 가진 은빛 물고기. 겨울에 방파제로 몰려와 수면 바로 아래를 떼 지어 다닌다. 몸이 가늘고 가벼워서 파르르 떨며 금방 끌려온다.",
+	},
+	"nongeo": {
+		"name": "농어", "rarity": "rare",
+		"min_cm": 25.0, "max_cm": 72.0, "legal_cm": 30.0, "strength": 0.8, "price": 10000, "stamina": 1.3,
+		"weight": 0.9, "night": 0.4, "zone": [0.4, 1.0, 1.6],
+		"weather": {"windy": 1.5, "rain": 1.2},
+		"beat": 3.0, "habit": "jump", "catalog": "nongeo", "grill": "nongeo-gui",
+		"desc": "은빛 몸에 입이 큰 사냥꾼. 늦봄부터 가을까지 파도가 일어 물이 흐린 날 잘 문다. 걸리면 물 위로 뛰어올라 머리를 흔들며 바늘을 턴다.",
 	},
 	"gamseongdom": {
 		"name": "감성돔", "rarity": "legend",

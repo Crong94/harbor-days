@@ -422,7 +422,7 @@ func _test_fun() -> void:
 	_eq(mid > near and near > mid * 0.4, true, "학공치는 방파제 앞 표층에 떼로 몰려온다 (발밑에도 나옴)")
 	for id in FishDB.FISH:
 		var fd: Dictionary = FishDB.FISH[id]
-		_eq(fd.min_cm < fd.max_cm and fd.max_cm <= {"bolak": 36.0, "mangsang": 30.0, "noraemi": 33.0, "ssombaengi": 36.0, "ureok": 65.0, "hakgongchi": 40.0, "gamseongdom": 60.0}.get(id, 100.0), true, "%s 크기가 실제 최대 전장 안" % id)
+		_eq(fd.min_cm < fd.max_cm and fd.max_cm <= {"bolak": 36.0, "mangsang": 30.0, "noraemi": 33.0, "ssombaengi": 36.0, "ureok": 65.0, "hakgongchi": 40.0, "gamseongdom": 60.0, "nongeo": 102.0}.get(id, 100.0), true, "%s 크기가 실제 최대 전장 안" % id)
 	_eq(FishDB.weight_of("bolak", {"brightness": 0.0, "depth": 0.1}) > FishDB.weight_of("bolak", {"brightness": 0.0, "depth": 0.9}), true, "볼락은 가까운 물")
 	_eq(FishDB.weight_of("ureok", {"bait": "worm"}) > FishDB.weight_of("ureok", {"bait": "krill"}), true, "우럭은 청갯지렁이를 좋아함")
 	_eq(FishDB.weight_of("gamseongdom", {"rare_boost": 2.0}) > FishDB.weight_of("gamseongdom", {}), true, "물 오름은 희귀 어종을 늘림")
@@ -1377,6 +1377,27 @@ func _test_fishing_depth() -> void:
 			t += 1.0 / 60.0
 		jumped += h.jumps
 	_eq(jumped, 0, "학공치는 바늘털이를 안 함")
+	# 농어는 바늘털이를 한다. 뛰는 동안 손을 떼고 있으면 빠진다
+	var nj := 0
+	var nlost := 0
+	for sd in 12:
+		var hn := _new_logic(90 + sd)
+		hn.forgiving = false
+		hn.force_first_fish = "nongeo"
+		_cast(hn)
+		_run_until(hn, [S.BITE], func(_x): return false, 20.0)
+		hn.press()
+		var tn := 0.0
+		while hn.state == S.REELING and tn < 25.0:
+			hn.update(1.0 / 60.0, hn.jump_t <= 0.0 and hn.tension < 0.6)
+			tn += 1.0 / 60.0
+		nj += hn.jumps
+		if hn.fail_reason == "jumped":
+			nlost += 1
+	_eq(nj > 0, true, "농어 바늘털이 (%d번)" % nj)
+	_eq(nlost > 0, true, "바늘털이 때 손을 떼면 놓침 (%d번)" % nlost)
+	_eq(FishDB.must_release("nongeo", 30.0), true, "농어 30cm 이하는 놓아줌")
+	_eq(FishDB.season_mult("nongeo", 1) < FishDB.season_mult("nongeo", 6), true, "농어는 겨울보다 여름")
 	_eq(FishDB.FISH.hakgongchi.strength < FishDB.FISH.bolak.strength, true, "학공치는 볼락보다 힘이 약함")
 	# 철: 학공치는 겨울 고기라 여름엔 거의 없다. 여름에도 노래미는 남는다
 	_eq(FishDB.weight_of("hakgongchi", {"month": 1}) > FishDB.weight_of("hakgongchi", {"month": 7}) * 10.0, true, "학공치는 겨울에 많고 여름엔 거의 없음")

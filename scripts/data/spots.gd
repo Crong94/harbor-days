@@ -17,7 +17,7 @@ const SPOTS := {
 	},
 	"rocks": {
 		"name": "검은여 갯바위", "size_bonus": 0.15,
-		"fish": {"ureok": 2.6, "ssombaengi": 1.8, "noraemi": 1.5, "gamseongdom": 4.0, "bolak": 0.8, "mangsang": 0.35, "hakgongchi": 0.3},
+		"fish": {"ureok": 2.6, "ssombaengi": 1.8, "noraemi": 1.5, "gamseongdom": 4.0, "bolak": 0.8, "mangsang": 0.35, "hakgongchi": 0.3, "nongeo": 1.6},
 		"intro": "검은여 갯바위. 물이 빠진 틈에 드러난 검은 바위 끝.",
 		"bg_prefix": "bg_fishing_rocks_", # 그림 요청 중 (밤, 새벽, 아침, 저녁 _v). 없으면 방파제 그림
 		# 해: 산 없이 탁 트인 수평선(그림 세로 0.344)의 해돋이 빛 자리(가로 0.515)에서 떠오른다. 그림이 있을 때만
