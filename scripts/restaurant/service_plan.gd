@@ -96,7 +96,7 @@ static func forecast(gs: Object) -> Dictionary:
 	var vis := Bus.visitors(gs.reputation, gs.day)
 	var lo := DiningLogic.GUESTS_MIN + d + vis
 	var hi := DiningLogic.GUESTS_MAX + d + vis
-	var fish: int = gs.inventory.filter(func(e): return DayFlow.dish_price(e.id, e.size) <= DayFlow.REGULAR_MAX and not FishDB.is_bycatch(e.id)).size()
+	var fish: int = gs.inventory.filter(func(e): return DayFlow.dish_price(e.id, e.size) <= DayFlow.REGULAR_MAX).size()
 	var note := "생선이 넉넉해요"
 	if fish < lo:
 		note = "생선이 모자라요. 손님 몇 명은 못 받아요"

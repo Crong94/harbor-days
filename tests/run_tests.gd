@@ -1446,8 +1446,10 @@ func _test_fishing_depth() -> void:
 				mang_ask += 1
 	_eq(mang_ask, 0, "망상어 주문과 의뢰는 없음")
 	var dl_m := DiningLogic.new()
+	dl_m.inventory = [{"id": "mangsang", "size": 22.0}, {"id": "bolak", "size": 16.0}]
+	_eq(dl_m.pick_fish(), 1, "손님상엔 볼락부터")
 	dl_m.inventory = [{"id": "mangsang", "size": 22.0}]
-	_eq(dl_m.pick_fish(), -1, "망상어는 손님상에 안 냄")
+	_eq(dl_m.pick_fish(), 0, "망상어도 굳이 내려면 낼 수 있음")
 	for who_f in Friends.PEOPLE:
 		_eq("fish:mangsang" in Friends.person(who_f).get("like", []) + Friends.person(who_f).get("love", []), false, "%s는 망상어 선물을 반기지 않음" % who_f)
 	_eq(Portraits.path("???"), "", "??? 이름표만으로는 그림 없음")

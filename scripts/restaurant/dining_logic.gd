@@ -658,8 +658,6 @@ func pick_fish() -> int:
 		var e: Dictionary = inventory[i]
 		if DayFlow.dish_price(e.id, e.size) > DayFlow.REGULAR_MAX:
 			continue
-		if FishDB.is_bycatch(e.id): # 망상어처럼 보통 안 먹는 고기는 손님상에 내지 않는다
-			continue
 		if best < 0 or FishDB.value_of(e.id, e.size) > FishDB.value_of(inventory[best].id, inventory[best].size):
 			best = i
 	return best

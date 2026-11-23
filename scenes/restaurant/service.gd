@@ -759,7 +759,7 @@ func _fill_plan() -> void:
 	_plan_body.add_child(UiKit.text("생선마다 낼 요리 (누르면 바뀌어요)", "title", UiKit.INK))
 	var seen := {}
 	for e in GameState.inventory:
-		if seen.has(e.id) or DayFlow.dish_price(e.id, e.size) > DayFlow.REGULAR_MAX or FishDB.is_bycatch(e.id):
+		if seen.has(e.id) or DayFlow.dish_price(e.id, e.size) > DayFlow.REGULAR_MAX:
 			continue
 		seen[e.id] = true
 		var n: int = GameState.inventory.filter(func(x): return x.id == e.id).size()
@@ -798,7 +798,7 @@ func _fish_choices() -> Array:
 	var out := [special_fish]
 	var seen := {special_fish.id: true}
 	for e in GameState.inventory:
-		if not seen.has(e.id) and not FishDB.is_bycatch(e.id):
+		if not seen.has(e.id):
 			seen[e.id] = true
 			out.append(e)
 	return out
