@@ -73,6 +73,16 @@ static func fishing_end(minutes: int) -> int:
 	return s.end
 
 
+## 낚시 화면이 끝나는 시각. 낮은 시작하고 DAY_SESSION분 뒤(늦어도 17시), 밤은 23:30, 갯바위는 물이 들어오기 전.
+## 낚시 시간대 밖이면 late_min까지 두 시간 (11-24: 낮에 17시까지 이어지던 것을 고침)
+static func session_end(minutes: int, spot := "breakwater", day := 1, late_min := 23 * 60 + 30) -> int:
+	if spot == "rocks":
+		return Spots.rocks_end(day, minutes)
+	if fishing_slot(minutes).is_empty():
+		return mini(minutes + 120, late_min)
+	return fishing_end(minutes)
+
+
 ## 가게를 열 수 있는가 (열기 전이면 18시로 건너뛴다)
 static func can_open_shop(minutes: int, opened_today: bool) -> bool:
 	return not opened_today and minutes < SHOP_CLOSE

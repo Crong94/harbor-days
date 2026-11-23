@@ -1427,6 +1427,10 @@ func _test_fishing_depth() -> void:
 			if po.get("item", "") == "hakgongchi" and Calendar.date(dd).month in [6, 7, 8]:
 				summer_hak += 1
 	_eq(summer_hak, 0, "여름엔 학공치 주문과 의뢰가 없음")
+	# 낚시 화면 마감: 낮은 시작하고 세 시간 (11시에 시작하면 14시)
+	_eq(DayFlow.session_end(11 * 60), 14 * 60, "11시 낮 낚시는 14시까지")
+	_eq(DayFlow.session_end(15 * 60 + 30), 17 * 60, "늦게 시작하면 17시까지")
+	_eq(DayFlow.session_end(21 * 60), 23 * 60 + 30, "밤 낚시는 23:30까지")
 	# 통발에 든 작은 고기는 아이스박스에 넣지 않고 놓아준다
 	var gs_trap = load("res://scripts/autoload/game_state.gd").new()
 	gs_trap.trap_fish = [{"id": "bolak", "size": 13.0, "day": 3}, {"id": "bolak", "size": 20.0, "day": 3}]

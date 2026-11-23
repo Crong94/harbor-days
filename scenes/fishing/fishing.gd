@@ -27,6 +27,7 @@ const END_MIN := 7 * 60 # 07:00
 const LATE_MIN := 23 * 60 + 30 # 시간대를 모를 때 끝나는 시각
 const REAL_SEC_PER_GAME_MIN := 1.2
 const LOW_BAIT := 3 # 미끼가 이만큼 남으면 알린다
+var _warned_end := false # 철수 30분 전 알림을 했는지
 
 const HINTS := {
 	FishingLogic.State.READY: "꾹 눌러 힘을 모으고, 오른쪽 게이지가 포인트에 오면 손을 떼요",
@@ -197,10 +198,9 @@ func _ready() -> void:
 	if not tutorial:
 		minutes = float(GameState.time_minutes)
 		var slot := DayFlow.fishing_slot(GameState.time_minutes)
-		session_end = float(slot.end) if not slot.is_empty() else minf(minutes + 120.0, float(LATE_MIN))
 		spot = Spots.of_location(GameState.current_location)
-		if spot == "rocks":
-			session_end = float(Spots.rocks_end(GameState.day, int(minutes))) # 물이 들어오면 나와야 한다
+		# 낮은 시작하고 세 시간, 밤은 23:30, 갯바위는 물이 들어오기 전 (DayFlow.session_end)
+		session_end = float(DayFlow.session_end(GameState.time_minutes, spot, GameState.day, LATE_MIN))
 		night = not slot.is_empty() and slot.id == "night"
 		logic.forgiving = false
 		logic.force_first_fish = ""
@@ -409,6 +409,10 @@ func _process(delta: float) -> void:
 		playing = false
 	if playing:
 		minutes = minf(minutes + delta / REAL_SEC_PER_GAME_MIN, END_MIN if tutorial else session_end)
+		# 끝나기 30분 전에 한 번 알린다
+		if not tutorial and not _warned_end and session_end - minutes <= 30.0:
+			_warned_end = true
+			_pop_text("%d분 뒤면 철수할 시간이에요" % maxi(1, ceili(session_end - minutes)), UiKit.SUN, Vector2(size.x / 2.0, size.y * 0.3), 30)
 		logic.brightness = FishingLogic.brightness_at(minutes)
 		logic.steer = _steer()
 		logic.update(delta, _held, _mend_held)
