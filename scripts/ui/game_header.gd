@@ -99,6 +99,14 @@ func _process(_delta: float) -> void:
 	_clock.text = HudText.clock_text(_minutes if _minutes >= 0.0 else float(GameState.time_minutes))
 
 
+## 시각 글자를 보이거나 숨긴다 (첫날 튜토리얼 낚시는 숨긴다)
+func set_clock_visible(on: bool) -> void:
+	if _clock:
+		_clock.visible = on
+	else:
+		ready.connect(func(): _clock.visible = on, CONNECT_ONE_SHOT)
+
+
 ## 장면이 굴리는 시각(자정부터 분)
 func set_minutes(m: float) -> void:
 	_minutes = m

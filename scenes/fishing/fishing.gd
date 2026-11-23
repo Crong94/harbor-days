@@ -598,7 +598,7 @@ func _watch_charge() -> void:
 
 func _on_state_changed() -> void:
 	var s := logic.state
-	if _in_story:
+	if _in_story or _ending:
 		_hint.text = ""
 		return
 	if s == FishingLogic.State.FAILED:
@@ -811,6 +811,7 @@ func _build_hud() -> void:
 	# 맨 위 공통 헤더: 날짜와 시각, 오늘의 바다(날씨, 물때), 돈, 메뉴. 줄다리기 중에는 숨긴다
 	_header = GameHeader.new()
 	add_child(_header)
+	_header.set_clock_visible(not tutorial) # 첫날은 시각을 보여 주지 않는다 (첫 볼락 한 마리로 끝난다)
 	_header.gear_changed.connect(_on_gear_changed)
 
 	# 헤더 아래 (조용할 때만): 오른쪽에 그만하기
@@ -1448,12 +1449,17 @@ func _close_card() -> void:
 		_open_box(true)
 		return
 	if tutorial and not _met_mansu and GameState.caught_today.size() == 1:
+		# 첫날은 첫 볼락 한 마리로 끝난다 (사용자 11-24: 계속 낚이는데 대사는 한 마리라 앞뒤가 안 맞았다).
+		# 시계는 숨기고, 만수를 만난 뒤 해가 떠서 자연스럽게 마무리한다
 		_met_mansu = true
+		_ending = true
 		_play_story([
 			{"speaker": "{player}", "text": "잡았다...! 진짜 잡았어!"},
 			{"speaker": "???", "who": "mansu", "text": "어이 서울 양반. 그 낚싯대로 고기 잡으려면 해 지겠다 싶었는데."},
 			{"speaker": "박만수", "text": "볼락이네. 새벽 볼락은 눈이 커서 날 밝으면 귀신같이 숨어."},
-			{"speaker": "박만수", "face": "smile", "text": "고기 모인 자리에 던지고 찌 들어갈 때 딱 채 봐라. 손맛이 다를 거다."},
+			{"speaker": "", "text": "그 사이 해가 수평선 위로 올라왔다. 찌 주변이 조용해졌다."},
+			{"speaker": "박만수", "face": "smile", "text": "봐라. 해 뜨면 끝이다. 첫날에 한 마리면 됐다."},
+			{"speaker": "{player}", "text": "한 마리. 이걸로 {shop} 문을 열어 보자."},
 		])
 
 
@@ -1509,6 +1515,7 @@ func _leave() -> void:
 
 
 func _show_summary() -> void:
+	_hint.text = "" # 오늘 조과 창 뒤에 던지기 안내가 남지 않게
 	for c in _summary_list.get_children():
 		c.queue_free()
 	var total := 0
