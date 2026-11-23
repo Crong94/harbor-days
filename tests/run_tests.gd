@@ -1399,6 +1399,13 @@ func _test_fishing_depth() -> void:
 	var hauled: Array = gs_trap.haul_traps()
 	_eq(gs_trap.inventory.size(), 1, "통발 작은 볼락은 놓아줌")
 	_eq(hauled[0].get("released", false), true, "놓아준 통발 고기 표시")
+	_eq(gs_trap.reputation, 1, "놓아주면 평판 +1")
+	_eq(gs_trap.flags.get("first_release", false), true, "처음 놓아준 날 일지")
+	for k in 5:
+		var rel := {"id": "mangsang", "size": 14.0, "released": true}
+		gs_trap.caught_today.append(rel)
+		gs_trap.reward_release(rel)
+	_eq(gs_trap.reputation, GameState.RELEASE_REP_MAX, "놓아주기 평판은 하루 %d까지" % GameState.RELEASE_REP_MAX)
 	gs_trap.free()
 	# 포획금지체장: 이하는 놓아줘야 한다 (수산자원관리법 시행령 별표 2)
 	_eq(FishDB.must_release("bolak", 15.0), true, "볼락 15cm는 놓아줌")

@@ -1435,7 +1435,8 @@ func _free_catch() -> void:
 		return
 	_card_entry["released"] = true
 	Sound.play_sfx("slip", 0.05, -4.0)
-	_pop_text("%s 바다로" % FishDB.get_fish(_card_entry.id).name, UiKit.FOAM, Vector2(size.x / 2.0, size.y * 0.42), 34)
+	var rep := GameState.reward_release(_card_entry)
+	_pop_text("%s 바다로%s" % [FishDB.get_fish(_card_entry.id).name, "  평판 +1" if rep > 0 else ""], UiKit.FOAM, Vector2(size.x / 2.0, size.y * 0.42), 34)
 	_card_entry = {}
 	_close_card()
 

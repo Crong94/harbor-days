@@ -367,6 +367,22 @@ func buy_kit(id: String) -> String:
 	return ""
 
 
+## 고기를 바다로 돌려보내면 평판이 조금 오른다 (하루 RELEASE_REP_MAX번까지). 오른 만큼 돌려준다.
+## 오늘 조과(caught_today)에 "released"로 이미 들어간 뒤에 부른다. 처음 놓아준 날은 일지에 남긴다
+const RELEASE_REP_MAX := 3
+
+
+func reward_release(entry: Dictionary) -> int:
+	if not flags.get("first_release", false):
+		flags["first_release"] = true
+		note("%s %.0fcm를 바다로 돌려보냈다. 내년에 더 커서 만나자." % [FishDB.get_fish(entry.id).name, entry.size], 3)
+	var n := caught_today.filter(func(e): return e.get("released", false)).size()
+	if n > RELEASE_REP_MAX:
+		return 0
+	reputation += 1
+	return 1
+
+
 ## 방파제에 오면 통발을 걷는다: 든 고기를 아이스박스에 넣고(넘치면 화면이 고르게 한다) 걷은 것을 돌려준다.
 ## 포획금지체장 이하는 넣지 않고 놓아준다 ("released": true로 표시해 돌려준다)
 func haul_traps() -> Array:
@@ -378,6 +394,8 @@ func haul_traps() -> Array:
 		else:
 			store_catch(e, false)
 		caught_today.append(e)
+		if e.get("released", false):
+			reward_release(e)
 	return got
 
 
