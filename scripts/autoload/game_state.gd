@@ -66,7 +66,9 @@ var equipped_reel := GearDB.DEFAULT_REEL
 var owned_rods: Array = [GearDB.DEFAULT_ROD]
 var owned_reels: Array = [GearDB.DEFAULT_REEL]
 ## 미끼: id → 남은 수 (크릴은 -1, 끝이 없다)
-var baits := {BaitDB.DEFAULT: -1}
+## 미끼 남은 수. 크릴도 사서 쓴다 (11-24). 처음엔 창고에서 찾은 크릴 START_KRILL개
+const START_KRILL := 30
+var baits := {BaitDB.DEFAULT: START_KRILL}
 var equipped_bait := BaitDB.DEFAULT
 
 ## 오늘의 주문 (Orders.of(day)). 잡은 수와 받았는지
@@ -236,8 +238,6 @@ func buy_bait(id: String, price := -1) -> String:
 	if not BaitDB.BAITS.has(id):
 		return "없는 물건이에요."
 	var b := BaitDB.bait(id)
-	if b.amount < 0:
-		return "창고에 많이 있어요."
 	var cost: int = AppWork.shop_price(flags, int(b.price)) if price < 0 else price
 	if money < cost:
 		return "돈이 모자라요."
@@ -250,7 +250,7 @@ func bait_count(id: String) -> int:
 	return int(baits.get(id, 0))
 
 
-## 미끼 하나를 쓴다. 다 떨어지면 크릴로 바꾼다.
+## 미끼 하나를 쓴다. 다 떨어지면 남은 미끼 가운데 하나로 바꾼다 (크릴 먼저)
 func use_bait() -> void:
 	var n := bait_count(equipped_bait)
 	if n < 0:
@@ -259,7 +259,16 @@ func use_bait() -> void:
 	baits[equipped_bait] = n
 	if n <= 0:
 		baits.erase(equipped_bait)
+		for id in BaitDB.ORDER:
+			if bait_count(id) > 0:
+				equipped_bait = id
+				return
 		equipped_bait = BaitDB.DEFAULT
+
+
+## 던질 미끼가 남았는지
+func has_bait() -> bool:
+	return bait_count(equipped_bait) != 0
 
 
 ## 오늘 주문

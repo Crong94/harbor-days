@@ -473,7 +473,11 @@ func _test_sea_day() -> void:
 	gs.money = 5000
 	_eq(gs.buy_bait("worm"), "", "청갯지렁이 사기")
 	_eq(gs.bait_count("worm"), 10, "10개 들어옴")
-	_eq(gs.buy_bait("krill"), "창고에 많이 있어요.", "크릴은 안 팜")
+	var kr0: int = gs.bait_count("krill")
+	gs.money = maxi(gs.money, 50000)
+	_eq(gs.buy_bait("krill"), "", "크릴도 봉지로 삼")
+	_eq(gs.bait_count("krill") - kr0 >= 20, true, "크릴 한 봉지 20개")
+	gs.money = 0
 	_eq(gs.buy_bait("shrimp"), "돈이 모자라요.", "돈 모자람")
 	gs.equipped_bait = "worm"
 	gs.use_bait()
@@ -482,8 +486,17 @@ func _test_sea_day() -> void:
 	gs.use_bait()
 	_eq(gs.equipped_bait, "krill", "다 쓰면 크릴로")
 	gs.equipped_bait = "krill"
+	var kr1: int = gs.bait_count("krill")
 	gs.use_bait()
-	_eq(gs.bait_count("krill"), -1, "크릴은 끝이 없음")
+	_eq(gs.bait_count("krill"), kr1 - 1, "크릴도 하나씩 줄어듦")
+	gs.baits = {"krill": 1, "squid": 2}
+	gs.equipped_bait = "krill"
+	gs.use_bait()
+	_eq(gs.equipped_bait, "squid", "크릴이 떨어지면 남은 미끼로")
+	gs.baits = {"krill": 1}
+	gs.equipped_bait = "krill"
+	gs.use_bait()
+	_eq(gs.has_bait(), false, "미끼가 다 떨어짐")
 	gs.end_day()
 	_eq(gs.order_filled + int(gs.order_done), 0, "다음 날 주문 새로")
 	gs.free()
@@ -906,7 +919,7 @@ func _test_save() -> void:
 	_eq(gs2.equipped_rod, "rod_2", "쓰던 낚싯대")
 	_eq("rod_2" in gs2.owned_rods, true, "가진 낚싯대")
 	_eq(gs2.bait_count("worm"), 7, "미끼 수")
-	_eq(gs2.bait_count("krill"), -1, "크릴은 그대로 무제한")
+	_eq(gs2.bait_count("krill") >= 0, true, "크릴 수 (예전 무제한은 창고 한 상자로)")
 	_eq(gs2.has_flag("first_guest_done"), true, "진행 표시")
 	_eq(gs2.opened_today, true, "오늘 가게를 열었는지")
 	_eq(gs2.reputation, 12, "평판")

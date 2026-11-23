@@ -26,6 +26,7 @@ const START_MIN := 5 * 60 # 05:00
 const END_MIN := 7 * 60 # 07:00
 const LATE_MIN := 23 * 60 + 30 # 시간대를 모를 때 끝나는 시각
 const REAL_SEC_PER_GAME_MIN := 1.2
+const LOW_BAIT := 3 # 미끼가 이만큼 남으면 알린다
 
 const HINTS := {
 	FishingLogic.State.READY: "꾹 눌러 힘을 모으고, 오른쪽 게이지가 포인트에 오면 손을 떼요",
@@ -384,8 +385,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		if was_charging and logic.state == FishingLogic.State.CASTING:
 			Haptics.play("cast")
 			if not tutorial:
+				var before := GameState.equipped_bait
 				GameState.use_bait()
 				_refresh_bait()
+				var left := GameState.bait_count(GameState.equipped_bait)
+				if GameState.equipped_bait != before and left > 0:
+					_pop_text("%s 다 썼어요. %s 바꿔요" % [BaitDB.bait(before).name, Josa.attach(BaitDB.bait(GameState.equipped_bait).name, "으로/로")], UiKit.FOAM, Vector2(size.x / 2.0, size.y * 0.32), 28)
+				elif left > 0 and left <= LOW_BAIT:
+					_pop_text("%s %d개 남았어요" % [BaitDB.bait(GameState.equipped_bait).name, left], UiKit.CORAL, Vector2(size.x / 2.0, size.y * 0.32), 28)
 
 
 func _steer() -> float:
@@ -488,6 +495,8 @@ func _process(delta: float) -> void:
 			_start_ending()
 		elif not tutorial and minutes >= session_end:
 			_start_ending()
+		elif not tutorial and not GameState.has_bait():
+			_start_ending() # 미끼가 다 떨어졌다
 
 
 ## 찌 톡톡, 릴 감는 소리처럼 상태 안에서 반복되는 소리
@@ -799,6 +808,8 @@ func _start_ending() -> void:
 
 
 func _end_line() -> String:
+	if not tutorial and not GameState.has_bait():
+		return "미끼가 다 떨어졌다. 오늘은 여기까지. 다음엔 낚시방에서 크릴을 넉넉히 사 오자."
 	if minutes < session_end:
 		return "이번 낚시는 여기까지."
 	if spot == "rocks" and Spots.rocks_until(GameState.day, int(minutes)) < 0:
@@ -928,8 +939,9 @@ func _build_hud() -> void:
 	var bv := UiKit.vbox(-4)
 	bv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bh.add_child(bv)
-	bv.add_child(UiKit.text("미끼", "caption", UiKit.INK_SOFT))
+	bv.alignment = BoxContainer.ALIGNMENT_CENTER
 	_bait_label = UiKit.text("", "label", UiKit.INK)
+	_bait_label.add_theme_font_size_override("font_size", 22)
 	bv.add_child(_bait_label)
 	_refresh_bait()
 
@@ -979,6 +991,8 @@ func _refresh_bait() -> void:
 	_bait_icon.texture = load(ArtSlot.art_path(art)) if ArtSlot.has_art(art) else null
 	var n := GameState.bait_count(id)
 	_bait_label.text = BaitDB.bait(id).name + ("" if n < 0 else " %d" % n)
+	# 얼마 안 남으면 주황으로 (사서 쓰는 미끼라는 걸 알게)
+	_bait_label.add_theme_color_override("font_color", UiKit.CORAL_DEEP if n >= 0 and n <= LOW_BAIT and not tutorial else UiKit.INK)
 
 
 func _update_order_card() -> void:
@@ -1124,7 +1138,7 @@ func _open_bait_sheet() -> void:
 		tv.add_child(UiKit.text(b.name, "title", UiKit.INK))
 		tv.add_child(UiKit.text("잘 무는 고기: " + BaitDB.liked_names(id), "caption", UiKit.INK_SOFT))
 		h.add_child(UiKit.spacer())
-		h.add_child(UiKit.text("무제한" if n < 0 else "%d개" % n, "number", UiKit.INK))
+		h.add_child(UiKit.text("%d개" % n, "number", UiKit.INK))
 		row.pressed.connect(func():
 			GameState.equipped_bait = id
 			_refresh_bait()

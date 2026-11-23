@@ -358,7 +358,7 @@ func _build_gear() -> void:
 		if n == 0:
 			continue
 		var b := BaitDB.bait(id)
-		var stats := ("무제한" if n < 0 else "%d개" % n) + "  ·  잘 무는 고기: " + BaitDB.liked_names(id)
+		var stats := ("%d개" % n) + "  ·  잘 무는 고기: " + BaitDB.liked_names(id)
 		_list.add_child(_gear_row(BaitDB.icon_art(id), b.name, stats, id == GameState.equipped_bait, func():
 			GameState.equipped_bait = id
 			_gear_picked()))
