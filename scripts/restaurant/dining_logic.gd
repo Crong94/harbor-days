@@ -91,7 +91,7 @@ const BURNERS := [Vector2(849 / W, 365 / H), Vector2(849 / W, 443 / H)] # 화구
 ## 완성 접시 내놓는 자리 (카운터 꺾이는 모서리 픽업대 위)
 const PASS_SPOTS := [Vector2(328 / W, 575 / H), Vector2(366 / W, 575 / H), Vector2(404 / W, 575 / H)]
 const KITCHEN_EXIT := Vector2(330 / W, 390 / H) # 카운터 세로 팔 위 직원 통로
-const HALL_HOME := Vector2(390 / W, 722 / H) # 홀 담당(주인공)이 접시를 기다리는 자리 (픽업대 아래)
+const HALL_HOME := Vector2(390 / W, 772 / H) # 홀 담당(주인공)이 접시를 기다리는 자리 (픽업대 아래)
 const START := COOK_SPOT
 
 ## 손님 입구 (아래 가운데 문)
@@ -301,7 +301,7 @@ func _to_pass(c: Dictionary, q: String) -> void:
 # 같은 생선을 시킨 손님이면 누구에게 줘도 된다 (두 손님의 주문을 맞바꾼다). 다른 요리를 시킨 손님은 안 받는다.
 
 const MAX_TASKS := 3
-const HELPER_HOME := Vector2(300 / W, 712 / H) # 서빙 알바가 기다리는 자리 (주인공 옆)
+const HELPER_HOME := Vector2(290 / W, 772 / H) # 서빙 알바가 기다리는 자리 (주인공 옆)
 
 var selected := -1 # 고른 접시 (주문한 guest index). 아직 내놓는 자리에 있다
 var tasks: Array = [] # 줄 선 일 [{type: "serve", dish} / {type: "clear", seat}]

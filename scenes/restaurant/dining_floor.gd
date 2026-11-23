@@ -28,8 +28,10 @@ const SEAT_LIFT := 30.0 # 앉은 그림이 없어 서 있는 그림으로 대신
 const DISH := 50.0
 const NIGHT_DIM := Color(0.85, 0.85, 0.85)
 ## 화구 고리 (오른쪽 벽 옆모습 화구 둘 위, 누르는 자리)
-const BURNER_UI := [Vector2(849 / 982.0, 372 / 1602.0), Vector2(849 / 982.0, 450 / 1602.0)]
-const BURNER_R := 38.0
+## 굽는 중 말풍선 (요리사 머리 위, 한 줄에 생선 하나와 익는 막대)
+const BUBBLE_W := 176.0
+const BUBBLE_ROW_H := 46.0
+const BUBBLE_GAP := 6.0
 ## 쟁반 자리 (시트에서 쟁반의 회색 금속 부분을 찾아 잰 값). 칸마다 [가로: 칸 가운데에서 칸 폭 비율, 쟁반 윗면: 칸 높이 비율, 쟁반 폭: 칸 폭 비율].
 ## 빈 배열은 쟁반이 몸에 가려 안 보이는 칸(뒷모습)
 const TRAY := {
@@ -313,17 +315,18 @@ func _draw_decor_items(ci: Control, front: bool) -> void:
 func _gui_input_pos(p: Vector2) -> bool:
 	# 화구: 주인공이 굽는 판(helper_kitchen false)에서만 누른다
 	for b in (DiningLogic.STOVES if not logic.helper_kitchen else 0):
-		if p.distance_to(to_screen(BURNER_UI[b])) <= BURNER_R + 14.0:
+		var br := _burner_rect(b)
+		if br.has_area() and br.grow(8.0).has_point(p):
 			var r := logic.plate(b)
 			match r:
 				"perfect", "good":
 					_taught_plate = true
 				"early":
-					_pop(to_screen(BURNER_UI[b]) + Vector2(0, -BURNER_R - 10.0), "아직 덜 익었어요", UiKit.FOAM, false)
+					_pop(br.get_center() + Vector2(0, -BUBBLE_ROW_H), "아직 덜 익었어요", UiKit.FOAM, false)
 				"full":
-					_pop(to_screen(BURNER_UI[b]) + Vector2(0, -BURNER_R - 10.0), "내놓을 자리가 없어요", UiKit.PINK, false)
+					_pop(br.get_center() + Vector2(0, -BUBBLE_ROW_H), "내놓을 자리가 없어요", UiKit.PINK, false)
 				"away":
-					_pop(to_screen(BURNER_UI[b]) + Vector2(0, -BURNER_R - 10.0), "주방에 아무도 없어요", UiKit.PINK, false)
+					_pop(br.get_center() + Vector2(0, -BUBBLE_ROW_H), "주방에 아무도 없어요", UiKit.PINK, false)
 			return true
 	# 내놓는 자리 접시: 가장 가까운 것을 고른다 (다시 누르면 내려놓는다)
 	var best := -1
@@ -461,7 +464,7 @@ func _handle_events() -> void:
 			"ready":
 				Sound.play_sfx("tick", 0.05)
 			"plated":
-				var at := to_screen(BURNER_UI[e.burner]) + Vector2(0, -BURNER_R - 12.0)
+				var at := _bubble_anchor() + Vector2(-BUBBLE_W / 2.0 - 18.0, -BUBBLE_ROW_H * 1.6)
 				if logic.helper_kitchen:
 					sera_plated(e.quality)
 				match e.quality:
@@ -769,40 +772,83 @@ func _draw_cook(ci: Control) -> void:
 
 ## 화구 고리: 굽는 중(하늘색 차오름) → 노릇노릇(금빛, 지금 누르기) → 지나감(주황) → 타기 직전(빨강)
 func _draw_burner_ui(ci: Control, font: Font) -> void:
-	for b in DiningLogic.STOVES:
-		var p := to_screen(BURNER_UI[b])
-		var c := {}
-		for x in logic.cooking:
-			if int(x.burner) == b:
-				c = x
-		ci.draw_circle(p, BURNER_R + 3.0, Color(UiKit.OUTLINE, 0.85))
-		ci.draw_circle(p, BURNER_R, Color(UiKit.NIGHT_DEEP, 0.78))
-		if c.is_empty():
-			ci.draw_arc(p, BURNER_R - 6.0, 0.0, TAU, 32, Color(UiKit.FOAM, 0.18), 3.0, true)
-			continue
+	var rows := _cook_rows()
+	if rows.is_empty():
+		return
+	var tip := _bubble_anchor()
+	var r0 := _row_rect(0, rows.size())
+	var mid := (r0.position.y + _row_rect(rows.size() - 1, rows.size()).end.y) / 2.0
+	# 말풍선 꼬리 (오른쪽 요리사 쪽)
+	var tail := PackedVector2Array([Vector2(r0.end.x - 4.0, mid - 10.0), Vector2(r0.end.x - 4.0, mid + 10.0), Vector2(tip.x, tip.y)])
+	ci.draw_colored_polygon(tail, UiKit.PAPER)
+	ci.draw_polyline(PackedVector2Array([tail[0], tail[2], tail[1]]), UiKit.OUTLINE, 3.0, true)
+	for k in rows.size():
+		var c: Dictionary = rows[k]
+		var r := _row_rect(k, rows.size())
 		var d := DiningLogic.doneness(c)
 		var over := float(c.t) - float(c.total)
 		var col := UiKit.SKY
 		var frac := clampf(d, 0.0, 1.0)
+		var bg := UiKit.PAPER
 		if over >= 0.0:
 			frac = 1.0
 			if over <= DiningLogic.GOLD:
 				col = UiKit.SUN
+				bg = UiKit.GOLD_SOFT
 				var pulse := 0.5 + 0.5 * sin(_t * 10.0)
-				ci.draw_circle(p, BURNER_R + 8.0 + pulse * 4.0, Color(UiKit.SUN, 0.35))
+				ci.draw_style_box(UiKit.box(Color(UiKit.SUN, 0.35 + 0.25 * pulse), 20), r.grow(4.0 + pulse * 3.0))
 			elif over <= DiningLogic.BURN - 1.5:
 				col = UiKit.CORAL
 			else:
 				col = UiKit.DANGER
-		ci.draw_arc(p, BURNER_R - 5.0, -PI / 2.0, -PI / 2.0 + TAU * frac, 40, col, 7.0, true)
+		ci.draw_style_box(UiKit.chunky(bg, 16, 0, 3), r)
 		var ft: Texture2D = _fish_tex.get(logic.guests[c.guest].fish)
 		if ft:
-			var w := BURNER_R * 1.4
+			var w := 36.0
 			var h := w * ft.get_height() / float(ft.get_width())
-			ci.draw_texture_rect(ft, Rect2(p.x - w / 2.0, p.y - h / 2.0, w, h), false)
+			ci.draw_texture_rect(ft, Rect2(r.position.x + 10.0, r.position.y + (r.size.y - 3.0 - h) / 2.0, w, h), false)
+		var bar := Rect2(r.position.x + 54.0, r.position.y + (r.size.y - 3.0) / 2.0 - 6.0, r.size.x - 68.0, 12.0)
+		ci.draw_style_box(UiKit.box(Color(UiKit.INK, 0.15), 6), bar)
+		if frac > 0.0:
+			ci.draw_style_box(UiKit.box(col, 6), Rect2(bar.position, Vector2(maxf(bar.size.x * frac, 12.0), bar.size.y)))
 		if over >= 0.0 and over <= DiningLogic.GOLD and logic.at_stove() and not _taught_plate:
-			_caption(ci, font, p + Vector2(0, BURNER_R + 26.0), "지금 눌러요!")
+			_caption(ci, font, Vector2(r.get_center().x, _row_rect(rows.size() - 1, rows.size()).end.y + 30.0), "지금 눌러요!")
 
+
+## 굽는 중인 것만 화구 순서대로
+func _cook_rows() -> Array:
+	var out := []
+	for b in DiningLogic.STOVES:
+		for x in logic.cooking:
+			if int(x.burner) == b:
+				out.append(x)
+	return out
+
+
+## 말풍선 꼬리 끝: 요리사 가슴 왼쪽
+func _bubble_anchor() -> Vector2:
+	var at := to_screen(DiningLogic.COOK_SPOT)
+	var body := SERA_BODY_H if logic.helper_kitchen else CHAR_H * SHEET_WALK_SCALE * 0.67
+	return Vector2(at.x - body * 0.28, at.y - body * 0.6)
+
+
+## 말풍선 k번째 줄 (n줄 중). 요리사 왼쪽 주방 바닥에 세로로 쌓는다
+func _row_rect(k: int, n: int) -> Rect2:
+	var tip := _bubble_anchor()
+	var fr := floor_rect()
+	var x := maxf(tip.x - 18.0 - BUBBLE_W, fr.position.x + 8.0)
+	var h := n * BUBBLE_ROW_H + (n - 1) * BUBBLE_GAP
+	var top := tip.y - h / 2.0
+	return Rect2(x, top + k * (BUBBLE_ROW_H + BUBBLE_GAP), BUBBLE_W, BUBBLE_ROW_H)
+
+
+## 화구 b가 말풍선에서 차지하는 줄 (굽는 중이 아니면 빈 상자)
+func _burner_rect(b: int) -> Rect2:
+	var rows := _cook_rows()
+	for k in rows.size():
+		if int(rows[k].burner) == b:
+			return _row_rect(k, rows.size())
+	return Rect2()
 
 ## 홀: 서빙 알바와 (홀에 나와 있으면) 주인공. y 순서로 그린다
 func _draw_hall(ci: Control) -> void:

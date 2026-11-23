@@ -216,10 +216,12 @@ func _special_arrives() -> void:
 func _start_cooking() -> void:
 	step = Step.COOK
 	_recipe = Catalog.recipe(FishDB.get_fish(special_fish.id).get("grill", "bollak-gui"))
-	_cook_title.text = _recipe.get("name", "생선구이")
-	UiKit.set_chip(_cook_step, "세라가 굽는 중")
-	_cook_art.set_art("kitchen/grill", "화로")
-	_cook_hint.text = "세라가 불 앞에 섰어요. 잠깐만 기다려요"
+	_cook_title.text = "%s %s" % [FishDB.get_fish(special_fish.id).name, ServicePlan.dish_name(_pick_dish)]
+	var style := SpecialGuest.style_of(_pick_dish)
+	UiKit.set_chip(_cook_step, "세라가 굽는 중" if style == "grill" else "세라가 만드는 중")
+	var tool: Array = {"grill": ["kitchen/grill", "화로"], "fry": ["kitchen/fryer", "튀김솥"], "raw": ["kitchen/board", "도마"]}.get(style, ["kitchen/pot", "냄비"])
+	_cook_art.set_art(tool[0], tool[1])
+	_cook_hint.text = "세라가 칼을 잡았어요. 잠깐만 기다려요" if style == "raw" else "세라가 불 앞에 섰어요. 잠깐만 기다려요"
 	_stars.hide()
 	_gauge.hide()
 	_cook_panel.show()
