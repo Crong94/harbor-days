@@ -84,7 +84,6 @@ func _ready() -> void:
 	_build_ledger()
 
 	_dialogue = DialogueBox.new()
-	_dialogue.on_stage = ["sundeok"] # 할머니가 화면에 크게 서 있다
 	add_child(_dialogue)
 	_dialogue.finished.connect(_on_dialogue_finished)
 
@@ -217,9 +216,7 @@ func _served() -> void:
 func _guest_arrives() -> void:
 	step = Step.GUEST
 	_cook_panel.hide()
-	Sound.play_sfx("door")
-	_guest.show()
-	UiKit.fade_in(_guest, 0.6)
+	Sound.play_sfx("door") # 할머니 얼굴은 대화창 일러스트로 나온다 (전신 그림은 11-23부터 띄우지 않는다)
 	var taste := {
 		"good": "간이 딱 맞네.",
 		"bland": "간이 좀 싱겁네.",

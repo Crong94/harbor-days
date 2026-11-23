@@ -300,12 +300,9 @@ func _special_served() -> void:
 		GameState.note("%s 아쉬운 얼굴로 돌아갔다. 원하는 생선을 싱싱할 때 잡아 와야겠다." % Josa.attach(who, "이/가"), 2)
 	rep_change += st
 	_header.refresh()
-	if not _guest.guest_id.is_empty():
-		_guest.set_pose(GuestSD.pose_for_stars(st))
-		_guest.show()
-		UiKit.fade_in(_guest, 0.25)
 	var react: Array = Orders.customer(special.name).get("react", ["잘 먹었어요.", "잘 먹었어요.", "잘 먹었어요."])
-	var after := [{"speaker": special.name, "text": react[clampi(3 - st, 0, 2)]}]
+	# 손님 얼굴은 대화창 일러스트로 (별 셋이면 웃고, 하나면 곤란한 얼굴)
+	var after := [{"speaker": special.name, "text": react[clampi(3 - st, 0, 2)], "face": "smile" if st >= 3 else ("sad" if st <= 1 else "normal")}]
 	if sc.perfect:
 		# 셋 다 맞히면 더 친해지고 사연을 한 토막 들려준다
 		if Friends.PEOPLE.has(special.name):
@@ -325,15 +322,10 @@ func _guest_enters() -> void:
 	var id := GuestSD.id_for(special.get("name", ""))
 	if not GuestSD.has_sheet(id):
 		return
-	_guest.guest_id = id
-	_guest.set_pose("stand")
-	_guest.show()
-	UiKit.rise_in(_guest, 0.0, 40.0)
-	_dialogue.on_stage = [id]
+	_guest.guest_id = id # SD는 띄우지 않는다. 말할 때 대화창 오른쪽 아래에 일러스트가 나온다 (11-23)
 
 
 func _guest_leaves() -> void:
-	_dialogue.on_stage = []
 	if _guest.visible:
 		var tw := _guest.create_tween()
 		tw.tween_property(_guest, "modulate:a", 0.0, 0.3)
