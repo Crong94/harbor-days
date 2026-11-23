@@ -16,6 +16,7 @@ extends RefCounted
 ## season_floor: 철이 아닐 때 출현 배율의 바닥. 달별 배율은 바다 한 접시 데이터(Catalog.month_factor)를 쓰고,
 ##   여름에도 방파제에서 잡히는 고기(노래미, 쏨뱅이, 망상어 등)가 아예 사라지지 않게 이 값 밑으로는 안 내린다.
 ##   학공치는 늦가을부터 봄까지 오는 겨울 고기라 여름엔 거의 없다 (기본 0.3)
+## bycatch: 보통 먹지 않고 놓아주는 고기 (망상어. 사용자 11-24). 값이 싸고, 주문과 의뢰, 선물로 찾는 사람이 없다
 ## habit: 줄다리기 버릇 (FishingLogic). dive 처음에 바위로 세게 파고듦, shake 짧고 잦게 처박음, long 길게 차고 나감, jump 바늘털이(수면 위로 뛰어 머리를 턴다. 농어),
 ##   tap 짧고 가볍게 툭툭, side 몸을 눕혀 같은 쪽으로 버팀, hole 발밑에서 바위틈으로 처박음
 ## beat: 당기는 힘이 오르내리는 박자 (낚싯대 떨림과 진동). 클수록 잘게 툭툭, 작을수록 묵직하게
@@ -37,11 +38,11 @@ const FISH := {
 	},
 	"mangsang": {
 		"name": "망상어", "rarity": "common",
-		"min_cm": 12.0, "max_cm": 27.0, "strength": 0.35, "price": 2500,
+		"min_cm": 12.0, "max_cm": 27.0, "strength": 0.35, "price": 800, "bycatch": true,
 		"weight": 4.0, "night": 0.0, "zone": [1.6, 1.0, 0.5],
 		"weather": {},
 		"habit": "side", "beat": 2.0, "catalog": "mangsangeo", "grill": "mangsangeo-gui",
-		"desc": "몸이 납작하고 은빛이 도는 방파제 단골. 알 대신 새끼를 낳는 물고기다.",
+		"desc": "몸이 납작하고 은빛이 도는 방파제 단골. 알 대신 새끼를 낳는다. 살이 무르고 맛이 덜해서 꾼들은 보통 놓아준다.",
 	},
 	"noraemi": {
 		"name": "노래미", "rarity": "common",
@@ -217,6 +218,11 @@ static func stars(id: String, size_cm: float) -> int:
 static func must_release(id: String, size_cm: float) -> bool:
 	var f := get_fish(id)
 	return f.has("legal_cm") and size_cm <= float(f.legal_cm)
+
+
+## 보통 먹지 않고 놓아주는 고기인지
+static func is_bycatch(id: String) -> bool:
+	return bool(get_fish(id).get("bycatch", false))
 
 
 ## 놓아줘야 하는 까닭 한 줄 (잡은 카드)

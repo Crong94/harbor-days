@@ -29,7 +29,7 @@ const PEOPLE := [
 ]
 
 ## [종류, id, 몇 개]. 달걀은 닭장이 열려야 나온다
-const FISH_POOL := [["bolak", 2], ["bolak", 3], ["mangsang", 2], ["noraemi", 1], ["noraemi", 2], ["hakgongchi", 2], ["ssombaengi", 1]]
+const FISH_POOL := [["bolak", 2], ["bolak", 3], ["ssombaengi", 2], ["noraemi", 1], ["noraemi", 2], ["hakgongchi", 2], ["ssombaengi", 1]]
 const PRODUCE_POOL := [["daepa", 3], ["kkaennip", 4], ["mu", 2], ["gochu", 3], ["baechu", 1], ["maneul", 3], ["egg", 3], ["egg", 4]]
 const COUNT_WORD := ["", "한", "두", "세", "네", "다섯", "여섯"]
 

@@ -106,7 +106,8 @@ func _advance() -> void:
 	UiKit.set_name_label(_name_tag, speaker)
 	_name_tag.reset_size()
 	_name_tag.visible = not speaker.is_empty()
-	_show_portrait(str(line.get("speaker", "")), str(line.get("face", "normal")))
+	# "who": 이름표와 다른 사람 그림을 쓸 때 (예: 소개 전이라 "???"로 나오는 만수, "젊은 여자"로 나오는 세라)
+	_show_portrait(str(line.get("who", line.get("speaker", ""))), str(line.get("face", "normal")))
 	_text.text = GameState.line(line.get("text", ""))
 	# 지문은 흐리게, 대사는 밝게
 	_text.add_theme_color_override("font_color", UiKit.FOAM if not speaker.is_empty() else UiKit.FOAM_SOFT)

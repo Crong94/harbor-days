@@ -51,7 +51,7 @@ static func call_name(name: String) -> String:
 
 ## 주문에 나올 수 있는 어종과 몇 마리
 const POOL := [
-	["bolak", 2], ["bolak", 3], ["mangsang", 2], ["noraemi", 2],
+	["bolak", 2], ["bolak", 3], ["noraemi", 2],
 	["ssombaengi", 2], ["ureok", 1], ["hakgongchi", 2],
 ]
 

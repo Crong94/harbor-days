@@ -1434,6 +1434,24 @@ func _test_fishing_depth() -> void:
 	_eq(FishDB.must_release("ureok", 23.0), true, "우럭 23cm는 놓아줌")
 	_eq(FishDB.must_release("gamseongdom", 24.0), true, "감성돔 24cm는 놓아줌")
 	_eq(FishDB.must_release("hakgongchi", 15.0), false, "학공치는 금지체장 없음")
+	# 망상어는 보통 먹지 않는 고기: 싸고, 주문과 의뢰, 선물로 찾지 않는다
+	_eq(FishDB.is_bycatch("mangsang"), true, "망상어는 잡어")
+	_eq(FishDB.value_of("mangsang", 25.0) < FishDB.value_of("bolak", 15.5), true, "큰 망상어도 작은 볼락보다 쌈")
+	var mang_ask := 0
+	for dd in range(2, 120):
+		if Orders.of(dd).get("fish", "") == "mangsang":
+			mang_ask += 1
+		for po in Board.posted_on(dd):
+			if po.get("item", "") == "mangsang":
+				mang_ask += 1
+	_eq(mang_ask, 0, "망상어 주문과 의뢰는 없음")
+	var dl_m := DiningLogic.new()
+	dl_m.inventory = [{"id": "mangsang", "size": 22.0}]
+	_eq(dl_m.pick_fish(), -1, "망상어는 손님상에 안 냄")
+	for who_f in Friends.PEOPLE:
+		_eq("fish:mangsang" in Friends.person(who_f).get("like", []) + Friends.person(who_f).get("love", []), false, "%s는 망상어 선물을 반기지 않음" % who_f)
+	_eq(Portraits.path("???"), "", "??? 이름표만으로는 그림 없음")
+	_eq(Portraits.path("mansu").is_empty(), false, "그림 id로도 찾음 (who)")
 	_eq(FishDB.legal_text("bolak"), "볼락 15cm 이하는 법으로 놓아줘야 해요", "금지체장 안내")
 	for id in FishDB.FISH:
 		var fo: Dictionary = FishDB.FISH[id]

@@ -1354,8 +1354,8 @@ func _show_card() -> void:
 		_card_box.add_theme_color_override("font_color", UiKit.INK_SOFT)
 	# 금지체장 이하는 쿨러에 못 넣는다. 첫날 튜토리얼 볼락은 놓아줄 수 없다 (식당 첫 손님 재료)
 	var small := FishDB.must_release(id, logic.fish_size)
-	_card_continue.text = FishDB.legal_text(id) if small else ""
-	_card_continue.visible = small
+	_card_continue.text = FishDB.legal_text(id) if small else ("보통 먹지 않는 고기라 놓아주는 꾼이 많아요" if FishDB.is_bycatch(id) else "")
+	_card_continue.visible = not _card_continue.text.is_empty()
 	_card_keep.disabled = small
 	_card_keep.text = "작아서 못 넣어요" if small else "쿨러에 넣기"
 	_card_free.visible = not tutorial
@@ -1451,7 +1451,7 @@ func _close_card() -> void:
 		_met_mansu = true
 		_play_story([
 			{"speaker": "{player}", "text": "잡았다...! 진짜 잡았어!"},
-			{"speaker": "???", "text": "어이 서울 양반. 그 낚싯대로 고기 잡으려면 해 지겠다 싶었는데."},
+			{"speaker": "???", "who": "mansu", "text": "어이 서울 양반. 그 낚싯대로 고기 잡으려면 해 지겠다 싶었는데."},
 			{"speaker": "박만수", "text": "볼락이네. 새벽 볼락은 눈이 커서 날 밝으면 귀신같이 숨어."},
 			{"speaker": "박만수", "face": "smile", "text": "고기 모인 자리에 던지고 찌 들어갈 때 딱 채 봐라. 손맛이 다를 거다."},
 		])
