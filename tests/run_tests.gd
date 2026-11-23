@@ -1445,6 +1445,32 @@ func _test_fishing_depth() -> void:
 		gs_trap.reward_release(rel)
 	_eq(gs_trap.reputation, GameState.RELEASE_REP_MAX, "놓아주기 평판은 하루 %d까지" % GameState.RELEASE_REP_MAX)
 	gs_trap.free()
+	# 활어 수조: 경자상회에서 한 단계씩, 넣은 고기는 상하지 않고 꺼내면 싱싱하다
+	var gt = load("res://scripts/autoload/game_state.gd").new()
+	gt.money = 0
+	_eq(gt.buy_tank(), "돈이 모자라요.", "수조 돈 모자람")
+	gt.money = 1000000
+	_eq(gt.tank_level, 0, "처음엔 수조 없음")
+	_eq(gt.buy_tank(), "", "1단계 수조")
+	_eq(gt.tank_level, 1, "건너뛰지 않고 1단계")
+	_eq(Tank.slots(gt.tank_level), 2, "1단계는 두 마리")
+	gt.buy_tank()
+	gt.buy_tank()
+	_eq(gt.tank_level, 3, "차례로 3단계")
+	_eq(gt.buy_tank(), "더 좋은 수조는 없어요.", "끝 단계")
+	gt.tank_level = 1
+	gt.day = 5
+	gt.inventory = [{"id": "bolak", "size": 20.0, "day": 4}, {"id": "ureok", "size": 30.0, "day": 4}, {"id": "noraemi", "size": 18.0, "day": 4}]
+	gt.end_day()
+	_eq(gt.tank.size(), 2, "밤에 상할 고기 중 두 마리를 수조로")
+	_eq(gt.tank.any(func(e): return e.id == "ureok"), true, "값진 우럭부터 살림")
+	_eq(gt.inventory.size(), 0, "나머지는 상해서 버림")
+	gt.end_day()
+	_eq(gt.tank.size(), 2, "수조 고기는 다음 날에도 살아 있음")
+	_eq(gt.tank_take(gt.tank[0]), true, "꺼내기")
+	_eq(int(gt.inventory[0].day), gt.day, "꺼낸 고기는 오늘 잡은 것처럼 싱싱")
+	_eq(gt.tank_put(gt.inventory[0]), true, "다시 넣기")
+	gt.free()
 	# 포획금지체장: 이하는 놓아줘야 한다 (수산자원관리법 시행령 별표 2)
 	_eq(FishDB.must_release("bolak", 15.0), true, "볼락 15cm는 놓아줌")
 	_eq(FishDB.must_release("bolak", 15.1), false, "볼락 15.1cm는 가져감")

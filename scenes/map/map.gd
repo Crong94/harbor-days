@@ -48,6 +48,9 @@ var _gift_sheet: Control
 var _gift_list: VBoxContainer
 var _gift_title: Label
 var _gift_who := ""
+var _tank_sheet: Control
+var _tank_list: VBoxContainer
+var _tank_title: Label
 const APP_SCENE := "res://scenes/village/app_work.tscn"
 const LAB_SCENE := "res://scenes/restaurant/menu_lab.tscn"
 
@@ -649,6 +652,20 @@ func _fill_extras(id: String, arrive: int) -> void:
 		var ab := UiKit.action("앱 만들어 주기 〈%s〉 %d/%d" % [AppWork.app(app).title, AppWork.stage(GameState, app) + 1, AppWork.app(app).stages.size()], "sun", true)
 		ab.pressed.connect(_extra_go.bind(id, "app", app))
 		_extras.add_child(ab)
+	# 활어 수조: 경자상회에서 한 단계씩 산다. 수조가 있으면 가게와 경자상회에서 넣고 꺼낸다
+	if id == "store":
+		var nx := Tank.next_info(GameState.tank_level)
+		if not nx.is_empty():
+			var price := AppWork.shop_price(GameState.flags, int(nx.price))
+			var label := ("수조 들이기: %s %s" if GameState.tank_level == 0 else "수조 바꾸기: %s %s") % [nx.name, GameState.format_won(price)]
+			var tb := UiKit.action(label, "mint", true)
+			tb.disabled = GameState.money < price
+			tb.pressed.connect(_extra_go.bind(id, "tank_buy", ""))
+			_extras.add_child(tb)
+	if id in ["shop", "store"] and GameState.tank_level > 0:
+		var vb := UiKit.action("활어 수조  %d/%d" % [GameState.tank.size(), Tank.slots(GameState.tank_level)], "secondary", true)
+		vb.pressed.connect(_extra_go.bind(id, "tank", ""))
+		_extras.add_child(vb)
 	if id == "shop" and arrive + Menu.LAB_MINUTES <= DayFlow.SHOP_OPEN and Menu.RECIPES.keys().any(func(r): return Menu.learned(GameState.flags, r)):
 		var n := Menu.to_test(GameState.flags).size()
 		var lb := UiKit.action("메뉴 개발" + (" · 시험할 요리 %d" % n if n > 0 else ""), "sun", true)
@@ -669,6 +686,101 @@ func _extra_go(id: String, kind: String, data: String) -> void:
 			UiKit.go_to(self, APP_SCENE)
 		"lab":
 			UiKit.go_to(self, LAB_SCENE)
+		"tank_buy":
+			_buy_tank()
+		"tank":
+			_open_tank()
+
+
+# ─── 활어 수조 (11-24) ─────────────────────────────
+
+func _buy_tank() -> void:
+	var nx := Tank.next_info(GameState.tank_level)
+	var err := GameState.buy_tank()
+	if not err.is_empty():
+		_show_toast(err)
+		return
+	Sound.play_sfx("coin")
+	var first := GameState.tank_level == 1
+	_play_story([
+		{"speaker": "문경자", "text": "수조? 함지에 물 받아 두면 고기가 며칠은 산다. 가져가라." if first else "%s? 이거면 고기들이 한결 팔팔하겠네." % nx.name},
+		{"speaker": "", "text": "%s 들였다. 고기 %d마리를 살려 둘 수 있다. 상할 고기는 밤에 알아서 옮겨 둔다." % [Josa.attach(nx.name, "을/를"), int(nx.slots)]},
+	], func():
+		_refresh_hud()
+		_drawer.refresh_dot())
+
+
+func _build_tank_sheet() -> void:
+	_tank_sheet = Control.new()
+	_tank_sheet.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_tank_sheet)
+	var dim := UiKit.scrim(0.45)
+	dim.gui_input.connect(func(e):
+		if e is InputEventMouseButton and e.pressed:
+			_tank_sheet.hide())
+	_tank_sheet.add_child(dim)
+	var panel := UiKit.paper_panel(UiKit.SPACE_LG, UiKit.RADIUS_LG)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	panel.offset_left = 16
+	panel.offset_right = -16
+	panel.offset_bottom = -20
+	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_tank_sheet.add_child(panel)
+	var v := UiKit.vbox(UiKit.SPACE_MD)
+	panel.add_child(v)
+	_tank_title = UiKit.text("", "h2", UiKit.INK)
+	v.add_child(_tank_title)
+	v.add_child(UiKit.paragraph("수조 고기는 살아 있어서 상하지 않아요. 꺼내면 오늘 잡은 것처럼 싱싱해요", "caption", UiKit.INK_SOFT))
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 560)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.scroll_deadzone = 8
+	v.add_child(scroll)
+	_tank_list = UiKit.vbox(UiKit.SPACE_SM)
+	_tank_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_tank_list)
+	_tank_sheet.hide()
+
+
+func _open_tank() -> void:
+	if _tank_sheet == null:
+		_build_tank_sheet()
+	_fill_tank()
+	_tank_sheet.show()
+	UiKit.fade_in(_tank_sheet, UiKit.MOTION_BASE)
+
+
+func _fill_tank() -> void:
+	for c in _tank_list.get_children():
+		c.queue_free()
+	var info := Tank.level_info(GameState.tank_level)
+	_tank_title.text = "%s  %d/%d" % [info.get("name", "수조"), GameState.tank.size(), Tank.slots(GameState.tank_level)]
+	_tank_list.add_child(UiKit.text("수조 (살아 있음)", "label", UiKit.SEA))
+	if GameState.tank.is_empty():
+		_tank_list.add_child(UiKit.text("비어 있어요", "caption", UiKit.INK_SOFT))
+	for e in GameState.tank:
+		var b := UiKit.game_button("꺼내기", UiKit.TEAL_BTN, Vector2(120, 50))
+		b.disabled = GameState.icebox_free() <= 0
+		b.pressed.connect(func():
+			GameState.tank_take(e)
+			Sound.play_sfx("tap")
+			_fill_tank())
+		var row := FishLine.make(e, GameState.day, "값 " + GameState.format_won(FishDB.value_of(e.id, e.size)), "", b)
+		row.mouse_filter = Control.MOUSE_FILTER_PASS
+		_tank_list.add_child(row)
+	_tank_list.add_child(UiKit.text("아이스박스  %d/%d" % [GameState.inventory.size(), GameState.icebox_size], "label", UiKit.INK_SOFT))
+	if GameState.inventory.is_empty():
+		_tank_list.add_child(UiKit.text("비어 있어요", "caption", UiKit.INK_SOFT))
+	for e in GameState.inventory:
+		var b := UiKit.game_button("수조에", UiKit.CORAL, Vector2(120, 50))
+		b.disabled = GameState.tank_free() <= 0
+		b.pressed.connect(func():
+			GameState.tank_put(e)
+			Sound.play_sfx("slip", 0.05, -6.0)
+			_fill_tank())
+		var row := FishLine.make(e, GameState.day, "값 " + GameState.format_won(FishDB.value_of(e.id, e.size)), "", b)
+		row.mouse_filter = Control.MOUSE_FILTER_PASS
+		_tank_list.add_child(row)
 
 
 func _build_gift_sheet() -> void:

@@ -66,6 +66,10 @@ var equipped_reel := GearDB.DEFAULT_REEL
 var owned_rods: Array = [GearDB.DEFAULT_ROD]
 var owned_reels: Array = [GearDB.DEFAULT_REEL]
 ## 미끼: id → 남은 수 (크릴은 -1, 끝이 없다)
+## 활어 수조 (Tank). tank_level 0이면 없음. tank: 살려 둔 고기 (상하지 않는다)
+var tank_level := 0
+var tank: Array = []
+
 ## 미끼 남은 수. 크릴도 사서 쓴다 (11-24). 처음엔 창고에서 찾은 크릴 START_KRILL개
 const START_KRILL := 30
 var baits := {BaitDB.DEFAULT: START_KRILL}
@@ -363,6 +367,45 @@ func buy_cooler() -> String:
 	return ""
 
 
+## 수조를 다음 단계로 산다 (경자상회). 건너뛰지 않고 하나씩. 문제가 없으면 빈 문자열
+func buy_tank() -> String:
+	var nx := Tank.next_info(tank_level)
+	if nx.is_empty():
+		return "더 좋은 수조는 없어요."
+	var p := AppWork.shop_price(flags, int(nx.price))
+	if money < p:
+		return "돈이 모자라요."
+	spend(p)
+	tank_level += 1
+	return ""
+
+
+func tank_free() -> int:
+	return maxi(0, Tank.slots(tank_level) - tank.size())
+
+
+## 아이스박스 고기를 수조로 옮긴다. 옮겼으면 true
+func tank_put(entry: Dictionary) -> bool:
+	if tank_free() <= 0 or not inventory.has(entry):
+		return false
+	inventory.erase(entry)
+	entry["alive"] = true
+	tank.append(entry)
+	return true
+
+
+## 수조 고기를 꺼내 아이스박스에 넣는다. 오늘 잡은 것처럼 싱싱하다. 꺼냈으면 true
+func tank_take(entry: Dictionary) -> bool:
+	if icebox_free() <= 0 or not tank.has(entry):
+		return false
+	tank.erase(entry)
+	var e := entry.duplicate()
+	e["day"] = day
+	e.erase("alive")
+	inventory.append(e)
+	return true
+
+
 ## 도구를 다음 단계로 산다. 문제가 없으면 빈 문자열
 func buy_kit(id: String) -> String:
 	var nx := KitDB.next_level(kits, id)
@@ -438,6 +481,15 @@ func end_day(wake_minutes := -1) -> void:
 	yesterday_sales = sales_today
 	yesterday_spent = spent_today
 	news_today = []
+	# 수조가 있으면 오늘 밤 상할 고기를 값진 것부터 옮겨 살려 둔다
+	var saving := spoiling_tonight()
+	saving.sort_custom(func(a, b): return FishDB.value_of(a.id, a.size) > FishDB.value_of(b.id, b.size))
+	var moved := 0
+	for e in saving:
+		if tank_put(e):
+			moved += 1
+	if moved > 0:
+		_news("상할 뻔한 생선 %d마리를 수조로 옮겨 살려 뒀어요" % moved)
 	# 오래된 생선은 밤새 상해서 버린다
 	var spoiled := spoiling_tonight()
 	if not spoiled.is_empty():

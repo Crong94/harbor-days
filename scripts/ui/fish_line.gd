@@ -5,6 +5,8 @@ extends RefCounted
 
 ## 신선도 단계: 잡은 날이면 "오늘 잡음"(초록, 막대 가득), 하루 지나면 "오늘 밤 상함"(금빛, 막대 반)
 static func stage(entry: Dictionary, today: int) -> Dictionary:
+	if entry.get("alive", false): # 활어 수조 고기 (Tank)
+		return {"name": "살아 있음", "color": UiKit.SEA, "fill": 1.0}
 	var age := today - int(entry.get("day", today))
 	if age <= 0:
 		return {"name": "오늘 잡음", "color": UiKit.GREEN_FRESH, "fill": 1.0}
