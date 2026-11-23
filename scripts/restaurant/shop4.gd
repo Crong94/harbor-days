@@ -36,8 +36,8 @@ const ITEMS := [
 	["kit2_sink", 418, 354, 130, 10.354, "bl", false, false],
 	["kit2_worktable", 556, 354, 130, 10.354, "bl", false, false],
 	["kit2_fridge", 756, 354, 128, 10.354, "bl", false, false],
-	["kit2_stove_side", 810, 472, 78, 10.472, "bl", false, false],
-	["kit2_stove_side", 810, 550, 78, 10.55, "bl", false, false],
+	["kit2_stove_side_empty", 810, 472, 78, 10.472, "bl", false, false], # 냄비 없는 빈 화구 (조리 도구는 영업 판이 얹는다, 11-24)
+	["kit2_stove_side_empty", 810, 550, 78, 10.55, "bl", false, false],
 	["kit2_panrack", 588, 196, 66, 9.5, "tl", false, false],
 	# 카운터(ㄱ자, 세로 팔 위를 잘라 직원 통로)와 픽업대
 	["struct4_counterG2", 288, 303, 0, 20.0, "tl", true, true],

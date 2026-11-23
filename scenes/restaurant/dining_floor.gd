@@ -32,8 +32,10 @@ const SEAT_LIFT := 30.0 # 앉은 그림이 없어 서 있는 그림으로 대신
 const DISH := 50.0
 const NIGHT_DIM := Color(0.85, 0.85, 0.85)
 ## 화구 고리 (오른쪽 벽 옆모습 화구 둘 위, 누르는 자리)
-## 화구 위 조리 도구 (바다 한 접시 cook_tool 그림). 요리 갈래(SpecialGuest.style_of)마다 하나
-const COOK_TOOLS := {"grill": "cook_tool/grill", "fry": "cook_tool/fryer", "soup": "cook_tool/stockpot", "braise": "cook_tool/wok", "raw": "cook_tool/knife"}
+## 화구 위 조리 도구 (코지 cook_tool2 그림, 11-24). 요리 갈래(SpecialGuest.style_of)마다 하나
+const COOK_TOOLS := {"grill": "cook_tool2/grill", "fry": "cook_tool2/fryer", "soup": "cook_tool2/stockpot", "braise": "cook_tool2/wok", "raw": "cook_tool2/board"}
+## 세라 요리법별 조리 시트 (4칸 한 줄. 손에 든 도구만 그려져 있다). 조림은 프라이팬 흔드는 v2 시트를 그대로 쓴다
+const SERA_STYLE_SHEETS := {"grill": "staff/sera_sd_cook_grill", "soup": "staff/sera_sd_cook_soup", "fry": "staff/sera_sd_cook_fry", "raw": "staff/sera_sd_cook_raw"}
 const COOK_TOOL_W := 72.0
 const COOK_TOOL_SINK := 14.0 # 도구 바닥을 화구 자리보다 이만큼 아래에
 var _tool_cache := {}
@@ -789,6 +791,11 @@ func _draw_cook(ci: Control) -> void:
 			return
 		if cook != "" and _has_sheet(cook):
 			if grid:
+				# 굽는 중이면 그 요리법 시트(구이 집게, 국물 국자, 튀김 건지기, 회 칼질), 다 익어 담을 때와 쉴 때는 v2 시트
+				var style_sheet: String = SERA_STYLE_SHEETS.get(_sera_style(), "")
+				if style_sheet != "" and _has_sheet(style_sheet) and not _sera_plating():
+					_draw_grid(ci, style_sheet, int(_t * 2.5) % 4, at, SERA_BODY_H, false)
+					return
 				_draw_grid(ci, cook, _sera_cook_cell(), at, SERA_BODY_H, false)
 				return
 			var cell := (1 + int(_t * 4.0) % 2) if not logic.cooking.is_empty() else 0
@@ -1075,6 +1082,20 @@ const SERA_BODY_H := CHAR_H * 1.05 * 0.946
 const SERA_COOK_LOOP := [0, 1, 2, 3, 2, 3, 4, 2, 3]
 
 
+## 세라가 지금 만드는 요리 갈래 (굽는 것 중 첫 번째). 없으면 빈 문자열
+func _sera_style() -> String:
+	var rows := _cook_rows()
+	return "" if rows.is_empty() else SpecialGuest.style_of(_cook_dish(rows[0]))
+
+
+## 다 익은 것이 있어 담는 중인지 (v2 시트의 담기·내밀기 칸을 쓴다)
+func _sera_plating() -> bool:
+	for c in _cook_rows():
+		if DiningLogic.doneness(c) >= 1.0:
+			return true
+	return false
+
+
 func _sera_cook_cell() -> int:
 	if not special_cook.is_empty():
 		return (5 if int(_t * 2.0) % 2 == 0 else 6) if DiningLogic.doneness(special_cook) >= 1.0 else SERA_COOK_LOOP[int(_t * 2.5) % SERA_COOK_LOOP.size()]
@@ -1097,11 +1118,13 @@ static func _grid_info(path: String) -> Dictionary:
 	var img := tex.get_image()
 	if img.is_compressed():
 		img.decompress()
+	# 4열 2줄 격자, 가로로 긴 시트(가로:세로 2.5 이상)는 4칸 한 줄
+	var rows := 1 if img.get_width() >= img.get_height() * 2.5 else 2
 	var cw := img.get_width() / 4
-	var chh := img.get_height() / 2
+	var chh := img.get_height() / rows
 	var boxes := []
 	var tallest := 1.0
-	for i in 8:
+	for i in 4 * rows:
 		var r := Rect2i((i % 4) * cw, (i / 4) * chh, cw, chh)
 		var u := img.get_region(r).get_used_rect()
 		boxes.append(Rect2(r.position + u.position, u.size))
@@ -1114,7 +1137,7 @@ static func _grid_info(path: String) -> Dictionary:
 ## 격자 칸 i의 그림을 발끝이 feet에 오게 그린다. body_h: 가장 큰 칸의 키가 이 높이가 되게 줄인다
 func _draw_grid(ci: Control, path: String, i: int, feet: Vector2, body_h: float, flip: bool) -> void:
 	var e := _grid_info(path)
-	var box: Rect2 = e.boxes[clampi(i, 0, 7)]
+	var box: Rect2 = e.boxes[clampi(i, 0, e.boxes.size() - 1)]
 	var k: float = body_h / float(e.tallest)
 	var w := box.size.x * k
 	var h := box.size.y * k
