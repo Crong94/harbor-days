@@ -83,6 +83,9 @@ static func schedule_mix(sched: Array, m: float) -> Array:
 var sun_art := ""
 var minutes := -1.0
 var sun_size := 0.17 # 해 그림(빛무리 포함) 크기, 화면 가로 대비
+var sun_low := SUN_LOW # 해가 처음 나타나는 자리 (그림 비율). 낚시터마다 다르다 (Spots sun_low)
+var sun_clip := -1.0 # 0 이상이면 이 높이(그림 세로 비율, 수평선) 아래는 해를 그리지 않는다. 산이 없이 탁 트인 수평선에서 떠오를 때
+const SUN_LOW := Vector2(0.55, 0.285) # 방파제: 산 바로 위
 var _sun_tex: Texture2D
 var _sun_node: Control # 해는 물결 셰이더가 안 먹게 자식 노드에 그린다
 
@@ -123,12 +126,11 @@ func _ready() -> void:
 
 ## 시각(자정부터 분)에 따른 해 위치 (배경 그림 비율). z는 0이면 산 아래로 완전히 숨음.
 ## 05:00 산 뒤에서 떠올라 11:00 오른쪽 위 높이까지 오르고, 17:30부터 오른쪽 끝으로 내려가 19:30에 진다.
-static func sun_path(m: float) -> Vector3:
+static func sun_path(m: float, low := SUN_LOW) -> Vector3:
 	# 방향: 북쪽 방파제 끝에서 동쪽 바다를 본다. 화면 왼쪽이 북쪽, 오른쪽이 남쪽, 등 뒤가 서쪽.
 	# 해는 정면(동쪽) 수평선 바로 위에서 서서히 나타나 떠오르고, 남쪽(오른쪽 위)으로 높이 올라가다
 	# 정오 무렵 머리 위를 지나 등 뒤(서쪽)로 넘어가며 화면 위로 사라진다. 저녁 해넘이는 등 뒤라 보이지 않는다.
 	m = fposmod(m, 24.0 * 60.0)
-	var low := Vector2(0.55, 0.285) # 산 바로 위 (해가 처음 나타나는 자리)
 	var gone := Vector2(0.92, -0.06) # 화면 위로 넘어간 자리
 	var start := 5 * 60 + 15.0
 	var end := 13 * 60.0
@@ -307,14 +309,24 @@ func _draw_breakwater_and_lighthouse(w: float, h: float, hy: float, p: Dictionar
 func _draw_sun() -> void:
 	if _sun_tex == null or minutes < 0.0:
 		return
-	var p := sun_path(minutes)
+	var p := sun_path(minutes, sun_low)
 	if p.z <= 0.0:
 		return
 	var c := art_point(Vector2(p.x, p.y))
 	var sz := size.x * sun_size
 	var tint := Color(1.0, 0.72, 0.5).lerp(Color.WHITE, clampf(brightness, 0.0, 1.0))
 	tint.a = p.z
-	_sun_node.draw_texture_rect(_sun_tex, Rect2(c - Vector2(sz, sz) / 2.0, Vector2(sz, sz)), false, tint)
+	var dst := Rect2(c - Vector2(sz, sz) / 2.0, Vector2(sz, sz))
+	if sun_clip >= 0.0:
+		# 수평선 아래는 자른다 (수평선에서 떠오르는 해)
+		var cy := art_point(Vector2(0.0, sun_clip)).y
+		if dst.position.y >= cy:
+			return
+		var ts := _sun_tex.get_size()
+		var k := clampf((cy - dst.position.y) / dst.size.y, 0.0, 1.0)
+		_sun_node.draw_texture_rect_region(_sun_tex, Rect2(dst.position, Vector2(dst.size.x, dst.size.y * k)), Rect2(Vector2.ZERO, Vector2(ts.x, ts.y * k)), tint)
+		return
+	_sun_node.draw_texture_rect(_sun_tex, dst, false, tint)
 
 
 func _vertical_gradient(rect: Rect2, top: Color, bottom: Color, steps: int) -> void:

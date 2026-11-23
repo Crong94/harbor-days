@@ -18,13 +18,16 @@ const SPEAKERS := {
 	"준호": "junho", "이준호": "junho",
 	"해솔": "haesol", "김해솔": "haesol",
 	"세라": "sera", "최세라": "sera",
+	"이장": "taesik", "정태식": "taesik",
+	"여울": "yeoul", "한여울": "yeoul",
+	"은행 직원": "banker",
 	"{player}": "player", "나": "player",
 }
 
 
 ## 그 사람의 얼굴 그림 경로. 없으면 빈 문자열
 static func path(speaker: String, face := "normal") -> String:
-	var id: String = SPEAKERS.get(speaker, "")
+	var id: String = SPEAKERS.get(speaker, speaker if speaker in SPEAKERS.values() else "")
 	if id.is_empty():
 		return ""
 	if not face in FACES:

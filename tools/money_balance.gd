@@ -15,8 +15,8 @@ const DAYS := 62 # 3월 1일 ~ 5월 1일 (4월 1일, 5월 1일 고정비까지)
 
 ## 하는 사람 유형: 날마다 어느 시간대를 낚시하는가
 const PROFILES := {
-	"새벽만": ["dawn"],
-	"새벽+아침": ["dawn", "morning"],
+	"낮만": ["day"],
+	"낮+밤": ["day", "night"],
 }
 
 var _fight_rng := 0
@@ -144,7 +144,7 @@ func _fish_session(day: int, slot_id: String, sea: Dictionary) -> Array:
 			slot = s
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("낚시-%d-%s" % [day, slot_id])
-	var real_left := float(slot[3] - slot[2]) * REAL_SEC_PER_GAME_MIN
+	var real_left := float(mini(slot[3] - slot[2], DayFlow.DAY_SESSION if slot_id == "day" else 9999)) * REAL_SEC_PER_GAME_MIN
 	var minute := float(slot[2])
 	var out := []
 	while real_left > 0.0:

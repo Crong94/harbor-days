@@ -22,8 +22,9 @@ const LIST := {
 
 ## 요리사 (둘째 날부터 늘 주방에 있다. Story sera_arrives)
 ## 걷기 8칸(1·2 앞, 3·4 뒤, 5~8 오른쪽 옆), 반응 3칸(서 있기, 만족 엄지 척, 곤란)
-const COOK := {"id": "sera", "name": "세라", "full": "최세라", "sd_cook": "staff/sera_sd_cook",
-	"sd_walk": "staff/sera_sd_walk", "sd_react": "staff/sera_sd_react"}
+## 세라 시트 v2 (11-19 그림 세션): 4열 2줄 격자, 칸 384x512. 조리 1 올리기 2 뒤집기 3·4 팬 흔들기 5 소금 6 담기 7 내밀기 8 기다리기
+const COOK := {"id": "sera", "name": "세라", "full": "최세라", "sd_cook": "staff/sera_sd_cook_v2",
+	"sd_walk": "staff/sera_sd_walk_v2", "sd_react": "staff/sera_sd_react", "grid": true}
 
 
 static func get_staff(id: String) -> Dictionary:

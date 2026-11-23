@@ -20,7 +20,7 @@ const BAITS := {
 	},
 	"shrimp": {
 		"name": "생새우", "price": 6000, "amount": 8, "wait": 1.0, "icon": "bait-2",
-		"likes": ["gamseongdom", "bolak"],
+		"likes": ["gamseongdom", "bolak", "nongeo"],
 		"desc": "비싸지만 큰 고기가 좋아하는 미끼. 감성돔 꾼들이 쓴다.",
 	},
 	"squid": {

@@ -5,8 +5,8 @@ extends Control
 ## lines 형식: [{"speaker": "순덕", "text": "{shop|이/가}라..."}]
 ## speaker와 text 안의 {player}, {shop|이/가} 같은 템플릿은 GameState.line()으로 바뀐다.
 ## speaker가 비어 있으면 지문(설명)으로 보고 이름표 없이 조금 흐린 글자로 보여 준다.
-## 말하는 사람의 얼굴 일러스트(Portraits)가 있으면 대사창 오른쪽 위에 띄운다. "face": "smile" / "sad"로 표정을 고른다.
-## 화면에 그 사람이 이미 크게 서 있는 장면은 on_stage에 그 사람 id를 넣는다 (전부 끄려면 show_portraits = false).
+## 말하는 사람의 얼굴 일러스트(Portraits)가 있으면 화면 오른쪽 아래(대사창 오른쪽 위에 걸쳐) 띄운다. "face": "smile" / "sad"로 표정을 고른다.
+## 모든 대화는 SD나 전신 그림 대신 이 일러스트로 말하는 사람을 보여 준다 (사용자 11-23). 전부 끄려면 show_portraits = false
 
 signal finished
 
@@ -17,8 +17,6 @@ const HEIGHT := 230.0
 const PORTRAIT := 330.0 # 얼굴 그림 크기 (정사각형 안에 맞춘다)
 
 var show_portraits := true
-## 화면에 이미 크게 서 있는 사람 (얼굴 그림 id). 이 사람이 말할 때는 얼굴을 띄우지 않는다
-var on_stage: Array = []
 
 var _lines: Array = []
 var _index := -1
@@ -108,7 +106,8 @@ func _advance() -> void:
 	UiKit.set_name_label(_name_tag, speaker)
 	_name_tag.reset_size()
 	_name_tag.visible = not speaker.is_empty()
-	_show_portrait(str(line.get("speaker", "")), str(line.get("face", "normal")))
+	# "who": 이름표와 다른 사람 그림을 쓸 때 (예: 소개 전이라 "???"로 나오는 만수, "젊은 여자"로 나오는 세라)
+	_show_portrait(str(line.get("who", line.get("speaker", ""))), str(line.get("face", "normal")))
 	_text.text = GameState.line(line.get("text", ""))
 	# 지문은 흐리게, 대사는 밝게
 	_text.add_theme_color_override("font_color", UiKit.FOAM if not speaker.is_empty() else UiKit.FOAM_SOFT)
@@ -121,7 +120,7 @@ func _advance() -> void:
 
 ## 말하는 사람 얼굴을 보여 준다. 같은 사람이 이어 말하면 그림만 바꾸고, 사람이 바뀌면 살짝 떠오르게
 func _show_portrait(speaker: String, face: String) -> void:
-	var p := Portraits.path(speaker, face) if show_portraits and not Portraits.SPEAKERS.get(speaker, "") in on_stage else ""
+	var p := Portraits.path(speaker, face) if show_portraits else ""
 	if p.is_empty():
 		_portrait.hide()
 		_portrait_path = ""

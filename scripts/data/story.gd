@@ -12,7 +12,7 @@ extends RefCounted
 
 const EVENTS := [
 	{
-		"id": "mansu_mend", "note": "방파제 노인은 박만수 할아버지였다. 견제하는 법을 배웠다.", "place": "breakwater", "day": 2, "needs": ["first_guest_done"], "time": [5 * 60, 11 * 60],
+		"id": "mansu_mend", "note": "방파제 노인은 박만수 할아버지였다. 견제하는 법을 배웠다.", "place": "breakwater", "day": 2, "needs": ["first_guest_done"], "time": [6 * 60, 12 * 60],
 		"set": ["met_mansu"],
 		"lines": [
 			{"speaker": "", "text": "방파제 끝에 어제 그 노인이 또 앉아 있다. 오늘은 혼자 막걸리 한 병을 옆에 두었다."},
@@ -64,7 +64,7 @@ const EVENTS := [
 		],
 	},
 	{
-		"id": "mansu_tide", "note": "만수 할아버지한테 물때를 배웠다. 감성돔 한 마리 올리면 갯바위에 데려가 준단다.", "place": "breakwater", "day": 5, "needs": ["met_mansu"], "time": [5 * 60, 11 * 60],
+		"id": "mansu_tide", "note": "만수 할아버지한테 물때를 배웠다. 감성돔 한 마리 올리면 갯바위에 데려가 준단다.", "place": "breakwater", "day": 5, "needs": ["met_mansu"], "time": [6 * 60, 12 * 60],
 		"set": ["learned_tide_talk"],
 		"lines": [
 			{"speaker": "박만수", "text": "니 물때 볼 줄 아나."},
@@ -185,21 +185,90 @@ const EVENTS := [
 			{"speaker": "", "text": "복자 할머니의 생선튀김 비법을 배웠어요. 이제 가게에서 생선튀김도 팔 수 있어요."},
 		],
 	},
+	{
+		"id": "mansu_rocks", "note": "감성돔을 올렸더니 만수 할아버지가 검은여 갯바위 가는 길을 알려 줬다.", "place": "breakwater", "day": 2, "needs": ["learned_tide_talk", "caught_gamseongdom"],
+		"set": ["learned_tide"],
+		"lines": [
+			{"speaker": "", "text": "방파제 끝에서 만수 할아버지가 일어나 바지를 턴다."},
+			{"speaker": "박만수", "text": "감성돔 올렸다매. 용팔이가 온 동네에 떠들고 다니더라."},
+			{"speaker": "{player}", "face": "smile", "text": "운이 좋았어요. 손이 아직도 얼얼해요."},
+			{"speaker": "박만수", "face": "smile", "text": "운도 실력이다. 약속은 약속이니 검은여 가는 길 알려 주꾸마."},
+			{"speaker": "박만수", "text": "물은 하루 두 번 빠진다. 날마다 한 시간 가까이씩 늦어지고. 빠진 앞뒤 한 시간 반만 들어가라."},
+			{"speaker": "박만수", "face": "sad", "text": "물 들어오는 거 보이믄 고기 물고 있어도 바로 나와라. 바다는 기다려 주지 않는다."},
+			{"speaker": "", "text": "검은여 갯바위가 열렸어요. 지도에서 갯바위를 누르면 오늘 물 빠지는 시간이 나와요. 우럭과 감성돔이 잘 나와요."},
+		],
+	},
+	{
+		"id": "taesik_first", "note": "이장 정태식 아저씨를 만났다. 마을회관 게시판에 붙은 의뢰를 들어주면 된다.", "place": "store", "day": 9, "needs": ["first_guest_done"], "time": [9 * 60, 19 * 60],
+		"set": ["hall_open", "met_taesik"],
+		"lines": [
+			{"speaker": "", "text": "경자상회 평상에 양복 조끼를 입은 아저씨가 서류 봉투를 끼고 앉아 있다."},
+			{"speaker": "문경자", "text": "마침 잘 왔다. 이장 양반이 니 찾더라."},
+			{"speaker": "정태식", "text": "아이고 반갑습니다. 이장 정태식입니다. 인사가 늦었지요. {shop} 사장님 맞으시죠?"},
+			{"speaker": "{player}", "face": "smile", "text": "네. {player|이에요/예요}. 잘 부탁드려요."},
+			{"speaker": "정태식", "text": "다름이 아니라 회관 게시판에 마을 부탁을 붙여 두거든요. 근데 요새는 들어줄 젊은 사람이 없어서 종이만 누렇게 바래요."},
+			{"speaker": "정태식", "face": "smile", "text": "생선이든 채소든 회관에 맡겨 주시면 제가 전해 드릴게요. 사례도 섭섭지 않게 하고요."},
+			{"speaker": "", "text": "마을회관이 열렸어요. 게시판 의뢰는 붙은 날부터 사흘 동안 남아요."},
+		],
+	},
+	# ── 갯벌, 앱 만들기 (11-19): 새로 할 거리는 마을 사람이 먼저 말을 꺼낸다 ──
+	{
+		"id": "bokja_flat", "note": "복자 사장님이 물 빠지면 아래 갯벌에서 바지락을 캐 보라고 했다.", "place": "diner", "day": 5, "needs": ["met_bokja"], "time": [9 * 60, 18 * 60],
+		"set": ["flat_open"],
+		"lines": [
+			{"speaker": "", "text": "밥집 앞 고무 대야에 바지락이 가득하다. 복자가 소금물을 붓고 있다."},
+			{"speaker": "{player}", "text": "이거 다 어디서 났어요?"},
+			{"speaker": "김복자", "text": "어디긴. 해변 아래 갯벌이지. 물 빠지믄 호미 하나로 한 바가지다."},
+			{"speaker": "김복자", "face": "smile", "text": "니 고기만 잡지 말고 갯벌도 가 봐라. 숨구멍 뽕뽕 난 데를 파믄 나온다."},
+			{"speaker": "김복자", "text": "물 들어오기 시작하믄 미련 두지 말고 나오고."},
+			{"speaker": "", "text": "갯벌이 열렸어요. 낮에 물이 빠졌을 때만 들어가요. 지도에서 갯벌을 누르면 오늘 물 빠지는 시간이 나와요."},
+		],
+	},
+	{
+		"id": "junho_app_ask", "note": "준호가 가게를 접을까 고민 중이다. 조황 페이지를 만들어 주기로 했다.", "place": "tackle", "day": 6, "needs": ["met_junho", "first_guest_done"],
+		"set": ["app_junho"],
+		"lines": [
+			{"speaker": "", "text": "낚시방 계산대에 준호가 턱을 괴고 앉아 있다. 오늘은 기어비 얘기를 안 한다."},
+			{"speaker": "이준호", "face": "sad", "text": "형. 이번 달도 손님이 열 명이 안 돼요. 그냥 접고 도시 가야 하나 봐요."},
+			{"speaker": "{player}", "text": "다들 여기 낚시방이 있는 줄도 모르는 거 아니야?"},
+			{"speaker": "이준호", "face": "sad", "text": "그러니까요. 요즘은 다 휴대폰으로 조황 보고 예약하고 오잖아요."},
+			{"speaker": "{player}", "face": "smile", "text": "그거 내가 해 줄 수 있어. 서울에서 하던 일이 그거였거든."},
+			{"speaker": "이준호", "face": "smile", "text": "진짜요? 형 개발자였어요?"},
+			{"speaker": "", "text": "낚시방에서 하루 한 단계씩 앱을 만들어 줄 수 있어요. 한 번에 두 시간 걸려요."},
+		],
+	},
+	{
+		"id": "kyungja_ledger_ask", "note": "경자 할머니 외상장부를 컴퓨터로 옮겨 드리기로 했다.", "place": "store", "day": 10, "needs": ["met_kyungja", "ev_kyungja_store"],
+		"set": ["app_kyungja"],
+		"lines": [
+			{"speaker": "", "text": "경자상회 서랍이 다 열려 있다. 할머니가 돋보기를 쓰고 누런 장부를 넘긴다."},
+			{"speaker": "문경자", "face": "sad", "text": "이 집 외상이 얼마였는지 내가 못 읽겠다. 글씨가 다 날아갔어."},
+			{"speaker": "{player}", "text": "할머니, 그거 제가 사진 찍어서 컴퓨터에 옮겨 드릴까요?"},
+			{"speaker": "문경자", "text": "그런 것도 되나? 되믄 해 봐라. 공짜로는 안 시킨다."},
+			{"speaker": "", "text": "경자상회에서 하루 한 단계씩 장부를 옮길 수 있어요."},
+		],
+	},
+	{
+		"id": "taesik_excel_ask", "note": "이장님 엑셀 파일을 정리하고 마을 게시판 앱을 만들어 드리기로 했다.", "place": "hall", "day": 12, "needs": ["met_taesik"],
+		"set": ["app_taesik"],
+		"lines": [
+			{"speaker": "", "text": "회관 컴퓨터 앞에서 이장이 한숨을 쉰다. 화면에 칸이 다 어긋난 표가 떠 있다."},
+			{"speaker": "정태식", "face": "sad", "text": "군청에 낼 서류인데 이게 왜 이렇게 되는지 모르겠어요."},
+			{"speaker": "{player}", "text": "보여 주세요. 이 정도면 금방 고쳐요."},
+			{"speaker": "정태식", "face": "smile", "text": "사장님이 그런 것도 하세요? 그럼 게시판도 종이 말고 휴대폰으로 볼 수 있게 될까요?"},
+			{"speaker": "", "text": "마을회관에서 하루 한 단계씩 앱을 만들 수 있어요. 다 만들면 게시판 의뢰 사례가 늘어요."},
+		],
+	},
 ]
 
-## 요리사 최세라가 처음 오는 날 (2026-11-16 사용자: 주인공은 낚시와 서빙, 요리는 다른 인물이 전담).
-## 순덕 할머니의 손녀. 부산 횟집 주방에서 오 년을 버티다 그만두고 할머니 집에 내려와 있다.
-## 첫날 순덕이 손녀 얘기를 꺼내고(first_guest), 처음 가게 문을 여는 저녁에 이 대화가 나온다 (service). 끝나면 flags sera_joined
-const SERA_ARRIVES := [
-	{"speaker": "", "text": "문을 열자마자 누가 먼저 들어왔다. 빨간 고글을 머리에 얹은 젊은 여자가 앞치마를 어깨에 걸치고 있다."},
-	{"speaker": "최세라", "text": "여기가 {shop}죠? 할머니가 가 보라고 해서요."},
-	{"speaker": "{player}", "face": "smile", "text": "아, 순덕 할머니 손녀분! 말씀은 들었어요."},
-	{"speaker": "최세라", "text": "최세라예요. 부산 횟집 주방에서 오 년 일했어요. 그만두고 할머니 집에서 놀고 있었고요."},
-	{"speaker": "최세라", "face": "sad", "text": "어제 할머니가 그러더라고요. 서울 총각이 생선을 구웠는데 간이 영 아니라고."},
-	{"speaker": "{player}", "face": "sad", "text": "그 얘기가 벌써 거기까지 갔어요?"},
-	{"speaker": "최세라", "face": "smile", "text": "그래서 왔어요. 사장님은 고기 잡아 오고 손님 받아요. 불 앞은 제가 볼게요."},
-	{"speaker": "{player}", "text": "월급을 드릴 형편이 아직 아닌데요."},
-	{"speaker": "최세라", "text": "알아요. 장사 되면 그때 줘요. 저도 바다 보면서 불 앞에 서 보고 싶었어요."},
+## 세라와 처음 여는 저녁 장사 (2026-11-19 사용자: 주인공은 요리에 소질이 없고, 세라와 마음이 맞아 식당을 같이 한다).
+## 세라는 순덕 할머니 손녀. 부산 횟집 주방에서 오 년 일하고 내려왔다. 첫날 아침 주인공이 볼락을 태울 때 할머니와 들어와 대신 구웠다(first_guest).
+## 처음 저녁 장사를 여는 날 이 대화가 나온다 (service). 끝나면 flags sera_first_shift
+const SERA_FIRST_SHIFT := [
+	{"speaker": "", "text": "세라가 앞치마 끈을 질끈 묶고 화구에 불을 올린다."},
+	{"speaker": "최세라", "face": "smile", "text": "첫 저녁 장사네요. 긴장돼요?"},
+	{"speaker": "{player}", "face": "smile", "text": "솔직히 좀요. 그래도 세라 씨가 있으니까."},
+	{"speaker": "최세라", "text": "사장님은 손님 얼굴만 봐요. 굽는 건 제가 할게요."},
 	{"speaker": "", "text": "세라는 늘 조리대 뒤에서 생선을 굽는다. 다 구운 접시가 조리대 끝에 나오면 눌러서 손님에게 갖다줘요."},
 	{"speaker": "", "text": "접시가 세 개 넘게 쌓이면 세라가 다음 생선을 못 내려서 타요. 얼른 날라요."},
 ]

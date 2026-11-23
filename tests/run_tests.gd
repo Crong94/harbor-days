@@ -47,6 +47,15 @@ func _init() -> void:
 	_test_seated()
 	_test_decor_shop()
 	_test_sundeok_art()
+	_test_bus()
+	_test_board()
+	_test_quests()
+	_test_kits()
+	_test_service_plan()
+	_test_tide_times()
+	_test_special_guest()
+	_test_shop4()
+	_test_spots()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -409,8 +418,11 @@ func _test_fun() -> void:
 
 	# 어종: 학공치는 먼 물, 볼락은 가까운 물. 미끼를 좋아하면 잘 나온다
 	var near := FishDB.weight_of("hakgongchi", {"brightness": 1.0, "depth": 0.05})
-	var far := FishDB.weight_of("hakgongchi", {"brightness": 1.0, "depth": 0.95})
-	_eq(far > near * 3.0, true, "학공치는 먼 물")
+	var mid := FishDB.weight_of("hakgongchi", {"brightness": 1.0, "depth": 0.5})
+	_eq(mid > near and near > mid * 0.4, true, "학공치는 방파제 앞 표층에 떼로 몰려온다 (발밑에도 나옴)")
+	for id in FishDB.FISH:
+		var fd: Dictionary = FishDB.FISH[id]
+		_eq(fd.min_cm < fd.max_cm and fd.max_cm <= {"bolak": 36.0, "mangsang": 30.0, "noraemi": 33.0, "ssombaengi": 36.0, "ureok": 65.0, "hakgongchi": 40.0, "gamseongdom": 60.0, "nongeo": 102.0}.get(id, 100.0), true, "%s 크기가 실제 최대 전장 안" % id)
 	_eq(FishDB.weight_of("bolak", {"brightness": 0.0, "depth": 0.1}) > FishDB.weight_of("bolak", {"brightness": 0.0, "depth": 0.9}), true, "볼락은 가까운 물")
 	_eq(FishDB.weight_of("ureok", {"bait": "worm"}) > FishDB.weight_of("ureok", {"bait": "krill"}), true, "우럭은 청갯지렁이를 좋아함")
 	_eq(FishDB.weight_of("gamseongdom", {"rare_boost": 2.0}) > FishDB.weight_of("gamseongdom", {}), true, "물 오름은 희귀 어종을 늘림")
@@ -448,6 +460,7 @@ func _test_sea_day() -> void:
 	_eq(Orders.matches(o, o.fish, o.min_cm - 1.0), false, "너무 작으면 안 받음")
 
 	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.flags = {"met_sundeok": true, "met_mansu": true, "met_junho": true, "met_kyungja": true, "met_bokja": true, "met_yongpal": true, "met_taesik": true}.duplicate()
 	gs.day = 3
 	gs.money = 0
 	var got := 0
@@ -489,7 +502,8 @@ func _test_locations() -> void:
 	_eq(Locations.travel_minutes("shop", "breakwater") > Locations.travel_minutes("shop", "tackle"), true, "방파제는 옆 가게보다 멀다")
 	_eq(Locations.is_visible("cave", {}), false, "숨은 장소는 열리기 전에 안 보임")
 	_eq(Locations.is_visible("cave", {"found_sea_cave": true}), true, "찾으면 숨은 장소가 보임")
-	_eq(Locations.is_visible("rocks", {}), true, "잠긴 보통 장소는 점으로 보임")
+	_eq(Locations.is_visible("rocks", {}), false, "잠긴 보통 장소도 지도에 안 보임 (점 없음)")
+	_eq(Locations.is_visible("rocks", {"learned_tide": true}), true, "열리면 보임")
 	_eq(Locations.travel_minutes("shop", "breakwater"), Locations.travel_minutes("breakwater", "shop"), "이동 시간 대칭")
 	_eq(Locations.travel_minutes("shop", "breakwater") % 5, 0, "5분 단위")
 	_eq(Locations.travel_minutes("shop", "island") > Locations.travel_minutes("shop", "rocks"), true, "섬은 배 시간 추가")
@@ -740,25 +754,29 @@ func _test_header() -> void:
 
 
 func _test_day_flow() -> void:
-	# 시간대: 새벽 05~07, 아침 07~11, 밤 21~23:30
-	_eq(DayFlow.fishing_slot(5 * 60).get("id", ""), "dawn", "05:00 새벽 낚시")
-	_eq(DayFlow.fishing_slot(7 * 60).get("id", ""), "morning", "07:00 아침 낚시")
-	_eq(DayFlow.can_fish(12 * 60), false, "한낮엔 낚시 못 함")
-	_eq(DayFlow.can_fish(19 * 60), false, "영업 시간엔 낚시 못 함")
+	# 시간대 (11-19 저녁): 낮 낚시 06~17시 사이 하루 한 번 세 시간, 밤 21~23:30
+	_eq(DayFlow.FISHING_SLOTS.size(), 2, "낚시 시간대는 낮과 밤 두 개")
+	_eq(DayFlow.fishing_slot(6 * 60).get("id", ""), "day", "06:00 낮 낚시")
+	_eq(DayFlow.can_fish(13 * 60), true, "한낮에도 낚시")
+	_eq(DayFlow.can_fish(13 * 60, true), false, "낮 낚시는 하루 한 번")
+	_eq(DayFlow.can_fish(22 * 60, true), true, "밤 낚시는 따로")
+	_eq(DayFlow.can_fish(17 * 60), false, "17시부터는 영업 준비")
+	_eq(DayFlow.can_fish(5 * 60), false, "새벽 5시는 아직")
 	_eq(DayFlow.fishing_slot(22 * 60).get("id", ""), "night", "22:00 밤 낚시")
-	_eq(DayFlow.fishing_end(6 * 60), 7 * 60, "새벽 낚시는 7시에 끝")
-	_eq(DayFlow.fishing_end(9 * 60), 11 * 60, "아침 낚시는 11시에 끝")
+	_eq(DayFlow.fishing_end(6 * 60), 9 * 60, "낮 낚시는 세 시간")
+	_eq(DayFlow.fishing_end(15 * 60), 17 * 60, "늦게 가면 17시에 끝")
+	_eq(DayFlow.fishing_end(22 * 60), 23 * 60 + 30, "밤 낚시는 23:30까지")
 	# 밤 낚시하면 늦잠
-	_eq(DayFlow.wake_time(false), 5 * 60, "보통은 새벽 5시 기상")
-	_eq(DayFlow.wake_time(true), 7 * 60, "밤 낚시 뒤엔 7시 기상 (새벽 건너뜀)")
+	_eq(DayFlow.wake_time(false), 6 * 60, "보통은 아침 6시 기상")
+	_eq(DayFlow.wake_time(true), 8 * 60, "밤 낚시 뒤엔 8시 기상")
 	var gs = load("res://scripts/autoload/game_state.gd").new()
 	gs.night_fished = true
 	gs.opened_today = true
 	gs.end_day()
-	_eq(gs.time_minutes, 7 * 60, "end_day: 밤 낚시 다음 날 늦잠")
+	_eq(gs.time_minutes, 8 * 60, "end_day: 밤 낚시 다음 날 늦잠")
 	_eq(gs.night_fished or gs.opened_today, false, "end_day: 하루 표시 초기화")
 	gs.end_day()
-	_eq(gs.time_minutes, 5 * 60, "end_day: 그다음 날은 새벽 5시")
+	_eq(gs.time_minutes, 6 * 60, "end_day: 그다음 날은 아침 6시")
 	gs.free()
 	# 가게
 	_eq(DayFlow.can_open_shop(12 * 60, false), true, "낮에도 가게 열기(18시로 건너뜀)")
@@ -791,8 +809,9 @@ func _test_day_flow() -> void:
 	_eq(DayFlow.special_guest(1).is_empty(), true, "첫날 특별 손님 없음")
 	_eq(DayFlow.special_guest(2).get("name", ""), Orders.of(2).customer, "특별 손님은 주문서 낸 사람")
 	# 안내
-	_eq(DayFlow.next_hint(5 * 60, false).contains("새벽 낚시"), true, "새벽 안내")
-	_eq(DayFlow.next_hint(13 * 60, false).contains("저녁 6시"), true, "낮 안내: 가게 여는 시각")
+	_eq(DayFlow.next_hint(7 * 60, false).contains("낮 낚시"), true, "아침 안내: 낮 낚시 한 번")
+	_eq(DayFlow.next_hint(13 * 60, false, true).contains("저녁 6시"), true, "낮 낚시를 했으면: 가게 여는 시각")
+	_eq(DayFlow.next_hint(13 * 60, false, true).contains("마을"), true, "낮 안내: 마을 일")
 	_eq(DayFlow.next_hint(21 * 60 + 30, true).contains("늦잠"), true, "밤 낚시 안내")
 
 
@@ -1005,6 +1024,7 @@ func _test_icebox() -> void:
 	# 주문을 다 채우면 그 생선을 보낸다 (저녁에 또 팔지 않게)
 	var o := Orders.of(3)
 	var g2 = load("res://scripts/autoload/game_state.gd").new()
+	g2.flags = {"met_sundeok": true, "met_mansu": true, "met_junho": true, "met_kyungja": true, "met_bokja": true, "met_yongpal": true, "met_taesik": true}.duplicate()
 	g2.day = 3
 	for i in o.count:
 		g2.store_catch({"id": o.fish, "size": o.min_cm + 1.0 + i})
@@ -1073,10 +1093,10 @@ func _test_brief() -> void:
 	_eq(b.stats[0].value, "42,000원", "맨 위 어제 번 돈")
 	_eq(b.stats[2].name, "고정비 D-1", "다음 달 고정비")
 	var names: Array = b.sections.map(func(s): return s.name)
-	_eq(names, ["지금 할 일", "오늘 주문", "오늘의 바다", "아침 소식"], "서랍 분류")
+	_eq(names, ["지금 할 일", "메인 이야기", "오늘의 바다", "아침 소식"], "서랍 분류 (만난 사람이 없으면 오늘 부탁 없음)")
 	var todo: Array = b.sections[0].rows
-	_eq(todo[0].target, "breakwater", "새벽 6시엔 먼저 낚시")
-	_eq(todo[0].state, "~7:00", "낚시 끝 시각")
+	_eq(todo[0].target, "breakwater", "아침 6시엔 먼저 낚시")
+	_eq(todo[0].state, "~17:00", "낮 낚시 마감 시각")
 	_eq(todo.any(func(r): return r.target == "market"), true, "시장 열려 있으면 팔기")
 	_eq(todo.any(func(r): return r.target == "shop"), true, "저녁 장사")
 	_eq(todo.any(func(r): return r.target == "home"), false, "아침엔 자러 가지 않음")
@@ -1177,8 +1197,8 @@ func _test_story() -> void:
 	# 해솔: 복자를 만난 뒤 엿새째 오후 밥집에서 처음 만나고, 분교가 열리고, 지도에 걷기 시작한다
 	var hf := {"met_bokja": true, "ev_bokja_diner": true}
 	_eq(Story.pending("diner", 6, 15 * 60, {}).get("id", ""), "bokja_diner", "복자를 먼저 만남")
-	_eq(Story.pending("diner", 5, 15 * 60, hf).is_empty(), true, "닷새째엔 해솔 없음")
-	_eq(Story.pending("diner", 6, 10 * 60, hf).is_empty(), true, "오전엔 학교 가서 없음")
+	_eq(Story.pending("diner", 5, 15 * 60, hf).get("id", ""), "bokja_flat", "닷새째엔 해솔 대신 복자가 갯벌 얘기")
+	_eq(Story.pending("diner", 6, 10 * 60, hf).get("id", "") != "haesol_first", true, "오전엔 학교 가서 없음")
 	_eq(Story.pending("diner", 6, 15 * 60, hf).get("id", ""), "haesol_first", "엿새째 오후 밥집에서 해솔")
 	_eq(Locations.is_unlocked("school", hf), false, "만나기 전엔 분교 잠김")
 	_eq(Walkers.active(15 * 60, hf).any(func(w): return w.id == "haesol"), false, "만나기 전엔 지도에 없음")
@@ -1274,9 +1294,64 @@ func _test_fishing_depth() -> void:
 	_eq(FishDB.top_at(night, 0.1), "bolak", "어두운 발밑은 볼락")
 	_eq(FishDB.top_at(day, 0.95) != "bolak", true, "밝은 먼 물은 볼락이 아님 (%s)" % FishDB.top_at(day, 0.95))
 	# 어종 버릇
-	for id in ["noraemi", "ureok", "hakgongchi", "gamseongdom"]:
+	for id in FishDB.FISH:
 		_eq(FishDB.habit_text(id).is_empty(), false, "%s 버릇 설명" % id)
-	_eq(FishDB.habit_text("bolak"), "", "볼락은 버릇 없음")
+	_eq(FishDB.get_fish("bolak").beat > FishDB.get_fish("mangsang").beat, true, "볼락 박자가 망상어보다 잘다")
+	# 박자: 볼락은 같은 시간에 망상어보다 박자가 더 많이 돈다
+	var beats := {}
+	for id in ["bolak", "mangsang"]:
+		var bl := _new_logic(90)
+		bl.forgiving = false
+		bl.force_first_fish = id
+		_cast(bl)
+		_run_until(bl, [S.BITE], func(_x): return false, 20.0)
+		bl.press()
+		for i in 180:
+			if bl.state == S.REELING:
+				bl.update(1.0 / 60.0, bl.tension < 0.5)
+		beats[id] = bl.beat_ticks
+	_eq(beats.bolak > beats.mangsang, true, "볼락 박자 %d > 망상어 %d" % [beats.bolak, beats.mangsang])
+	# 쏨뱅이: 발밑에 오면 지쳤어도 한 번 바위틈으로 처박는다
+	var sb := _new_logic(91)
+	sb.forgiving = false
+	sb.force_first_fish = "ssombaengi"
+	_cast(sb)
+	_run_until(sb, [S.BITE], func(_x): return false, 20.0)
+	sb.press()
+	sb.fish_hp = 0.0
+	sb.update(1.0 / 60.0, true)
+	_eq(sb.exhausted, true, "쏨뱅이 지침")
+	sb.distance = FishingLogic.HOLE_AT - 0.01
+	sb.update(1.0 / 60.0, true)
+	_eq(sb.hole_dived and not sb.exhausted and sb.run_dir != 0, true, "쏨뱅이 발밑 처박기")
+	var runs := sb.run_count
+	sb.run_dir = 0
+	sb.update(1.0 / 60.0, true)
+	_eq(sb.run_count, runs, "처박기는 한 번만")
+	# 망상어: 거의 늘 같은 쪽으로 차고 나간다
+	var same := 0
+	var total := 0
+	for sd in 6:
+		var m := _new_logic(120 + sd)
+		m.forgiving = false
+		m.force_first_fish = "mangsang"
+		_cast(m)
+		_run_until(m, [S.BITE], func(_x): return false, 20.0)
+		m.press()
+		var prev := 0
+		var last_count := 0
+		for i in 1200:
+			if m.state != S.REELING:
+				break
+			m.update(1.0 / 60.0, m.tension < 0.5)
+			if m.run_count != last_count and m.run_dir != 0:
+				if prev != 0:
+					total += 1
+					if m.run_dir == prev:
+						same += 1
+				prev = m.run_dir
+				last_count = m.run_count
+	_eq(total > 0 and same * 10 >= total * 6, true, "망상어는 같은 쪽으로 (%d/%d)" % [same, total])
 	# 우럭은 물자마자 파고든다
 	var u := _new_logic(44)
 	u.forgiving = false
@@ -1288,25 +1363,102 @@ func _test_fishing_depth() -> void:
 	for i in 30:
 		u.update(1.0 / 60.0, true)
 	_eq(u.run_count >= 1, true, "우럭은 물자마자 차고 나감")
-	# 학공치는 바늘털이를 한다. 손을 떼고 있으면 빠진다
+	# 학공치는 가볍고 바늘털이를 하지 않는다 (실제 습성)
 	var jumped := 0
-	var lost_by_jump := 0
-	for sd in 12:
+	for sd in 6:
 		var h := _new_logic(60 + sd)
-		h.forgiving = false
 		h.force_first_fish = "hakgongchi"
 		_cast(h)
 		_run_until(h, [S.BITE], func(_x): return false, 20.0)
 		h.press()
 		var t := 0.0
 		while h.state == S.REELING and t < 20.0:
-			h.update(1.0 / 60.0, h.jump_t <= 0.0 and h.tension < 0.6)
+			h.update(1.0 / 60.0, h.tension < 0.6)
 			t += 1.0 / 60.0
 		jumped += h.jumps
-		if h.fail_reason == "jumped":
-			lost_by_jump += 1
-	_eq(jumped > 0, true, "학공치 바늘털이 (%d번)" % jumped)
-	_eq(lost_by_jump > 0, true, "바늘털이 때 손을 떼면 놓침 (%d번)" % lost_by_jump)
+	_eq(jumped, 0, "학공치는 바늘털이를 안 함")
+	# 농어는 바늘털이를 한다. 뛰는 동안 손을 떼고 있으면 빠진다
+	var nj := 0
+	var nlost := 0
+	for sd in 12:
+		var hn := _new_logic(90 + sd)
+		hn.forgiving = false
+		hn.force_first_fish = "nongeo"
+		_cast(hn)
+		_run_until(hn, [S.BITE], func(_x): return false, 20.0)
+		hn.press()
+		var tn := 0.0
+		while hn.state == S.REELING and tn < 25.0:
+			hn.update(1.0 / 60.0, hn.jump_t <= 0.0 and hn.tension < 0.6)
+			tn += 1.0 / 60.0
+		nj += hn.jumps
+		if hn.fail_reason == "jumped":
+			nlost += 1
+	_eq(nj > 0, true, "농어 바늘털이 (%d번)" % nj)
+	_eq(nlost > 0, true, "바늘털이 때 손을 떼면 놓침 (%d번)" % nlost)
+	_eq(FishDB.must_release("nongeo", 30.0), true, "농어 30cm 이하는 놓아줌")
+	_eq(FishDB.season_mult("nongeo", 1) < FishDB.season_mult("nongeo", 6), true, "농어는 겨울보다 여름")
+	_eq(FishDB.FISH.hakgongchi.strength < FishDB.FISH.bolak.strength, true, "학공치는 볼락보다 힘이 약함")
+	# 철: 학공치는 겨울 고기라 여름엔 거의 없다. 여름에도 노래미는 남는다
+	_eq(FishDB.weight_of("hakgongchi", {"month": 1}) > FishDB.weight_of("hakgongchi", {"month": 7}) * 10.0, true, "학공치는 겨울에 많고 여름엔 거의 없음")
+	_eq(FishDB.season_mult("noraemi", 7) >= 0.3, true, "여름에도 노래미는 나옴")
+	_eq(FishDB.weight_of("bolak", {}) == FishDB.weight_of("bolak", {"month": 0}), true, "달을 안 주면 철을 안 따짐")
+	_eq(DexInfo.season_text([1, 2, 3, 11, 12]), "11월~3월", "제철 구간 (해를 넘김)")
+	_eq(DexInfo.season_text([3, 4, 5, 10, 11]), "3월~5월, 10월~11월", "제철 구간 둘")
+	_eq(DexInfo.season_text(range(1, 13)), "사계절", "사계절")
+	var summer_hak := 0
+	for dd in range(120, 200):
+		if Orders.of(dd).get("fish", "") == "hakgongchi" and Calendar.date(dd).month in [6, 7, 8]:
+			summer_hak += 1
+		for po in Board.posted_on(dd):
+			if po.get("item", "") == "hakgongchi" and Calendar.date(dd).month in [6, 7, 8]:
+				summer_hak += 1
+	_eq(summer_hak, 0, "여름엔 학공치 주문과 의뢰가 없음")
+	# 통발에 든 작은 고기는 아이스박스에 넣지 않고 놓아준다
+	var gs_trap = load("res://scripts/autoload/game_state.gd").new()
+	gs_trap.trap_fish = [{"id": "bolak", "size": 13.0, "day": 3}, {"id": "bolak", "size": 20.0, "day": 3}]
+	var hauled: Array = gs_trap.haul_traps()
+	_eq(gs_trap.inventory.size(), 1, "통발 작은 볼락은 놓아줌")
+	_eq(hauled[0].get("released", false), true, "놓아준 통발 고기 표시")
+	_eq(gs_trap.reputation, 1, "놓아주면 평판 +1")
+	_eq(gs_trap.flags.get("first_release", false), true, "처음 놓아준 날 일지")
+	for k in 5:
+		var rel := {"id": "mangsang", "size": 14.0, "released": true}
+		gs_trap.caught_today.append(rel)
+		gs_trap.reward_release(rel)
+	_eq(gs_trap.reputation, GameState.RELEASE_REP_MAX, "놓아주기 평판은 하루 %d까지" % GameState.RELEASE_REP_MAX)
+	gs_trap.free()
+	# 포획금지체장: 이하는 놓아줘야 한다 (수산자원관리법 시행령 별표 2)
+	_eq(FishDB.must_release("bolak", 15.0), true, "볼락 15cm는 놓아줌")
+	_eq(FishDB.must_release("bolak", 15.1), false, "볼락 15.1cm는 가져감")
+	_eq(FishDB.must_release("ureok", 23.0), true, "우럭 23cm는 놓아줌")
+	_eq(FishDB.must_release("gamseongdom", 24.0), true, "감성돔 24cm는 놓아줌")
+	_eq(FishDB.must_release("hakgongchi", 15.0), false, "학공치는 금지체장 없음")
+	# 망상어는 보통 먹지 않는 고기: 싸고, 주문과 의뢰, 선물로 찾지 않는다
+	_eq(FishDB.is_bycatch("mangsang"), true, "망상어는 잡어")
+	_eq(FishDB.value_of("mangsang", 25.0) < FishDB.value_of("bolak", 15.5), true, "큰 망상어도 작은 볼락보다 쌈")
+	var mang_ask := 0
+	for dd in range(2, 120):
+		if Orders.of(dd).get("fish", "") == "mangsang":
+			mang_ask += 1
+		for po in Board.posted_on(dd):
+			if po.get("item", "") == "mangsang":
+				mang_ask += 1
+	_eq(mang_ask, 0, "망상어 주문과 의뢰는 없음")
+	var dl_m := DiningLogic.new()
+	dl_m.inventory = [{"id": "mangsang", "size": 22.0}, {"id": "bolak", "size": 16.0}]
+	_eq(dl_m.pick_fish(), 1, "손님상엔 볼락부터")
+	dl_m.inventory = [{"id": "mangsang", "size": 22.0}]
+	_eq(dl_m.pick_fish(), 0, "망상어도 굳이 내려면 낼 수 있음")
+	for who_f in Friends.PEOPLE:
+		_eq("fish:mangsang" in Friends.person(who_f).get("like", []) + Friends.person(who_f).get("love", []), false, "%s는 망상어 선물을 반기지 않음" % who_f)
+	_eq(Portraits.path("???"), "", "??? 이름표만으로는 그림 없음")
+	_eq(Portraits.path("mansu").is_empty(), false, "그림 id로도 찾음 (who)")
+	_eq(FishDB.legal_text("bolak"), "볼락 15cm 이하는 법으로 놓아줘야 해요", "금지체장 안내")
+	for id in FishDB.FISH:
+		var fo: Dictionary = FishDB.FISH[id]
+		if fo.has("legal_cm"):
+			_eq(snappedf(lerpf(fo.min_cm, fo.max_cm, 0.25), 1.0) > fo.legal_cm, true, "%s 주문 최소 크기는 금지체장보다 큼" % id)
 	# 지친 물고기는 감아도 장력이 오르지 않는다
 	var e := _new_logic(80)
 	e.forgiving = false
@@ -1345,7 +1497,8 @@ func _test_journal() -> void:
 	_eq(gs.journal[0].line, "처음으로 볼락을 잡았다.", "오늘의 한 줄")
 	_eq(gs.notes_today.size(), 0, "다음 날 메모 비움")
 	# 주문을 채우면 메모가 남는다
-	var o := Orders.of(gs.day)
+	gs.flags["met_sundeok"] = true
+	var o: Dictionary = gs.today_order()
 	for i in o.count:
 		gs.offer_to_order(o.fish, o.min_cm + 1.0)
 	_eq(gs.notes_today.size(), 1, "주문 메모")
@@ -1354,7 +1507,7 @@ func _test_journal() -> void:
 	for id in FishDB.FISH:
 		_eq(DexInfo.facts(id).size() >= 5, true, "%s 낚는 요령" % id)
 	_eq(DexInfo.facts("bolak")[1][1], "어두운 새벽과 밤", "볼락은 어두울 때")
-	_eq(DexInfo.facts("hakgongchi")[0][1], "먼 물", "학공치는 먼 물")
+	_eq(DexInfo.facts("hakgongchi")[0][1], "중간", "학공치는 방파제 앞 중간 거리")
 	_eq(DexInfo.facts("ureok").back()[0], "버릇", "우럭 버릇")
 	_eq(Locations.is_unlocked("hall", {"chapter2_done": true}), false, "마을회관은 할 일이 생길 때까지 잠김")
 
@@ -1508,7 +1661,7 @@ func _test_dining() -> void:
 	for i in DiningLogic.SEATS.size():
 		var path := DiningLogic.entry_path(i)
 		_eq(path[path.size() - 1], DiningLogic.SEATS[i], "%d번 자리까지 가는 길 끝은 자리" % i)
-		_eq(path[0], DiningLogic.LANE[4], "%d번 길은 문 앞 길에서 시작" % i)
+		_eq(path[0], DiningLogic.LANE[DiningLogic.ENTRY_LANE], "%d번 길은 문 앞 길에서 시작" % i)
 		_eq(path[path.size() - 2], DiningLogic.SPOTS[i], "%d번 손님은 서빙 자리를 거쳐 앉음" % i)
 	var wk := DiningLogic.new()
 	wk.setup(4, _fish_box(12), names)
@@ -1630,7 +1783,11 @@ func _test_dining() -> void:
 		_eq(DiningLogic.LANE.has(go[0]), true, "%d번 손님에게 갈 때 길로 먼저 감" % i)
 		var back := DiningLogic._path_home(i, DiningLogic.HALL_HOME)
 		_eq(back[back.size() - 1], DiningLogic.HALL_HOME, "%d번 자리에서 홀 자리로 돌아옴" % i)
-		_eq(HallCover.polys_for(i).is_empty(), false, "%d번 자리 가구 덮개" % i)
+		if DiningLogic.SEAT_VIEW[i] == "back":
+			_eq(Shop4.SEAT_STOOL[i] >= 0, true, "%d번 뒷모습 손님은 스툴 덮개가 있음" % i)
+			var st: Array = Shop4.STOOLS[Shop4.SEAT_STOOL[i]]
+			_eq(absf(DiningLogic.SEATS[i].x * DiningLogic.W - float(st[1])) < 1.0, true, "%d번 자리는 그 스툴 가운데" % i)
+		_eq(Shop4.SEAT_KEY[i] > 0.0, true, "%d번 자리 그리는 순서" % i)
 	var kp := DiningLogic._path_to_guest(DiningLogic.COOK_SPOT, 0)
 	_eq(kp[0], DiningLogic.KITCHEN_EXIT, "주방에서 나갈 땐 주방 출구로")
 	# 알바가 서빙을 맡으면 알아서 갖다준다
@@ -1653,7 +1810,7 @@ func _test_dining() -> void:
 func _test_shop_decor() -> void:
 	var decor := {}
 	var owned := []
-	_eq(DiningLogic.SEATS.size(), 16, "손님 자리 16석 (홀 3안)")
+	_eq(DiningLogic.SEATS.size(), 16, "손님 자리 16석 (식당 4안)")
 	var chairs := ShopDecor.slots().filter(func(s): return s.kind == "chair").size()
 	_eq(chairs, 16, "의자 슬롯은 자리마다")
 	_eq(ShopDecor.item_in(decor, "chair_3"), "chair_basic", "안 놓으면 기본 의자")
@@ -1676,14 +1833,31 @@ func _test_shop_decor() -> void:
 	d.seat_bonus = comfort
 	_eq(d.patience_of(0), DiningLogic.PATIENCE + 5.0, "편한 의자 자리는 더 참음")
 	_eq(d.patience_of(99), DiningLogic.PATIENCE, "모르는 자리는 기본")
-	_eq(ShopDecor.item_in(decor, "table"), "", "3안은 바 슬롯 없음 (바탕에 그려짐)")
-	_eq(ShopDecor.slots().filter(func(s): return s.kind == "lamp").size(), 0, "3안은 천장 등이 바탕에 그려져 있음")
+	_eq(ShopDecor.item_in(decor, "table"), "", "4안은 바 슬롯 없음 (Shop4 낱장)")
+	_eq(ShopDecor.slots().filter(func(s): return s.kind == "lamp").size(), 0, "4안은 천장 등을 Shop4가 그림")
 	for sl in ShopDecor.slots():
 		_eq(sl.pos.x >= 0.0 and sl.pos.x <= 1.0 and sl.pos.y >= 0.0 and sl.pos.y <= 1.0, true, "%s 자리는 배경 안" % sl.id)
 	for k in ShopDecor.SHOP_KINDS:
 		_eq(ShopDecor.slots().any(func(s): return s.kind == k), true, "상점 종류 %s는 자리가 있음" % k)
 	for k in ShopDecor.DRAWN_KINDS:
 		_eq(ShopDecor.SHOP_KINDS.has(k), true, "그리는 종류 %s는 상점에 있음" % k)
+	# 4안 자리: 그리는 종류는 모두 순서(key)가 있고, 손님 서빙 자리와 겹치지 않는다
+	for sl in ShopDecor.EXTRA_SLOTS:
+		_eq(sl.has("key"), true, "%s 그리는 순서" % sl.id)
+		var big := ""
+		for id in ShopDecor.items_of(sl.kind):
+			if not ShopDecor.art_of(id).is_empty() and ArtSlot.has_art(ShopDecor.art_of(id)):
+				big = ShopDecor.art_of(id)
+		if big.is_empty():
+			continue
+		var r := ShopDecor.draw_rect(sl, (load(ArtSlot.art_path(big)) as Texture2D).get_size())
+		for i in DiningLogic.SPOTS.size():
+			var sp: Vector2 = DiningLogic.SPOTS[i] * Shop4.SIZE
+			_eq(r.has_point(sp), false, "%s 자리가 %d번 서빙 자리를 막지 않음" % [sl.id, i])
+	var wr := ShopDecor.draw_rect({"kind": "wall", "pos": Vector2(0.5, 0.5)}, Vector2(100, 200))
+	_eq(wr.get_center().y, 0.5 * Shop4.SIZE.y, "벽 장식은 가운데 기준")
+	var pr := ShopDecor.draw_rect({"kind": "plant", "pos": Vector2(0.5, 0.5)}, Vector2(100, 200))
+	_eq([pr.end.y, pr.size.y], [0.5 * Shop4.SIZE.y, 112.0], "화분은 아래 가운데 기준, 높이 112")
 	# 저장된다
 	var gs = load("res://scripts/autoload/game_state.gd").new()
 	_eq(SaveGame.fields(gs).has("shop_decor") and SaveGame.fields(gs).has("owned_decor"), true, "가구는 저장됨")
@@ -1840,7 +2014,7 @@ func _test_staff() -> void:
 	_eq(ArtSlot.has_art(StaffDB.COOK.sd_react), true, "요리사 세라 반응 그림")
 	StaffDB.fire(staff, "yeoul")
 	_eq([StaffDB.is_hired(staff, "yeoul"), StaffDB.wages(staff)], [false, 0], "그만두면 일당도 빠짐")
-	_eq(Story.SERA_ARRIVES.size() > 3, true, "세라가 오는 이야기")
+	_eq(Story.SERA_FIRST_SHIFT.size() > 3, true, "세라와 첫 저녁 장사 이야기")
 	_eq(StaffDB.hire(staff, "없는사람"), false, "없는 알바는 못 뽑음")
 	for id in StaffDB.LIST:
 		_eq(ArtSlot.has_art(StaffDB.LIST[id].art), true, "%s 그림" % id)
@@ -1909,3 +2083,427 @@ func _test_decor_shop() -> void:
 		var art := ShopDecor.art_of(id)
 		if not art.is_empty():
 			_eq(ArtSlot.has_art(art), true, "%s 그림" % id)
+
+
+## 버스와 읍내 장터, 옆마을 손님 (2026-11-18)
+func _test_bus() -> void:
+	_eq(Bus.next_departure(7 * 60), 8 * 60, "아침 7시면 8시 첫차")
+	_eq(Bus.next_departure(8 * 60), 8 * 60, "딱 8시면 그 차를 탄다")
+	_eq(Bus.next_departure(8 * 60 + 1), 11 * 60, "8시를 놓치면 11시")
+	_eq(Bus.next_departure(17 * 60 + 5), -1, "막차 뒤엔 없음")
+	_eq(Bus.returns_after(8 * 60 + Bus.RIDE), [10 * 60, 13 * 60, 16 * 60, 19 * 60], "첫차로 오면 네 대 다 남음")
+	_eq(Bus.returns_after(17 * 60 + Bus.RIDE), [19 * 60], "막차로 오면 돌아갈 버스 하나")
+	for t in Bus.TO_TOWN:
+		_eq(Bus.returns_after(int(t) + Bus.RIDE).is_empty(), false, "읍내에 갇히지 않음 %d" % t)
+	_eq(Bus.TO_VILLAGE[-1] + Bus.RIDE < DayFlow.SHOP_CLOSE, true, "막차로 와도 가게 닫기 전")
+	_eq(Bus.clock(8 * 60 + 5), "08:05", "시각 글자")
+	_eq(Bus.fish_price("bolak", 20.0) > Market.price("bolak", 20.0), true, "읍내 도매상이 시장보다 조금 비쌈")
+	_eq(Bus.fish_price("bolak", 20.0) < DayFlow.dish_price("bolak", 20.0) - DayFlow.DISH_COST + Bus.FARE, true, "흔한 고기는 여전히 식당이 나음 (차비 감안)")
+	_eq(Bus.bait_price("worm") < int(BaitDB.bait("worm").price), true, "읍내 미끼가 쌈")
+	_eq(Bus.visitors(0, 5), 0, "평판 0이면 외지 손님 없음")
+	_eq(Bus.visitors(Bus.VISIT_STEP - 1, 5), 0, "평판이 모자라면 없음")
+	var most := 0
+	for d in 30:
+		var v := Bus.visitors(9999, d)
+		_eq(v >= Bus.VISIT_MAX - 1 and v <= Bus.VISIT_MAX, true, "평판 높으면 %d~%d명" % [Bus.VISIT_MAX - 1, Bus.VISIT_MAX])
+		most = maxi(most, v)
+	_eq(most, Bus.VISIT_MAX, "가끔 꽉 차게 옴")
+	# GameState 값 바꿔 사고팔기
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	var money0: int = gs.money
+	gs.money = 50000
+	var before: int = gs.bait_count("worm")
+	_eq(gs.buy_bait("worm", Bus.bait_price("worm")), "", "도매값으로 미끼 삼")
+	_eq(gs.money, 50000 - Bus.bait_price("worm"), "도매값만큼 나감")
+	_eq(gs.bait_count("worm"), before + int(BaitDB.bait("worm").amount), "묶음 수만큼 늘어남")
+	var e := {"id": "bolak", "size": 20.0, "day": gs.day}
+	gs.inventory.append(e)
+	var m1: int = gs.money
+	_eq(gs.sell_fish(e, Bus.fish_price("bolak", 20.0)), Bus.fish_price("bolak", 20.0), "읍내 값으로 팖")
+	_eq(gs.money, m1 + Bus.fish_price("bolak", 20.0), "돈이 들어옴")
+	gs.money = money0
+	gs.free()
+	# 영업: 외지 손님은 명단 끝에 붙고 버스 손님 이름이다
+	var a := DiningLogic.new()
+	a.setup(7, [], DayFlow.GUESTS)
+	var b := DiningLogic.new()
+	b.setup(7, [], DayFlow.GUESTS, 2)
+	_eq(b.schedule.size(), a.schedule.size() + 2, "외지 손님 두 명 더")
+	var names_a := a.schedule.map(func(x): return x.name)
+	var c := DiningLogic.new()
+	c.setup(7, [], DayFlow.GUESTS, 0)
+	_eq(c.schedule.map(func(x): return x.name), names_a, "외지 손님 0이면 예전 명단 그대로")
+	var bus_guests := b.schedule.filter(func(x): return x.name in Bus.VISITOR_NAMES)
+	_eq(bus_guests.size(), 2, "버스 손님 이름 둘")
+	var last_local := 0.0
+	for x in b.schedule:
+		if not x.name in Bus.VISITOR_NAMES:
+			last_local = maxf(last_local, x.t)
+	_eq(bus_guests.all(func(x): return x.t >= last_local - 8.0), true, "버스 손님은 늦게 온다")
+
+
+## 마을회관 의뢰 게시판 (2026-11-18)
+func _test_board() -> void:
+	_eq(Board.posted_on(10), Board.posted_on(10), "같은 날은 같은 의뢰")
+	var total := 0
+	var eggs_before := 0
+	for d in range(2, 60):
+		var ps := Board.posted_on(d)
+		_eq(ps.size() >= 1 and ps.size() <= 2, true, "하루 1~2장 %d" % d)
+		total += ps.size()
+		for p in ps:
+			_eq(p.reward >= Board.MIN_REWARD, true, "사례금 최소 %s" % p.id)
+			_eq(p.item != "egg", true, "닭장 전엔 달걀 의뢰 없음 %s" % p.id)
+			_eq(Board.item_name(p.kind, p.item).is_empty(), false, "물건 이름 %s" % p.id)
+			_eq(p.text.contains("%"), false, "쪽지 글 완성 %s" % p.id)
+			_eq(p.text.contains("—") or p.text.contains("ㅡ"), false, "줄표 없음 %s" % p.id)
+	var with_egg := 0
+	for d in range(2, 60):
+		for p in Board.posted_on(d, true):
+			if p.item == "egg":
+				with_egg += 1
+	_eq(with_egg > 0, true, "닭장 열리면 달걀 의뢰도 나옴")
+	_eq(Board.thing_text("fish", "bolak", 2), "볼락 두 마리", "생선 세는 말")
+	_eq(Board.thing_text("produce", "egg", 3), "달걀 세 알", "달걀 세는 말")
+	_eq(Board.thing_text("produce", "daepa", 3), "대파 세 단", "대파 세는 말")
+	# 붙어 있는 기간 (모두 만난 뒤)
+	var flags := {"met_sundeok": true, "met_mansu": true, "met_junho": true, "met_kyungja": true, "met_bokja": true, "met_yongpal": true, "met_taesik": true}.duplicate()
+	var p0: Dictionary = Board.posted_on(10)[0]
+	_eq(Board.open_on(10, flags).has(p0), true, "붙은 날 보임")
+	_eq(Board.open_on(12, flags).has(p0), true, "사흘째까지 보임")
+	_eq(Board.open_on(13, flags).has(p0), false, "나흘째엔 떨어짐")
+	_eq(Board.days_left(p0, 12), 0, "사흘째가 마지막 날")
+	_eq(Board.open_on(1, flags).is_empty(), true, "첫날엔 의뢰 없음")
+	# 갖다주기
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	var fp := {"id": "t-0", "day": 10, "who": "박만수", "kind": "fish", "item": "bolak", "count": 2, "text": "", "reward": 9000}
+	gs.inventory = [{"id": "bolak", "size": 20.0, "day": 10}, {"id": "noraemi", "size": 25.0, "day": 10}]
+	_eq(Board.can_deliver(fp, gs.inventory, gs.produce), false, "볼락 한 마리로는 못 줌")
+	_eq(Board.deliver(fp, gs), 0, "모자라면 안 줌")
+	gs.inventory.append({"id": "bolak", "size": 25.0, "day": 9})
+	var m0: int = gs.money
+	var r0: int = gs.reputation
+	_eq(Board.deliver(fp, gs), 9000, "볼락 두 마리 갖다줌")
+	_eq(gs.money, m0 + 9000, "사례금 받음")
+	_eq(gs.reputation, r0 + Board.REP, "평판 오름")
+	_eq(gs.inventory.size(), 1, "볼락 두 마리 빠짐")
+	_eq(gs.inventory[0].id, "noraemi", "다른 생선은 그대로")
+	_eq(Board.deliver(fp, gs), 0, "한 번만 들어줌")
+	var pp := {"id": "t-1", "day": 10, "who": "복자네 밥집", "kind": "produce", "item": "daepa", "count": 3, "text": "", "reward": 4000}
+	gs.produce = {"daepa": 3}
+	_eq(Board.deliver(pp, gs), 4000, "대파 세 단 갖다줌")
+	_eq(gs.produce.has("daepa"), false, "다 쓰면 목록에서 빠짐")
+	gs.flags["bd_" + p0.id] = true
+	_eq(Board.open_on(10, gs.flags).has(p0), false, "들어준 의뢰는 떨어짐")
+	gs.free()
+	# 이장 첫 만남이 회관을 연다
+	var ev: Array = Story.EVENTS.filter(func(e): return e.id == "taesik_first")
+	_eq(ev.size(), 1, "이장 첫 만남 사건")
+	_eq("hall_open" in ev[0].set, true, "회관이 열림")
+	_eq(Locations.get_loc("hall").scene, "res://scenes/village/hall.tscn", "회관 화면 연결")
+
+
+## 식당 4안 물건 배치 (Shop4)
+func _test_shop4() -> void:
+	_eq(Shop4.SEAT_KEY.size(), 16, "자리마다 그리는 순서")
+	_eq(Shop4.SEAT_STOOL.size(), 16, "자리마다 스툴 덮개 표")
+	for it in Shop4.ITEMS:
+		_eq(ArtSlot.has_art(Shop4.path(it[0], true, it[7])), true, "4안 그림 있음 %s" % it[0])
+		_eq(ArtSlot.has_art(Shop4.path(it[0], false, it[7])), true, "4안 낮 그림 있음 %s" % it[0])
+	_eq(ArtSlot.has_art(Shop4.bg_id(true)) and ArtSlot.has_art(Shop4.bg_id(false)), true, "빈 바탕 낮밤")
+	var r := Shop4.rect_of(["x", 366, 598, 134, 0.0, "bc", false, false], Vector2(1748, 751))
+	_eq(r.end.y, 598.0, "아래 가운데 기준이면 바닥이 y")
+	_eq(r.get_center().x, 366.0, "아래 가운데 기준이면 가운데가 x")
+	var sr := Shop4.stool_rect(Shop4.STOOLS[0])
+	_eq([sr.end.y, sr.size.y], [724.0, 111.0], "바 스툴 높이 111, 바닥 724")
+	# 뒷모습 손님 엉덩이는 스툴 방석 안에 (방석 윗면과 앞 테두리 사이)
+	for i in 16:
+		var si: int = Shop4.SEAT_STOOL[i]
+		if si < 0:
+			continue
+		var st: Array = Shop4.STOOLS[si]
+		var rr := Shop4.stool_rect(st)
+		var y: float = DiningLogic.SEATS[i].y * DiningLogic.H
+		_eq(y > rr.position.y and y < rr.position.y + float(Shop4.STOOL_FRONT[st[0]]) * rr.size.y, true, "%d번 엉덩이가 방석 위" % i)
+		_eq(Shop4.SEAT_KEY[i] > float(st[3]), true, "%d번 손님은 스툴 다음에 그림" % i)
+	# 위쪽 줄 테이블 손님은 테이블보다 먼저 그려 다리가 가린다
+	_eq(Shop4.SEAT_KEY[6] < 794.0 and Shop4.SEAT_KEY[10] < 1046.0, true, "테이블 위쪽 줄은 테이블 뒤")
+	_eq(Shop4.SEAT_KEY[4] < 1300.0, true, "창가 손님 다리는 창가 바가 덮음")
+	# 첫날 정지 화면 (Shop4View): 낮 판 그림이 있고, 덮기는 영업 판과 같다
+	_eq(Shop4View.has_art(false), true, "4안 낮 판 그림 있음")
+	var v := Shop4View.new()
+	v.size = Vector2(720, 1280)
+	_eq(v.floor_rect().size.y, 1280.0, "세로 화면은 높이를 맞춰 덮음")
+	_eq(v.floor_rect().position.x < 0.0, true, "넘치는 가로는 가운데 기준으로 잘림")
+	v.free()
+
+
+## 낚시터: 북쪽 방파제와 검은여 갯바위 (2026-11-18)
+func _test_spots() -> void:
+	_eq(Spots.of_location("rocks"), "rocks", "갯바위에서 오면 갯바위")
+	_eq(Spots.of_location("home"), "breakwater", "모르는 곳은 방파제")
+	_eq(Spots.fish_mult("breakwater", "ureok"), 1.0, "방파제는 배율 그대로")
+	var ctx := {"brightness": 0.3, "depth": 0.6, "weather": "sunny"}
+	var rc := ctx.duplicate()
+	rc["spot"] = "rocks"
+	_eq(FishDB.weight_of("ureok", rc) > FishDB.weight_of("ureok", ctx) * 2.0, true, "갯바위는 우럭이 잘 나옴")
+	_eq(FishDB.weight_of("mangsang", rc) < FishDB.weight_of("mangsang", ctx), true, "갯바위엔 망상어가 드묾")
+	# 감성돔 비율: 방파제보다 갯바위에서 몇 배
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var g := {"breakwater": 0, "rocks": 0}
+	for sp in g:
+		var c := ctx.duplicate()
+		c["spot"] = sp
+		for i in 4000:
+			if FishDB.pick_ctx(rng, c) == "gamseongdom":
+				g[sp] += 1
+	_eq(g.rocks > g.breakwater * 2, true, "갯바위 감성돔이 방파제보다 두 배 넘게 (%d / %d)" % [g.rocks, g.breakwater])
+	# 물때: 하루 두 번 간조, 날마다 늦어짐
+	_eq(Spots.low_tides(1)[0], Spots.FIRST_LOW, "첫날 첫 간조")
+	_eq(Spots.low_tides(2)[0], Spots.FIRST_LOW + Spots.TIDE_SHIFT, "다음 날 50분 늦게")
+	_eq(Spots.low_tides(1).size(), 2, "하루 두 번")
+	var low: int = Spots.low_tides(1)[0]
+	_eq(Spots.rocks_until(1, low), low + Spots.LOW_SPAN, "간조 때 열려 있고 한 시간 반 뒤 물이 듦")
+	_eq(Spots.rocks_until(1, low + Spots.LOW_SPAN + 10), -1, "물이 들면 닫힘")
+	var some := 0
+	for d in range(1, 31):
+		var times := Spots.rocks_fishing_times(d)
+		if not times.is_empty():
+			some += 1
+		for t in times:
+			_eq(Spots.can_fish_rocks(d, int(t[0])), true, "%d일 %s 갯바위 낚시 가능" % [d, Bus.clock(int(t[0]))])
+			_eq(Spots.rocks_end(d, int(t[0])) <= int(t[1]), true, "%d일 끝나는 시각은 물이 들거나 시간대가 끝날 때" % d)
+	_eq(some >= 20, true, "한 달 중 3분의 2 넘는 날은 갯바위 낚시 시간이 있음 (%d일)" % some)
+	_eq(Spots.times_text([[6 * 60, 7 * 60 + 30]]), "06:00~07:30", "시간 글자")
+	_eq(Spots.schedule("breakwater", SeaBackdrop.FISHING_SCHEDULE), SeaBackdrop.FISHING_SCHEDULE, "방파제 배경표 그대로")
+	_eq(Spots.schedule("rocks", SeaBackdrop.FISHING_SCHEDULE)[0][1], "bg_fishing_rocks_night_v", "갯바위 그림 네 장이 다 있으면 갯바위 배경표 (11-19)")
+	# 만수 이야기가 갯바위를 연다
+	var ev: Array = Story.EVENTS.filter(func(e): return e.id == "mansu_rocks")
+	_eq(ev.size(), 1, "만수 갯바위 사건")
+	_eq("learned_tide" in ev[0].set and "caught_gamseongdom" in ev[0].needs, true, "감성돔을 잡아야 열림")
+	_eq(Locations.get_loc("rocks").scene, "res://scenes/fishing/fishing.tscn", "갯바위는 낚시 화면")
+	_eq(Locations.get_loc("rocks").unlock, "learned_tide", "물때를 배워야 열림")
+	# 낚시 규칙: 갯바위 고기는 조금 더 크다
+	var a := FishingLogic.new()
+	a.spot = "rocks"
+	_eq(a.spot, "rocks", "낚시 규칙에 낚시터")
+
+
+## 이야기 목록: 메인, 서브, 오늘 부탁과 맥락 (11-19)
+func _test_quests() -> void:
+	# 주문과 게시판은 만난 사람만
+	_eq(Orders.of(5, {}), {}, "아무도 안 만났으면 주문 없음")
+	for d in range(2, 30):
+		_eq(Orders.of(d, {"met_sundeok": true}).get("customer", ""), "최순덕", "%d일: 순덕 할머니만 만났으면 순덕 할머니 주문" % d)
+	_eq(Orders.of(7).is_empty(), false, "flags 없이 부르면 예전처럼 아무나")
+	for d in range(9, 30):
+		for p in Board.posted_on(d, false, {"met_taesik": true}):
+			_eq(p.who, "정태식 이장", "%d일: 모르는 사람 자리는 이장이 붙임" % d)
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.day = 1
+	_eq(Quests.main_quest(gs).id, "main_first_guest", "첫날 메인: 첫 번째 손님")
+	gs.flags["first_guest_done"] = true
+	gs.flags["met_sundeok"] = true
+	gs.day = 2
+	var m: Dictionary = Quests.main_quest(gs)
+	_eq(m.id, "main_greet", "둘째 날 메인: 마을에 인사하기")
+	_eq(m.progress, "0/4", "인사 0/4")
+	_eq(m.target, "breakwater", "먼저 방파제 노인")
+	_eq(m.who, "순덕 할머니", "인사하라고 한 사람")
+	for f in ["met_mansu", "met_yongpal", "met_kyungja", "met_bokja"]:
+		gs.flags[f] = true
+	_eq(Quests.main_quest(gs).id, "main_first_month", "다 만나면 첫 달 버티기")
+	gs.day = 40
+	_eq(Quests.main_quest(gs).id, "main_wait", "첫 달이 지나면 1막 끝")
+	gs.arrears = 10000
+	_eq(Quests.main_quest(gs).goal.contains("밀린 돈"), true, "밀린 돈이 있으면 갚기")
+	gs.arrears = 0
+	# 서브: 부탁을 들은 뒤에만
+	var subs: Array = Quests.sub_quests(gs).map(func(q): return q.id)
+	_eq(subs, ["sub_sundeok"], "순덕 할머니 부탁만 (만수, 해솔은 아직 부탁 전)")
+	gs.flags["learned_tide_talk"] = true
+	gs.flags["hw_haesol"] = true
+	gs.flags["hw_lookout"] = true
+	subs = Quests.sub_quests(gs).map(func(q): return q.id)
+	_eq(subs, ["sub_sundeok", "sub_mansu", "sub_haesol"], "부탁을 들으면 생김")
+	var hs: Dictionary = Quests.sub_quests(gs)[2]
+	_eq(hs.progress, "1/3", "해솔 숙제 1/3")
+	_eq(hs.target, "market", "다음 자랑거리는 시장")
+	gs.flags["coop_open"] = true
+	gs.flags["learned_tide"] = true
+	_eq(Quests.sub_quests(gs).map(func(q): return q.id), ["sub_haesol"], "끝난 이야기는 사라짐")
+	# 오늘 부탁: 모든 줄에 누가와 왜
+	gs.flags["hall_open"] = true
+	gs.flags["met_taesik"] = true
+	gs.day = 12
+	var daily: Array = Quests.daily_quests(gs)
+	_eq(daily.size() >= 2, true, "주문 쪽지와 게시판 의뢰")
+	for q in Quests.active(gs):
+		_eq(q.who.is_empty() and q.kind != "main", false, "%s: 누가 부탁했는지 있음" % q.id)
+		_eq(q.why.is_empty(), false, "%s: 왜 하는지 있음" % q.id)
+	var names: Array = DayBrief.build(gs).sections.map(func(s): return s.name)
+	_eq(names.has("메인 이야기") and names.has("마을 사람 이야기") and names.has("오늘 부탁"), true, "서랍에 이야기 세 칸")
+	gs.free()
+
+
+## 아이스박스 골라 놓아주기, 쿨러, 낚시방 도구, 통발 (11-19, 여울 참고)
+func _test_kits() -> void:
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.day = 5
+	gs.icebox_size = 2
+	gs.store_catch({"id": "bolak", "size": 20.0})
+	gs.store_catch({"id": "bolak", "size": 15.0})
+	_eq(gs.store_catch({"id": "ureok", "size": 30.0}, false), {}, "골라 놓아주기: 바로 놓아주지 않음")
+	_eq(gs.is_overfull(), true, "넘친 채로 둠")
+	_eq(gs.release_fish(gs.inventory[0]), true, "고른 고기 놓아주기")
+	_eq(gs.is_overfull(), false, "한 마리 놓아주면 들어감")
+	_eq(gs.release_fish({"id": "x", "size": 1.0}), false, "없는 고기는 못 놓아줌")
+	_eq(gs.store_catch({"id": "bolak", "size": 10.0}).is_empty(), false, "기본은 예전처럼 가장 싼 것을 놓아줌")
+	# 쿨러
+	gs.money = 1_000_000
+	gs.cooler = 0
+	gs.icebox_size = 10
+	_eq(gs.buy_cooler(), "", "쿨러 사기")
+	_eq(gs.icebox_size, KitDB.COOLERS[1].size, "칸 수가 늘어남")
+	gs.cooler = KitDB.COOLERS.size() - 1
+	_eq(gs.buy_cooler().is_empty(), false, "끝 단계면 더 못 삼")
+	# 도구
+	_eq(KitDB.level(gs.kits, "line"), 0, "처음엔 줄 없음")
+	_eq(gs.buy_kit("line"), "", "줄 사기")
+	_eq(gs.buy_kit("line"), "", "다음 단계 줄")
+	_eq(KitDB.level(gs.kits, "line"), 2, "줄 2단계")
+	_eq(KitDB.effect_text("line", 2), "장력이 5% 덜 오른다", "효과 글")
+	_eq(KitDB.effect_text("hook", 1), "줄이 느슨해도 0.15초 더 버틴다", "소수 효과 글")
+	for i in 4:
+		gs.buy_kit("chair")
+	_eq(gs.buy_kit("chair").is_empty(), false, "4단계 넘으면 못 삼")
+	var l := FishingLogic.new()
+	GearDB.apply(l, "rod_1", "reel_1")
+	var base_t := l.tension_mult
+	l.bite_mult = 1.0
+	KitDB.apply(l, {"line": 4, "net": 2, "chair": 1, "lamp": 1, "boots": 1}, false, "sunny")
+	_eq(l.tension_mult < base_t, true, "줄: 장력 덜 오름")
+	_eq(is_equal_approx(l.land_at, 0.07), true, "뜰채: 7%에서 떠 올림")
+	_eq(is_equal_approx(l.bite_mult, 1.04), true, "낮 맑은 날은 의자만")
+	l.bite_mult = 1.0
+	KitDB.apply(l, {"chair": 1, "lamp": 1, "boots": 1}, true, "rain")
+	_eq(is_equal_approx(l.bite_mult, 1.13), true, "밤 비 오는 날은 의자, 랜턴, 장화")
+	# 태클박스: 미끼 묶음이 더 들어감
+	gs.kits["tacklebox"] = 2
+	var before: int = maxi(gs.bait_count("worm"), 0)
+	gs.buy_bait("worm")
+	_eq(gs.bait_count("worm") - before, int(BaitDB.bait("worm").amount) + 4, "태클박스 2단계: 4개 더")
+	# 통발
+	_eq(KitDB.trap_night({}, 0, 3), [], "통발 없으면 빈손")
+	var total := 0
+	for d in range(1, 40):
+		var got := KitDB.trap_night({"trap": 3}, 0, d)
+		_eq(got.size() <= 2, true, "%d일: 통발 3단계는 두 마리까지" % d)
+		total += got.size()
+		for e in got:
+			_eq(KitDB.TRAP_POOL.has(e.id), true, "통발엔 바위 고기")
+	_eq(total > 20, true, "통발에 꾸준히 든다 (%d)" % total)
+	_eq(KitDB.trap_night({"trap": 3}, 2, 5), [], "이미 차 있으면 더 안 듦")
+	gs.kits = {"trap": 4}
+	gs.inventory = []
+	gs.icebox_size = 10
+	for i in 10:
+		gs.end_day()
+	_eq(gs.trap_fish.size() <= 2, true, "걷지 않으면 통발 자리만큼만 쌓임")
+	var had: int = gs.trap_fish.size()
+	_eq(gs.haul_traps().size(), had, "방파제에서 걷기")
+	_eq(gs.inventory.size(), had, "걷은 고기는 아이스박스로")
+	_eq(gs.trap_fish.size(), 0, "통발 비움")
+	gs.free()
+
+
+## 영업 개편: 메뉴판, 값 수준, 손님 종류, 정산 줄 (11-19)
+func _test_service_plan() -> void:
+	_eq(ServicePlan.dish_options("bolak", {}), ["grill"], "배운 게 없으면 구이뿐")
+	var fl := {"recipe_fish_fry": true, "menu_maeuntang": true, "menu_jorim": true}
+	_eq(ServicePlan.dish_options("ureok", fl), ["grill", "fry", "jorim", "maeuntang"], "우럭은 매운탕까지")
+	_eq(ServicePlan.dish_options("bolak", fl).has("maeuntang"), false, "볼락은 매운탕 안 됨")
+	var plan := {"price": "mid", "dishes": {}}
+	_eq(ServicePlan.next_dish(plan, "ureok", fl), "fry", "누르면 다음 요리")
+	_eq(ServicePlan.dish_for(plan, "ureok", {}), "grill", "못 내는 요리면 구이")
+	var st := ServicePlan.settle("gourmet", 10000, "good", true)
+	_eq(st.heart, false, "미식가는 노릇노릇해야 하트")
+	_eq(int(ServicePlan.settle("gourmet", 10000, "perfect", true).price) > 10000, true, "미식가 만족하면 웃돈")
+	_eq(int(ServicePlan.settle("hurry", 10000, "good", true).price) > 10000, true, "급한 손님 빨리 받으면 웃돈")
+	_eq(int(ServicePlan.settle("hurry", 10000, "good", false).price), 10000, "늦으면 웃돈 없음")
+	# 손님 종류: 단골 이름이 들어간다
+	var sch := []
+	for i in 10:
+		sch.append({"t": float(i), "name": "손님"})
+	ServicePlan.assign_kinds(sch, ["최순덕"], 5)
+	_eq(sch.filter(func(x): return x.kind == "regular").size(), 1, "단골 한 명")
+	_eq(sch.filter(func(x): return x.name == "최순덕").size(), 1, "단골 이름")
+	# 영업 규칙에 넣기: 비싸게면 값이 오르고 덜 참는다
+	var l := DiningLogic.new()
+	l.plan = {"price": "high", "dishes": {"bolak": "fry"}}
+	l.flags = {"recipe_fish_fry": true}
+	l.price_mult = 1.2
+	l.patience_mult = 0.85
+	l.extra_guests = -2
+	var inv := []
+	for i in 12:
+		inv.append({"id": "bolak", "size": 20.0, "day": 5})
+	l.setup(5, inv, ["손님"])
+	_eq(l.schedule.all(func(x): return x.has("kind")), true, "모든 손님에 종류")
+	l.time = 999.0
+	l._arrive()
+	var g: Dictionary = l.guests[0]
+	_eq(g.dish, "fry", "메뉴판대로 튀김")
+	_eq(int(g.price) >= DiningLogic.dish_price_of("bolak", 20.0, "fry"), true, "비싸게면 값이 오름")
+	_eq(float(g.patience) < l.patience_of(g.seat) * 1.4, true, "참는 시간이 정해짐")
+	# 화난 이유
+	l.guests[0].state = DiningLogic.GuestState.SEATED
+	l._leave_angry(0)
+	_eq(l.angry_list[0].reason, "kitchen", "굽는 중에 가면 주방 탓")
+	var lines := ServicePlan.ledger_lines({"served": [{"heart": true, "dish": "fry", "kind": "normal", "guest": "손님"}], "angry_list": l.angry_list})
+	_eq(lines[0].contains("하트 1"), true, "정산: 하트")
+	_eq(lines.any(func(x): return x.contains("튀김")), true, "정산: 인기 요리")
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.inventory = []
+	for i in 12:
+		gs.inventory.append({"id": "bolak", "size": 20.0, "day": 5})
+	gs.service_plan = {}
+	_eq(ServicePlan.plan_of(gs).price, "mid", "처음 메뉴판은 보통 값")
+	_eq(ServicePlan.forecast(gs).fish, 12, "낼 생선 수")
+	gs.friendship = {"최순덕": 25}
+	gs.day = 3
+	_eq(ServicePlan.regulars(gs).size() <= 1, true, "하트 있는 사람만 단골")
+	gs.free()
+
+
+## 하루 서랍의 간조·만조 시각 (11-19)
+func _test_tide_times() -> void:
+	for d in range(1, 30):
+		var t := Tide.today_times(d)
+		_eq(t.low.size() >= 1 and t.low.size() <= 2, true, "%d일 간조 한두 번" % d)
+		_eq(t.high.size() >= 1 and t.high.size() <= 2, true, "%d일 만조 한두 번" % d)
+		for m in t.low:
+			_eq(Spots.rocks_until(d, int(m)) >= 0, true, "%d일 간조엔 갯바위 물이 빠져 있음" % d)
+	_eq(Tide.times_text(1).begins_with("간조 03:00"), true, "첫날 간조 03:00")
+
+
+## 특별 손님 알아맞히기 대접 (11-19)
+func _test_special_guest() -> void:
+	_eq(SpecialGuest.styles_ok({}), ["grill"], "배운 게 없으면 구이만")
+	var ok := SpecialGuest.styles_ok({"recipe_fish_fry": true, "menu_maeuntang": true})
+	_eq(ok.has("fry") and ok.has("soup"), true, "튀김, 국물까지")
+	var w := SpecialGuest.want(5, "최순덕", "bolak", "rain", ["grill"])
+	_eq(w.style, "grill", "못 내는 갈래는 바라지 않음")
+	_eq(w.hints.size(), 3, "힌트 세 줄")
+	_eq(SpecialGuest.want(5, "최순덕", "bolak", "rain", ["grill"]), w, "같은 날 같은 손님은 같은 바람")
+	var w2 := SpecialGuest.want(7, "박만수", "ureok", "rain", ok)
+	_eq(w2.style in ok, true, "바라는 갈래는 낼 수 있는 것 안에서")
+	var perfect := SpecialGuest.score(w2, "ureok", SpecialGuest.STYLES[w2.style].dishes[0], w2.side)
+	_eq(perfect.perfect, true, "셋 다 맞히면 완벽")
+	_eq(perfect.stars, 3, "별 셋")
+	_eq(SpecialGuest.score(w2, "bolak", "grill" if w2.style != "grill" else "fry", "").stars, 1, "다 틀려도 별 하나")
+	_eq(SpecialGuest.review(w2, perfect).contains("딱"), true, "세라 칭찬")
+	_eq(SpecialGuest.next_tale({}, "최순덕").is_empty(), false, "사연 첫 토막")
+	_eq(SpecialGuest.next_tale({"tale_최순덕": 3}, "최순덕"), "", "다 들으면 끝")
+	_eq(SpecialGuest.style_of("jiri"), "soup", "맑은탕은 국물")

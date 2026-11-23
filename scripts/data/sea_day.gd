@@ -42,7 +42,7 @@ static func best_fish(info: Dictionary, brightness: float, n := 2) -> Array:
 	var scored: Array = []
 	for id in FishDB.FISH:
 		var base: float = FishDB.FISH[id].weight
-		var w := FishDB.weight_of(id, {"brightness": brightness, "depth": 0.5, "weather": info.weather}) / base
+		var w := FishDB.weight_of(id, {"brightness": brightness, "depth": 0.5, "weather": info.weather, "month": int(Calendar.date(int(info.get("day", 1))).month)}) / base
 		scored.append([w, id])
 	scored.sort_custom(func(a, b): return a[0] > b[0])
 	var out: Array = []

@@ -43,6 +43,18 @@ var caught_today: Array = []
 var inventory: Array = []
 ## 아이스박스에 넣을 수 있는 마리 수. 꽉 차면 가장 싼 고기를 놓아준다
 var icebox_size := 10
+## 낚시방 도구 (KitDB). cooler: 쿨러 단계(0부터, icebox_size를 정한다), kits: {도구 id: 단계}, trap_fish: 통발에 든 채 기다리는 고기
+var cooler := 0
+var kits := {}
+var trap_fish: Array = []
+## 갯벌에서 캔 것 {Flat id: 개수}
+var seafood := {}
+## 친밀도 {이름: 점수}, 마지막으로 선물한 날 {이름: 날} (Friends)
+var friendship := {}
+var gift_day := {}
+## 앱 만들기 {앱 id: 마친 단계}, 마지막으로 한 날 {앱 id: 날} (AppWork)
+var apps := {}
+var app_day := {}
 ## 잡은 날을 포함해 생선이 버티는 날 수. 잡은 다음 날 저녁 장사까지 쓸 수 있다
 const FRESH_DAYS := 2
 ## 어종 도감: 어종 id → 가장 큰 기록(cm)
@@ -78,9 +90,12 @@ var spent_today := 0
 ## 하루 흐름 (DayFlow). 오늘 가게를 열었는지, 밤 낚시를 했는지(했으면 내일 늦잠), 식당 평판
 var opened_today := false
 var night_fished := false
+var day_fished := false # 오늘 낮 낚시를 했나 (하루 한 번, DayFlow)
 var reputation := 0
 ## 식당 가구와 장식 (ShopDecor). 놓은 것 {슬롯 id: 물건 id}, 산 것 [물건 id]
 var shop_decor := {}
+## 저녁 영업 메뉴판 {"price": "low"/"mid"/"high", "dishes": {어종: 요리}} (ServicePlan)
+var service_plan := {}
 var owned_decor: Array = []
 ## 뽑은 알바 {역할: 알바 id} (StaffDB). 한 번 뽑으면 그만두게 할 때까지 매일 나온다
 var staff := {}
@@ -184,7 +199,7 @@ func buy_gear(kind: String, id: String) -> String:
 		return "없는 물건이에요."
 	if id in owned:
 		return "이미 가지고 있어요."
-	var price: int = table[id].price
+	var price: int = AppWork.shop_price(flags, int(table[id].price))
 	if money < price:
 		return "돈이 모자라요."
 	spend(price)
@@ -216,16 +231,18 @@ func harvest_crop(index: int) -> String:
 
 
 ## 미끼를 산다. 문제가 없으면 빈 문자열, 있으면 안내 문구를 돌려준다.
-func buy_bait(id: String) -> String:
+## price를 주면 그 값으로 산다 (읍내 도매, Bus.bait_price)
+func buy_bait(id: String, price := -1) -> String:
 	if not BaitDB.BAITS.has(id):
 		return "없는 물건이에요."
 	var b := BaitDB.bait(id)
 	if b.amount < 0:
 		return "창고에 많이 있어요."
-	if money < b.price:
+	var cost: int = AppWork.shop_price(flags, int(b.price)) if price < 0 else price
+	if money < cost:
 		return "돈이 모자라요."
-	spend(b.price)
-	baits[id] = int(baits.get(id, 0)) + int(b.amount)
+	spend(cost)
+	baits[id] = int(baits.get(id, 0)) + int(b.amount) + int(KitDB.value(kits, "tacklebox"))
 	return ""
 
 
@@ -247,7 +264,7 @@ func use_bait() -> void:
 
 ## 오늘 주문
 func today_order() -> Dictionary:
-	return Orders.of(day)
+	return Orders.of(day, flags)
 
 
 ## 잡은 물고기를 주문에 넣어 본다. 주문을 막 다 채웠으면 보상 금액, 아니면 0
@@ -281,12 +298,13 @@ func _deliver_order(o: Dictionary) -> void:
 
 ## 잡은 생선을 아이스박스에 넣는다. 꽉 차 있으면 가장 싼 한 마리(방금 잡은 것일 수도 있다)를 놓아준다.
 ## 놓아준 생선을 돌려준다. 다 들어갔으면 빈 Dictionary
-func store_catch(entry: Dictionary) -> Dictionary:
+## auto_release가 false면 넘친 채로 두고 빈 Dictionary를 돌려준다. 낚시 화면이 놓아줄 고기를 고르게 한다 (is_overfull, release_fish)
+func store_catch(entry: Dictionary, auto_release := true) -> Dictionary:
 	var e := entry.duplicate()
 	if not e.has("day"):
 		e["day"] = day
 	inventory.append(e)
-	if inventory.size() <= icebox_size:
+	if inventory.size() <= icebox_size or not auto_release:
 		return {}
 	var low := 0
 	for i in inventory.size():
@@ -298,13 +316,86 @@ func store_catch(entry: Dictionary) -> Dictionary:
 
 
 ## 아이스박스의 그 생선(entry)을 수산시장에 판다. 받은 돈, 없으면 0
-func sell_fish(entry: Dictionary) -> int:
+func sell_fish(entry: Dictionary, price := -1) -> int:
 	var i := inventory.find(entry)
 	if i < 0:
 		return 0
 	inventory.remove_at(i)
-	var got := Market.price(entry.id, entry.size)
+	var got := Market.price(entry.id, entry.size) if price < 0 else price
 	earn(got)
+	return got
+
+
+## 아이스박스가 넘쳤는지 (놓아줄 고기를 골라야 한다)
+func is_overfull() -> bool:
+	return inventory.size() > icebox_size
+
+
+## 아이스박스의 그 생선을 바다에 놓아준다. 놓아줬으면 true
+func release_fish(entry: Dictionary) -> bool:
+	var i := inventory.find(entry)
+	if i < 0:
+		return false
+	inventory.remove_at(i)
+	return true
+
+
+## 쿨러를 다음 단계로 산다. 문제가 없으면 빈 문자열
+func buy_cooler() -> String:
+	if cooler + 1 >= KitDB.COOLERS.size():
+		return "더 큰 쿨러는 아직 없어요."
+	var c := KitDB.cooler(cooler + 1)
+	var cprice := AppWork.shop_price(flags, int(c.price))
+	if money < cprice:
+		return "돈이 모자라요."
+	spend(cprice)
+	cooler += 1
+	icebox_size = int(c.size)
+	return ""
+
+
+## 도구를 다음 단계로 산다. 문제가 없으면 빈 문자열
+func buy_kit(id: String) -> String:
+	var nx := KitDB.next_level(kits, id)
+	if nx.is_empty():
+		return "이게 제일 좋은 거예요."
+	var kprice := AppWork.shop_price(flags, int(nx[1]))
+	if money < kprice:
+		return "돈이 모자라요."
+	spend(kprice)
+	kits[id] = KitDB.level(kits, id) + 1
+	return ""
+
+
+## 고기를 바다로 돌려보내면 평판이 조금 오른다 (하루 RELEASE_REP_MAX번까지). 오른 만큼 돌려준다.
+## 오늘 조과(caught_today)에 "released"로 이미 들어간 뒤에 부른다. 처음 놓아준 날은 일지에 남긴다
+const RELEASE_REP_MAX := 3
+
+
+func reward_release(entry: Dictionary) -> int:
+	if not flags.get("first_release", false):
+		flags["first_release"] = true
+		note("%s %.0fcm를 바다로 돌려보냈다. 내년에 더 커서 만나자." % [FishDB.get_fish(entry.id).name, entry.size], 3)
+	var n := caught_today.filter(func(e): return e.get("released", false)).size()
+	if n > RELEASE_REP_MAX:
+		return 0
+	reputation += 1
+	return 1
+
+
+## 방파제에 오면 통발을 걷는다: 든 고기를 아이스박스에 넣고(넘치면 화면이 고르게 한다) 걷은 것을 돌려준다.
+## 포획금지체장 이하는 넣지 않고 놓아준다 ("released": true로 표시해 돌려준다)
+func haul_traps() -> Array:
+	var got := trap_fish.duplicate()
+	trap_fish.clear()
+	for e in got:
+		if FishDB.must_release(e.id, e.size):
+			e["released"] = true
+		else:
+			store_catch(e, false)
+		caught_today.append(e)
+		if e.get("released", false):
+			reward_release(e)
 	return got
 
 
@@ -344,6 +435,10 @@ func end_day(wake_minutes := -1) -> void:
 		inventory = inventory.filter(func(e): return not spoiled.has(e))
 		_news("아이스박스에서 생선 %d마리가 상해서 버렸어요. 잡은 다음 날 저녁까지 팔아요" % spoiled.size())
 	Coop.next_day(self)
+	# 밤새 통발에 고기가 든다 (KitDB trap). 잡은 날은 다음 날로 친다
+	for t in KitDB.trap_night(kits, trap_fish.size(), day + 1):
+		t["day"] = day + 1
+		trap_fish.append(t)
 	day += 1
 	# 매달 1일은 대출, 월세, 공과금이 나가는 날 (Loan)
 	var r := Loan.settle(day, money, debt, monthly_repayment, arrears)
@@ -358,6 +453,7 @@ func end_day(wake_minutes := -1) -> void:
 	time_minutes = wake_minutes if wake_minutes >= 0 else DayFlow.wake_time(night_fished)
 	opened_today = false
 	night_fished = false
+	day_fished = false
 	caught_today.clear()
 	order_filled = 0
 	order_done = false

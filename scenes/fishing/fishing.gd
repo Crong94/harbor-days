@@ -2,7 +2,7 @@ extends Control
 ## 북쪽 방파제 찌낚시.
 ## 첫날(튜토리얼): 챕터 2 새벽 05:00~07:00, 첫 물고기는 볼락, 끝나면 〈첫 번째 손님〉 식당 장면으로 간다.
 ## 그 뒤(자유 낚시): 지도에서 들어온 시각의 낚시 시간대(DayFlow: 새벽, 아침, 밤)가 끝나거나 그만하기를 누르면 끝나고 지도로 돌아간다.
-## 밤 낚시를 마치면 잠자리에 들고 다음 날은 늦잠(새벽 낚시 건너뜀)
+## 밤 낚시를 마치면 잠자리에 들고 다음 날은 늦잠(아침 낚시가 두 시간 줄어든다)
 ## 규칙은 FishingLogic, 이 스크립트는 입력, 시간, 화면 표시만 맡는다.
 ##
 ## 조작 (휴대폰 기준, PC는 괄호)
@@ -71,6 +71,7 @@ var tutorial := true
 ## 자유 낚시가 끝나는 시각 (DayFlow 시간대 끝)
 var session_end := float(LATE_MIN)
 var night := false
+var spot := "breakwater" # 낚시터 (Spots). 지도에서 온 장소로 정한다
 var sea := {}
 var order := {}
 
@@ -102,6 +103,15 @@ var _flash: ColorRect # 챔질 순간 번쩍
 var _hint_row: CenterContainer
 var _bait_sheet: Control
 var _bait_list: VBoxContainer
+## 아이스박스 (11-19): 조용할 때 열어서 골라 놓아준다. 꽉 찼을 때는 한 마리를 놓아줄 때까지 닫히지 않는다
+var _box_btn: Button
+var _box_sheet: Control
+var _box_title: Label
+var _box_desc: Label
+var _box_list: VBoxContainer
+var _box_forced := false
+var _bite_base := 1.0 # 날씨, 도구까지 넣은 입질 배율. 여기에 물때(Tide)를 곱한다
+var _box_just: Dictionary = {} # 방금 잡은 고기 (목록에 표시)
 var _dialogue: DialogueBox
 
 var _card_root: Control
@@ -114,11 +124,13 @@ var _card_badges: HBoxContainer
 var _card_value: Label
 var _card_star_row: HBoxContainer
 var _card_continue: Label
+var _card_keep: Button # 쿨러에 넣기 (금지체장 이하면 잠김)
+var _card_free: Button # 놓아주기
+var _card_entry: Dictionary = {} # 카드에 뜬 고기. 쿨러에 넣을지 놓아줄지 고른 뒤에 정해진다
 var _card_lock := 0.0 # 카드가 튀어나오는 동안은 눌러도 닫히지 않게
 var _card_order: PanelContainer
 var _card_new := false
 var _card_record := false
-var _card_released := {} # 아이스박스가 꽉 차서 놓아준 고기
 var _card_box: Label
 var _summary: Control
 var _summary_title: Label
@@ -151,6 +163,9 @@ var _hitstop := 0.0
 var _was_exhausted := false
 var _last_run := 0
 var _last_jumps := 0
+var _last_beat := 0 # 어종 박자 진동 (FishingLogic.beat_ticks)
+var _hole_seen := false
+var _last_fight_pop: Label
 var _hint_sticky := false # 실패 안내를 READY에서도 남겨 두는지
 var _was_countering := false
 var _tutor_fight_shown := false
@@ -181,6 +196,9 @@ func _ready() -> void:
 		minutes = float(GameState.time_minutes)
 		var slot := DayFlow.fishing_slot(GameState.time_minutes)
 		session_end = float(slot.end) if not slot.is_empty() else minf(minutes + 120.0, float(LATE_MIN))
+		spot = Spots.of_location(GameState.current_location)
+		if spot == "rocks":
+			session_end = float(Spots.rocks_end(GameState.day, int(minutes))) # 물이 들어오면 나와야 한다
 		night = not slot.is_empty() and slot.id == "night"
 		logic.forgiving = false
 		logic.force_first_fish = ""
@@ -190,8 +208,10 @@ func _ready() -> void:
 	sea = SeaDay.of(GameState.day)
 	order = {} if tutorial else GameState.today_order()
 	logic.weather = sea.weather
+	logic.month = int(Calendar.date(GameState.day).month)
 	logic.bite_mult = sea.bite
 	logic.bait = GameState.equipped_bait
+	logic.spot = spot
 
 	_world = Control.new()
 	_world.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -204,7 +224,10 @@ func _ready() -> void:
 	_bg.art_blend = BG_ART_BLEND
 	_bg.art_view = ART_VIEW
 	_bg.sun_art = "sun"
-	_bg.art_schedule = SeaBackdrop.FISHING_SCHEDULE # 밤, 새벽, 아침, 저녁 그림을 시각에 따라 이어 붙인다
+	_bg.art_schedule = Spots.schedule(spot, SeaBackdrop.FISHING_SCHEDULE) # 밤, 새벽, 아침, 저녁 그림을 시각에 따라 이어 붙인다 (낚시터마다)
+	var sun := Spots.sun_of(spot, SeaBackdrop.FISHING_SCHEDULE, _bg.art_schedule)
+	_bg.sun_low = sun[0]
+	_bg.sun_clip = sun[1]
 	_bg.water_band = Vector2(WATER_TOP_Y, WATER_BOTTOM_Y)
 	_bg.minutes = minutes
 	_world.add_child(_bg)
@@ -219,6 +242,9 @@ func _ready() -> void:
 	_world.add_child(_layer) # 찌, 포인트는 주인공 뒤 (바다 위)
 	_world.add_child(_player)
 	GearDB.apply(logic, GameState.equipped_rod, GameState.equipped_reel)
+	if not tutorial:
+		KitDB.apply(logic, GameState.kits, night, sea.weather)
+	_bite_base = logic.bite_mult
 	logic.new_point()
 	var fa := GearDB.float_art(GameState.equipped_rod)
 	_float_tex = load(ArtSlot.art_path(fa)) if ArtSlot.has_art(fa) else null
@@ -247,6 +273,7 @@ func _ready() -> void:
 	_fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_fx)
 	_build_bait_sheet()
+	_build_box_sheet()
 	_build_card()
 	_build_summary()
 
@@ -259,11 +286,26 @@ func _ready() -> void:
 	if not tutorial:
 		var best: Array = SeaDay.best_fish(sea, logic.brightness, 2)
 		var names := ", ".join(PackedStringArray(best.map(func(id): return FishDB.get_fish(id).name)))
-		_play_story([
-			{"speaker": "", "text": "북쪽 방파제. 빨간 등대 아래 늘 앉던 자리."},
+		var intro := [
+			{"speaker": "", "text": Spots.get_spot(spot).intro},
 			{"speaker": "", "text": "오늘의 바다는 %s. 이런 날엔 %s 입질이 좋다." % [SeaDay.summary(sea), names]},
-			{"speaker": "{player}", "text": "오늘은 뭐가 물려나."},
-		])
+		]
+		# 방파제에 오면 밤새 둔 통발부터 걷는다 (KitDB trap)
+		if spot == "breakwater" and KitDB.level(GameState.kits, "trap") > 0:
+			var got := GameState.haul_traps()
+			if got.is_empty():
+				intro.append({"speaker": "", "text": "밤새 둔 통발을 걷었다. 오늘은 빈 통발이다."})
+			else:
+				var kept := got.filter(func(e): return not e.get("released", false))
+				var freed := got.filter(func(e): return e.get("released", false))
+				var parts := PackedStringArray(kept.map(func(e): return "%s %.0fcm" % [FishDB.get_fish(e.id).name, e.size]))
+				if not kept.is_empty():
+					intro.append({"speaker": "", "text": "밤새 둔 통발을 걷었다. %s. 아이스박스에 넣었다." % ", ".join(parts)})
+				if not freed.is_empty():
+					var small := PackedStringArray(freed.map(func(e): return "%s %.0fcm" % [FishDB.get_fish(e.id).name, e.size]))
+					intro.append({"speaker": "", "text": "%s %s는 너무 작아서 바다로 돌려보냈다." % [("통발에 든" if kept.is_empty() else "그중"), ", ".join(small)]})
+		intro.append({"speaker": "{player}", "text": "오늘은 뭐가 물려나."})
+		_play_story(intro)
 		return
 	_play_story([
 		{"speaker": "", "text": "다음 날 새벽 다섯 시. 물빛울포 북쪽 방파제."},
@@ -276,7 +318,7 @@ func _ready() -> void:
 # ─── 입력 ───────────────────────────────────────────
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _in_story or _summary.visible or _bait_sheet.visible or _header.is_menu_open():
+	if _in_story or _summary.visible or _bait_sheet.visible or _box_sheet.visible or _header.is_menu_open():
 		return
 	# 견제: 오른쪽 클릭 또는 Shift
 	if (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT) \
@@ -318,9 +360,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		var at: Vector2 = event.position if event is InputEventMouseButton else Vector2(size.x / 2.0, size.y - 160.0)
 		_touches.append({"t": 0.0, "p": at})
 		if logic.state == FishingLogic.State.CAUGHT:
-			if _landing <= 0.0 and _card_lock <= 0.0:
-				Sound.play_sfx("tap", 0.05, -6.0)
-				_close_card()
+			# 카드는 아래 단추(놓아주기, 쿨러에 넣기)로만 닫는다. 스페이스는 기본 선택
+			if event is InputEventKey and _card_root.visible and _landing <= 0.0 and _card_lock <= 0.0:
+				if _card_keep.visible and not _card_keep.disabled:
+					_keep_catch()
+				else:
+					_free_catch()
 		else:
 			var before := logic.state
 			logic.press()
@@ -389,6 +434,8 @@ func _process(delta: float) -> void:
 		_last_state = logic.state
 
 	_header.set_minutes(minutes)
+	if not tutorial:
+		logic.bite_mult = _bite_base * Tide.bite(GameState.day, int(minutes)) # 정조엔 뜸하고 해뜰녘 물 흐를 때 잘 문다
 	var n := GameState.caught_today.size()
 	_header.set_badge("%d마리" % n if n > 0 else "")
 	# 화면은 지금 할 일만 보여 준다: 조용할 때는 주문과 오늘의 바다, 싸울 때는 판도 글자도 없이 낚싯대와 줄만
@@ -399,6 +446,9 @@ func _process(delta: float) -> void:
 	_quit_btn.visible = not tutorial
 	_order_card.visible = calm and not order.is_empty()
 	_bait_btn.visible = calm
+	_box_btn.visible = calm and not tutorial
+	if _box_btn.visible:
+		_box_btn.text = "아이스박스 %d/%d" % [GameState.inventory.size(), GameState.icebox_size]
 	_mend_btn.visible = not _in_story and logic.state == FishingLogic.State.WAITING
 	# 안내 말풍선 (튜토리얼 설명, 실패 이유): 줄다리기 중에는 헤더가 숨으니 맨 위, 조용할 때는 주문 쪽지와 그만하기 줄 아래, 나머지는 헤더 바로 아래
 	var below := GameHeader.BOTTOM + 12.0
@@ -461,8 +511,10 @@ func _watch_fight_events(delta: float) -> void:
 	if logic.state != FishingLogic.State.REELING:
 		_last_run = 0
 		_last_tension_level = 0
+		_last_beat = 0
+		_hole_seen = false
 		return
-	# 어종 버릇: 바늘털이 (학공치), 첫 파고들기 (우럭)
+	# 어종 버릇: 바늘털이 (jump 고기, 지금은 없음), 첫 파고들기 (우럭)
 	if logic.jumps != _last_jumps:
 		_last_jumps = logic.jumps
 		if logic.jumps > 0:
@@ -471,7 +523,7 @@ func _watch_fight_events(delta: float) -> void:
 			_kick(0.3)
 			for i in 6:
 				_splashes.append({"t": 0.0, "off": Vector2(randf_range(-30, 30), randf_range(-14, 4))})
-			_pop_text("바늘털이! 계속 감아요", UiKit.SUN, _above_fish_mark(34), 34, true)
+			_fight_pop("바늘털이! 계속 감아요", UiKit.SUN, _above_fish_mark(34), 34, true)
 	if logic.run_dir != 0 and _last_run == 0:
 		Sound.play_sfx("surge", 0.1, -4.0)
 		Haptics.play("surge")
@@ -479,9 +531,18 @@ func _watch_fight_events(delta: float) -> void:
 		_haptic_pull = 0.25
 		if logic.run_count == 1 and logic.habit() == "dive":
 			_kick(0.6)
-			_pop_text("바위로 파고들어요!", UiKit.CORAL, _above_fish_mark(34), 34, true)
+			_fight_pop("바위로 파고들어요!", UiKit.CORAL, _above_fish_mark(34), 34, true)
 		elif logic.run_count == 1 and logic.habit() == "long":
-			_pop_text("길게 차고 나가요!", UiKit.CORAL, _above_fish_mark(32), 32, true)
+			_fight_pop("길게 차고 나가요!", UiKit.CORAL, _above_fish_mark(32), 32, true)
+		elif logic.run_count == 1 and logic.habit() == "side":
+			_fight_pop("몸을 눕혀 버텨요!", UiKit.CORAL, _above_fish_mark(32), 32, true)
+		elif not logic.hole_dived or _hole_seen:
+			_fight_pop("힘겨루기!", UiKit.SUN, _above_fish_mark(32), 32, true)
+	if logic.hole_dived and not _hole_seen:
+		_hole_seen = true
+		_kick(0.6)
+		Haptics.play("surge")
+		_fight_pop("바위틈으로 처박아요!", UiKit.CORAL, _above_fish_mark(34), 34, true)
 	_last_run = logic.run_dir
 	if logic.countering and not _was_countering:
 		Sound.play_sfx("tick", 0.05)
@@ -490,7 +551,7 @@ func _watch_fight_events(delta: float) -> void:
 	if logic.exhausted and not _was_exhausted:
 		Sound.play_sfx("pop")
 		Haptics.play("exhausted")
-		_pop_text("지쳤어요!", UiKit.LEAF, _above_fish_mark(44), 44)
+		_fight_pop("지쳤어요!", UiKit.LEAF, _above_fish_mark(44), 44)
 	_was_exhausted = logic.exhausted
 
 	# 장력 위험: 들어가는 순간 소리, 있는 동안 짧은 진동을 빠르게 반복
@@ -506,6 +567,12 @@ func _watch_fight_events(delta: float) -> void:
 			Haptics.play("danger")
 			_haptic_danger = 0.16
 		return
+	# 쉬는 동안 어종 박자대로 톡 (볼락은 잘게 자주, 망상어는 느긋하게)
+	if logic.beat_ticks != _last_beat:
+		_last_beat = logic.beat_ticks
+		if _held and logic.run_dir == 0 and not logic.exhausted and _haptic_pull <= 0.0:
+			Haptics.play("nibble")
+			return
 	# 물고기가 당길 때 약하게 반복. 반대로 잘 버티는 중이면 드물게, 쉬는 중에는 힘센 고기만 가끔
 	if logic.exhausted or _haptic_pull > 0.0:
 		return
@@ -600,6 +667,8 @@ func _on_hooked() -> void:
 	_last_tension_level = 0
 	_trail.clear()
 	# 조작 안내는 첫 줄다리기 때만 (첫날 튜토리얼의 첫 물고기)
+	if tutorial and FishDB.must_release(logic.fish_id, logic.fish_size):
+		logic.fish_size = snappedf(float(FishDB.get_fish(logic.fish_id).legal_cm) + 1.0 + randf() * 4.0, 0.1) # 첫날 볼락은 식당에 써야 해서 놓아줄 크기로 안 나오게
 	if tutorial and not _tutor_fight_shown:
 		_tutor_fight_shown = true
 		_guide_on = true
@@ -677,7 +746,7 @@ func _play_state_sound(s: int) -> void:
 func _record_catch() -> void:
 	var entry := {"id": logic.fish_id, "size": logic.fish_size, "perfect": logic.hook_grade == "perfect", "day": GameState.day}
 	GameState.caught_today.append(entry)
-	_card_released = GameState.store_catch(entry) # 아이스박스가 꽉 차면 가장 싼 고기를 놓아준다
+	_card_entry = entry # 쿨러에 넣을지 놓아줄지는 카드에서 고른다 (_keep_catch, _free_catch)
 	var best: float = GameState.dex.get(logic.fish_id, 0.0)
 	_card_new = best == 0.0
 	_card_record = best > 0.0 and logic.fish_size > best
@@ -690,6 +759,8 @@ func _record_catch() -> void:
 	elif _card_record:
 		GameState.note("%s 최대 기록을 %.1fcm로 늘렸다." % [fname, logic.fish_size], 2)
 	GameState.dex[logic.fish_id] = maxf(best, logic.fish_size)
+	if logic.fish_id == "gamseongdom":
+		GameState.flags["caught_gamseongdom"] = true # 만수가 갯바위에 데려가 준다 (Story mansu_rocks)
 
 
 # ─── 이야기 ─────────────────────────────────────────
@@ -706,6 +777,8 @@ func _on_dialogue_finished() -> void:
 	_last_state = -1
 	if _ending:
 		_show_summary()
+	elif GameState.is_overfull():
+		_open_box(true) # 통발 고기로 넘쳤으면 먼저 놓아줄 고기를 고른다
 
 
 func _start_ending() -> void:
@@ -714,7 +787,7 @@ func _start_ending() -> void:
 	var n := GameState.caught_today.size()
 	if not tutorial:
 		_play_story([
-			{"speaker": "{player}", "text": ("밤이 깊었다. 이제 들어가 자자." if night else "물때가 지났다. 이번 낚시는 여기까지.") if minutes >= session_end else "이번 낚시는 여기까지."},
+			{"speaker": "{player}", "text": _end_line()},
 		])
 		return
 	_play_story([
@@ -722,6 +795,14 @@ func _start_ending() -> void:
 		{"speaker": "{player}", "text": "볼락은 밝아지면 숨는다고 했지. 오늘은 여기까지." if n > 0 else "오늘은 여기까지."},
 		{"speaker": "{player}", "text": "%d마리. 이걸로 {shop} 문을 열어 보자." % n},
 	])
+
+
+func _end_line() -> String:
+	if minutes < session_end:
+		return "이번 낚시는 여기까지."
+	if spot == "rocks" and Spots.rocks_until(GameState.day, int(minutes)) < 0:
+		return "발밑까지 물이 차오른다. 길이 잠기기 전에 나가자."
+	return "밤이 깊었다. 이제 들어가 자자." if night else "물때가 지났다. 이번 낚시는 여기까지."
 
 
 # ─── 화면 구성 ──────────────────────────────────────
@@ -741,6 +822,9 @@ func _build_hud() -> void:
 	_calm_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_calm_row)
 	_calm_row.add_child(UiKit.spacer())
+	_box_btn = UiKit.action("아이스박스", "secondary", true)
+	_box_btn.pressed.connect(_open_box.bind(false))
+	_calm_row.add_child(_box_btn)
 	_quit_btn = UiKit.action("그만하기", "secondary", true)
 	_quit_btn.pressed.connect(_start_ending)
 	_calm_row.add_child(_quit_btn)
@@ -866,6 +950,10 @@ func _build_hud() -> void:
 ## 메뉴에서 낚싯대, 릴, 미끼를 바꾸면 주인공 그림과 낚시 능력치에 바로 반영한다
 func _on_gear_changed() -> void:
 	GearDB.apply(logic, GameState.equipped_rod, GameState.equipped_reel)
+	if not tutorial:
+		logic.bite_mult = sea.bite
+		KitDB.apply(logic, GameState.kits, night, sea.weather)
+		_bite_base = logic.bite_mult
 	_player.set_gear(GameState.equipped_rod, GameState.equipped_reel)
 	var fa := GearDB.float_art(GameState.equipped_rod)
 	_float_tex = load(ArtSlot.art_path(fa)) if ArtSlot.has_art(fa) else null
@@ -905,7 +993,7 @@ func _update_order_card() -> void:
 func _update_prompt() -> void:
 	var t := ""
 	var hot := false
-	if not _in_story and not _ending and not _summary.visible and not _bait_sheet.visible:
+	if not _in_story and not _ending and not _summary.visible and not _bait_sheet.visible and not _box_sheet.visible:
 		match logic.state:
 			FishingLogic.State.READY:
 				t = "꾹 눌러서 힘 모으기"
@@ -941,7 +1029,14 @@ func _update_prompt() -> void:
 
 ## 판정 글자가 튀어 올랐다가 사라진다 (스티커처럼 굵은 외곽선).
 ## big이면 작게 시작해 크게 부풀었다가 자리 잡고, 살짝 기울었다가 바로 선다 (PERFECT, NICE CAST, 지금!)
-func _pop_text(t: String, color: Color, at: Vector2, px := 40, big := false) -> void:
+## 줄다리기 중 글 (버릇, 지쳤어요). 한 번에 하나만: 새 글이 뜨면 앞 글은 바로 지운다 (2026-11-19 사용자: 글자가 겹침)
+func _fight_pop(t: String, color: Color, at: Vector2, px := 40, big := false) -> void:
+	if is_instance_valid(_last_fight_pop):
+		_last_fight_pop.queue_free()
+	_last_fight_pop = _pop_text(t, color, at, px, big)
+
+
+func _pop_text(t: String, color: Color, at: Vector2, px := 40, big := false) -> Label:
 	var l := UiKit.text(t, "h1", color, HORIZONTAL_ALIGNMENT_CENTER)
 	l.add_theme_font_size_override("font_size", px)
 	UiKit.outlined(l, 14 if big else 12)
@@ -965,6 +1060,7 @@ func _pop_text(t: String, color: Color, at: Vector2, px := 40, big := false) -> 
 	tw.chain().tween_property(l, "position:y", l.position.y - 44.0, 0.4).set_trans(Tween.TRANS_SINE)
 	tw.parallel().tween_property(l, "modulate:a", 0.0, 0.4)
 	tw.chain().tween_callback(l.queue_free)
+	return l
 
 
 # ─── 미끼 고르기 ───────────────────────────────────
@@ -1035,6 +1131,95 @@ func _open_bait_sheet() -> void:
 		_bait_list.add_child(row)
 	_bait_sheet.show()
 	UiKit.fade_in(_bait_sheet, UiKit.MOTION_BASE)
+
+
+# ─── 아이스박스 (골라서 놓아주기) ─────────────────────
+
+func _build_box_sheet() -> void:
+	_box_sheet = Control.new()
+	_box_sheet.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_box_sheet)
+	var dim := UiKit.scrim(0.45)
+	dim.gui_input.connect(func(e):
+		if e is InputEventMouseButton and e.pressed and not _box_forced:
+			_box_sheet.hide())
+	_box_sheet.add_child(dim)
+	var panel := UiKit.paper_panel(UiKit.SPACE_LG, UiKit.RADIUS_LG)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	panel.offset_left = 16
+	panel.offset_right = -16
+	panel.offset_bottom = -20
+	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_box_sheet.add_child(panel)
+	var v := UiKit.vbox(UiKit.SPACE_MD)
+	panel.add_child(v)
+	_box_title = UiKit.text("", "h2", UiKit.INK)
+	v.add_child(_box_title)
+	_box_desc = UiKit.paragraph("", "caption", UiKit.INK_SOFT)
+	v.add_child(_box_desc)
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 600)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(scroll)
+	_box_list = UiKit.vbox(UiKit.SPACE_SM)
+	_box_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_box_list)
+	_box_sheet.hide()
+
+
+## 아이스박스 열기. forced면 꽉 차서 한 마리를 놓아줘야 닫힌다
+func _open_box(forced: bool) -> void:
+	if not forced and logic.state not in [FishingLogic.State.READY, FishingLogic.State.FAILED]:
+		return
+	_box_forced = forced
+	_held = false
+	Sound.play_sfx("tap")
+	_fill_box()
+	_box_sheet.show()
+	UiKit.fade_in(_box_sheet, UiKit.MOTION_BASE)
+
+
+func _fill_box() -> void:
+	for c in _box_list.get_children():
+		c.queue_free()
+	var inv: Array = GameState.inventory
+	_box_title.text = ("아이스박스가 꽉 찼어요" if _box_forced else "아이스박스") + "  %d/%d" % [inv.size(), GameState.icebox_size]
+	_box_desc.text = "한 마리를 바다에 놓아줘야 해요. 놓아준 고기는 돌아오지 않아요" if _box_forced else "놓아줄 고기를 골라요. 바깥을 누르면 닫혀요"
+	# 싼 고기부터 (놓아줄 만한 것이 위에)
+	var idx: Array = range(inv.size())
+	idx.sort_custom(func(a, b): return FishDB.value_of(inv[a].id, inv[a].size) < FishDB.value_of(inv[b].id, inv[b].size))
+	for i in idx:
+		_box_list.add_child(_box_row(inv[i]))
+
+
+func _box_row(e: Dictionary) -> PanelContainer:
+	var row := PanelContainer.new()
+	row.add_theme_stylebox_override("panel", UiKit.box(Color(UiKit.NOTE_DARK, 0.28), 16, Color(UiKit.NOTE_DARK, 0.6), 1, 10))
+	var h := UiKit.hbox(UiKit.SPACE_MD)
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_child(h)
+	var ic := UiKit.icon_rect("fish_" + e.id, 44)
+	if ic:
+		ic.custom_minimum_size = Vector2(72, 44)
+		h.add_child(ic)
+	var tv := UiKit.vbox(-2)
+	tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(tv)
+	var just := e == _box_just
+	tv.add_child(UiKit.text("%s %.1fcm%s" % [FishDB.get_fish(e.id).name, e.size, "  · 방금 잡음" if just else ""], "title", UiKit.INK))
+	tv.add_child(UiKit.text("값 %s  ·  %s" % [GameState.format_won(FishDB.value_of(e.id, e.size)), FishLine.stage(e, GameState.day).name], "caption", UiKit.INK_SOFT))
+	var b := UiKit.game_button("놓아주기", UiKit.TEAL_BTN, Vector2(132, 52))
+	b.pressed.connect(func():
+		GameState.release_fish(e)
+		Sound.play_sfx("slip", 0.05, -4.0)
+		_pop_text("%s 바다로" % FishDB.get_fish(e.id).name, UiKit.FOAM, Vector2(size.x / 2.0, size.y * 0.42), 34)
+		if _box_forced and not GameState.is_overfull():
+			_box_forced = false
+			_box_sheet.hide()
+			return
+		_fill_box())
+	h.add_child(b)
+	return row
 
 
 # ─── 잡은 물고기 카드 ───────────────────────────────
@@ -1108,8 +1293,21 @@ func _build_card() -> void:
 	v.add_child(_card_order)
 	_card_box = UiKit.text("", "caption", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(_card_box)
-	_card_continue = UiKit.text("눌러서 계속", "label", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER)
+	_card_continue = UiKit.text("", "label", UiKit.CORAL_DEEP, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(_card_continue)
+	# 고르기: 놓아주기 / 쿨러에 넣기
+	var btns := UiKit.hbox(UiKit.SPACE_MD, BoxContainer.ALIGNMENT_CENTER)
+	v.add_child(btns)
+	_card_free = UiKit.game_button("놓아주기", UiKit.TEAL_BTN, Vector2(250, 76), 26)
+	_card_free.pressed.connect(func():
+		if _card_lock <= 0.0:
+			_free_catch())
+	btns.add_child(_card_free)
+	_card_keep = UiKit.game_button("쿨러에 넣기", UiKit.CORAL, Vector2(250, 76), 26)
+	_card_keep.pressed.connect(func():
+		if _card_lock <= 0.0:
+			_keep_catch())
+	btns.add_child(_card_keep)
 	_card_root.hide()
 
 
@@ -1137,28 +1335,30 @@ func _show_card() -> void:
 		tags.append("PERFECT 챔질")
 	if logic.cast_grade == "nice":
 		tags.append("NICE CAST")
-	_card_value.text = "값 %s%s" % [GameState.format_won(FishDB.value_of(id, logic.fish_size)), ("  ·  " + "  ·  ".join(PackedStringArray(tags))) if not tags.is_empty() else ""]
+	if FishDB.must_release(id, logic.fish_size):
+		_card_value.text = "  ·  ".join(PackedStringArray(tags)) # 놓아줄 고기라 값은 안 보인다
+	else:
+		_card_value.text = "값 %s%s" % [GameState.format_won(FishDB.value_of(id, logic.fish_size)), ("  ·  " + "  ·  ".join(PackedStringArray(tags))) if not tags.is_empty() else ""]
 	# 주문
 	_card_order.hide()
-	if not tutorial:
-		var reward := GameState.offer_to_order(id, logic.fish_size)
-		if Orders.matches(order, id, logic.fish_size) or reward > 0:
-			var lbl := _card_order.get_child(0) as Label
-			if reward > 0:
-				lbl.text = "주문 완료! +%s" % GameState.format_won(reward)
-				Sound.play_sfx("coin")
-			else:
-				lbl.text = "주문 %d/%d" % [GameState.order_filled, order.count]
-			_card_order.show()
+	if not tutorial and not GameState.order_done and Orders.matches(order, id, logic.fish_size):
+		(_card_order.get_child(0) as Label).text = "주문에 맞는 고기예요. 쿨러에 넣으면 보내요"
+		_card_order.show()
 	# 아이스박스 자리
 	var cap := GameState.icebox_size
-	if not _card_released.is_empty():
-		var rf: String = FishDB.get_fish(_card_released.id).name
-		_card_box.text = ("아이스박스가 꽉 차서 방금 잡은 %s 놓아줬어요" % Josa.attach(rf, "을/를")) if _card_released.size == logic.fish_size and _card_released.id == id else ("아이스박스가 꽉 차서 %s 한 마리를 놓아줬어요" % rf)
+	if GameState.icebox_free() <= 0:
+		_card_box.text = "아이스박스 %d / %d. 넣으려면 한 마리를 빼야 해요" % [GameState.inventory.size(), cap]
 		_card_box.add_theme_color_override("font_color", UiKit.CORAL_DEEP)
 	else:
 		_card_box.text = "아이스박스 %d / %d" % [GameState.inventory.size(), cap]
-		_card_box.add_theme_color_override("font_color", UiKit.CORAL_DEEP if GameState.icebox_free() == 0 else UiKit.INK_SOFT)
+		_card_box.add_theme_color_override("font_color", UiKit.INK_SOFT)
+	# 금지체장 이하는 쿨러에 못 넣는다. 첫날 튜토리얼 볼락은 놓아줄 수 없다 (식당 첫 손님 재료)
+	var small := FishDB.must_release(id, logic.fish_size)
+	_card_continue.text = FishDB.legal_text(id) if small else ("보통 먹지 않는 고기라 놓아주는 꾼이 많아요" if FishDB.is_bycatch(id) else "")
+	_card_continue.visible = not _card_continue.text.is_empty()
+	_card_keep.disabled = small
+	_card_keep.text = "작아서 못 넣어요" if small else "쿨러에 넣기"
+	_card_free.visible = not tutorial
 	var rare := rar != FishDB.RARITY.common
 	Sound.play_sfx("newfish" if (_card_new or rare) else "catch")
 	_card_root.show()
@@ -1206,18 +1406,52 @@ func _animate_card(stars: int) -> void:
 		bc.scale = Vector2(0.3, 0.3)
 		bc.create_tween().tween_property(bc, "scale", Vector2.ONE, 0.3).set_delay(0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	# 닫을 수 있을 때 "눌러서 계속"이 나타난다
-	_card_continue.modulate.a = 0.0
-	_card_continue.create_tween().tween_property(_card_continue, "modulate:a", 1.0, 0.25).set_delay(_card_lock)
+	for b in [_card_free, _card_keep]:
+		b.modulate.a = 0.0
+		b.create_tween().tween_property(b, "modulate:a", 1.0, 0.25).set_delay(_card_lock)
+
+
+## 쿨러에 넣는다. 주문에 맞으면 보내고, 꽉 차면 카드를 닫은 뒤 뺄 고기를 고른다
+func _keep_catch() -> void:
+	if _card_entry.is_empty() or FishDB.must_release(_card_entry.id, _card_entry.size):
+		return
+	Sound.play_sfx("tap", 0.05, -6.0)
+	GameState.store_catch(_card_entry, false)
+	_box_just = GameState.inventory.back()
+	if not tutorial:
+		var reward := GameState.offer_to_order(_card_entry.id, _card_entry.size)
+		if reward > 0:
+			Sound.play_sfx("coin")
+			_pop_text("주문 완료! +%s" % GameState.format_won(reward), UiKit.SUN, Vector2(size.x / 2.0, size.y * 0.42), 36, true)
+		elif Orders.matches(order, _card_entry.id, _card_entry.size) and not GameState.order_done:
+			_pop_text("주문 %d/%d" % [GameState.order_filled, order.count], UiKit.SEA, Vector2(size.x / 2.0, size.y * 0.42), 32)
+	_card_entry = {}
+	_close_card()
+
+
+## 바다로 돌려보낸다. 오늘 조과 기록에는 "놓아줌"으로 남는다
+func _free_catch() -> void:
+	if _card_entry.is_empty() or tutorial:
+		return
+	_card_entry["released"] = true
+	Sound.play_sfx("slip", 0.05, -4.0)
+	var rep := GameState.reward_release(_card_entry)
+	_pop_text("%s 바다로%s" % [FishDB.get_fish(_card_entry.id).name, "  평판 +1" if rep > 0 else ""], UiKit.FOAM, Vector2(size.x / 2.0, size.y * 0.42), 34)
+	_card_entry = {}
+	_close_card()
 
 
 func _close_card() -> void:
 	_card_root.hide()
 	logic.acknowledge()
+	if GameState.is_overfull():
+		_open_box(true)
+		return
 	if tutorial and not _met_mansu and GameState.caught_today.size() == 1:
 		_met_mansu = true
 		_play_story([
 			{"speaker": "{player}", "text": "잡았다...! 진짜 잡았어!"},
-			{"speaker": "???", "text": "어이 서울 양반. 그 낚싯대로 고기 잡으려면 해 지겠다 싶었는데."},
+			{"speaker": "???", "who": "mansu", "text": "어이 서울 양반. 그 낚싯대로 고기 잡으려면 해 지겠다 싶었는데."},
 			{"speaker": "박만수", "text": "볼락이네. 새벽 볼락은 눈이 커서 날 밝으면 귀신같이 숨어."},
 			{"speaker": "박만수", "face": "smile", "text": "고기 모인 자리에 던지고 찌 들어갈 때 딱 채 봐라. 손맛이 다를 거다."},
 		])
@@ -1263,13 +1497,14 @@ func _leave() -> void:
 		GameState.current_location = "shop" # 잡은 볼락을 들고 식당으로 돌아간다
 		UiKit.go_to(self, TUTORIAL_NEXT)
 	elif night:
-		# 밤 낚시를 마치면 잔다. 내일은 늦잠 (새벽 낚시 건너뜀)
+		# 밤 낚시를 마치면 잔다. 내일은 늦잠 (아침 낚시가 두 시간 줄어든다)
 		GameState.night_fished = true
 		GameState.current_location = "home"
 		GameState.end_day()
 		UiKit.go_to(self, FREE_NEXT)
 	else:
-		GameState.current_location = "breakwater"
+		GameState.day_fished = true # 낮 낚시는 하루 한 번
+		GameState.current_location = "breakwater" if spot == "breakwater" else spot
 		UiKit.go_to(self, FREE_NEXT)
 
 
@@ -1278,7 +1513,8 @@ func _show_summary() -> void:
 		c.queue_free()
 	var total := 0
 	for e in GameState.caught_today:
-		total += FishDB.value_of(e.id, e.size)
+		if not e.get("released", false):
+			total += FishDB.value_of(e.id, e.size)
 		_summary_list.add_child(_catch_row(e))
 	if GameState.caught_today.is_empty():
 		_summary_list.add_child(UiKit.text("오늘은 한 마리도 못 잡았다.", "body", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
@@ -1309,6 +1545,8 @@ func _catch_row(e: Dictionary) -> PanelContainer:
 	var rar := FishDB.rarity(e.id)
 	if rar != FishDB.RARITY.common:
 		h.add_child(UiKit.badge(rar.name, rar.color, Color.WHITE))
+	if e.get("released", false):
+		h.add_child(UiKit.badge("놓아줌", UiKit.SEA, Color.WHITE))
 	h.add_child(UiKit.spacer())
 	var st := UiKit.text("★".repeat(FishDB.stars(e.id, e.size)), "label", UiKit.SUN)
 	h.add_child(st)
@@ -1738,11 +1976,21 @@ func _draw_tension_gauge() -> void:
 	var cy: float = y_of.call(_gauge_t)
 	var zone := FightView.gauge_zone(_gauge_t)
 	var knob_col: Color = {"slack": UiKit.SKY, "good": UiKit.LEAF, "drag": UiKit.SUN, "danger": UiKit.CORAL}[zone]
-	_hud_draw.draw_style_box(UiKit.chunky(knob_col, 9, 0, 2), Rect2(r.position.x - 10, cy - 9, r.size.x + 20, 18))
+	# 손잡이는 막대 안에만 (2026-11-19 사용자: 막대 밖으로 삐져나옴)
+	cy = clampf(cy, r.position.y + 9.0, r.end.y - 9.0)
+	_hud_draw.draw_style_box(UiKit.chunky(knob_col, 9, 0, 2), Rect2(r.position.x + 1, cy - 9, r.size.x - 2, 18))
 	var font := UiKit.font("cute")
 	var label := "장력"
-	_hud_draw.draw_string_outline(font, Vector2(r.position.x - 6, r.position.y - 14), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, 8, UiKit.OUTLINE)
-	_hud_draw.draw_string(font, Vector2(r.position.x - 6, r.position.y - 14), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, UiKit.FOAM)
+	# 힘겨루기 (물고기가 차고 나가는 중): 막대 테두리가 숨 쉬듯 빛나고 글이 바뀐다. 반대로 잘 버티면 연두
+	if logic.run_dir != 0 and not logic.exhausted:
+		var tug: Color = UiKit.LEAF if logic.countering else UiKit.SUN
+		var a := 0.55 + 0.45 * sin(_t * 9.0)
+		_hud_draw.draw_style_box(UiKit.box(Color.TRANSPARENT, 26, Color(tug, a), 5, 0), r.grow(6))
+		label = "버텨요" if logic.countering else "힘겨루기"
+	var lw := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+	var lp := Vector2(minf(r.get_center().x - lw / 2.0, size.x - lw - 10.0), r.position.y - 16)
+	_hud_draw.draw_string_outline(font, lp, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, 8, UiKit.OUTLINE)
+	_hud_draw.draw_string(font, lp, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, UiKit.FOAM)
 	# 드랙이 줄을 내주는 중: 게이지 아래에 짧게 알린다
 	if logic.drag_slip:
 		var t := "드르륵"

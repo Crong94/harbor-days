@@ -5,8 +5,8 @@ extends Control
 ## 구성: 맨 위 공통 헤더(고정) / 끌어서 움직이는 지도와 핀 / 아래 종이 시트(장소 정보와 이동)
 ## 지도는 화면 높이의 MAP_SCREENS배 크기로 보여 준다. 처음에는 지금 있는 곳을 가운데에 둔다.
 
-const PIN_DOT := 14.0 # 잠긴 장소 점 크기
 const SERVICE_SCENE := "res://scenes/restaurant/service.tscn"
+const TOWN_SCENE := "res://scenes/town/town_market.tscn"
 ## 지도 높이를 화면 높이의 몇 배로 보여 줄지
 const MAP_SCREENS := 1.2
 ## 이만큼 움직여야 끌기로 본다 (그보다 적으면 탭)
@@ -42,9 +42,20 @@ var _velocity := Vector2.ZERO
 var _focus_tween: Tween
 var _drawer: DayDrawer
 var _dialogue: DialogueBox # 이야기 사건과 잡담 (처음 쓸 때 만든다)
+## 시트의 덧붙은 버튼들 (11-19): 선물하기(Friends), 앱 만들어 주기(AppWork), 메뉴 개발(Menu)
+var _extras: VBoxContainer
+var _gift_sheet: Control
+var _gift_list: VBoxContainer
+var _gift_title: Label
+var _gift_who := ""
+const APP_SCENE := "res://scenes/village/app_work.tscn"
+const LAB_SCENE := "res://scenes/restaurant/menu_lab.tscn"
 
 
 func _ready() -> void:
+	# 갯바위 열기 전 저장: 이미 도감에 감성돔이 있으면 잡은 것으로 친다 (Story mansu_rocks)
+	if GameState.dex.has("gamseongdom"):
+		GameState.flags["caught_gamseongdom"] = true
 	var sea := ColorRect.new()
 	sea.color = Color("2f86b8")
 	sea.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -95,7 +106,7 @@ func _ready() -> void:
 		GameState.flags["map_drag_hint"] = true
 		_show_toast.call_deferred("지도를 끌어서 마을을 둘러봐요")
 	else:
-		_show_toast.call_deferred(DayFlow.next_hint(GameState.time_minutes, GameState.opened_today))
+		_show_toast.call_deferred(DayFlow.next_hint(GameState.time_minutes, GameState.opened_today, GameState.day_fished))
 	_show_notices.call_deferred(2.6)
 
 
@@ -273,7 +284,7 @@ func _rebuild_pins() -> void:
 	_pins.clear()
 	for id in Locations.LIST:
 		if not Locations.is_visible(id, GameState.flags):
-			continue # 숨은 장소
+			continue # 아직 못 가는 곳은 아무것도 띄우지 않는다 (11-19 사용자 요청. 예전엔 검은 점)
 		var p := _make_pin(id)
 		_pins[id] = p
 		_world.add_child(p)
@@ -282,15 +293,6 @@ func _rebuild_pins() -> void:
 
 func _make_pin(id: String) -> Control:
 	var loc := Locations.get_loc(id)
-	if not Locations.is_unlocked(id, GameState.flags):
-		# 아직 갈 수 없는 곳은 작은 점으로만
-		var dot := Panel.new()
-		dot.custom_minimum_size = Vector2(PIN_DOT, PIN_DOT)
-		dot.size = Vector2(PIN_DOT, PIN_DOT)
-		dot.add_theme_stylebox_override("panel", UiKit.box(Color(UiKit.NAVY_DEEP, 0.55), UiKit.RADIUS_PILL, Color(1, 1, 1, 0.5), 2, 0))
-		dot.tooltip_text = "아직 갈 수 없어요"
-		dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		return dot
 	var here := id == GameState.current_location
 	var b := Button.new()
 	b.text = ("● " if here else "") + GameState.line(loc.name)
@@ -405,6 +407,8 @@ func _build_sheet() -> void:
 	_sheet_desc = UiKit.paragraph("", "body", UiKit.INK_SOFT)
 	v.add_child(_sheet_desc)
 	v.add_child(UiKit.gap(4))
+	_extras = UiKit.vbox(UiKit.SPACE_SM)
+	v.add_child(_extras)
 	var row := UiKit.hbox(UiKit.SPACE_MD)
 	var cancel := UiKit.action("닫기", "secondary")
 	cancel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -433,11 +437,34 @@ func _select(id: String) -> void:
 	var arrive := GameState.time_minutes + travel
 	match id:
 		"breakwater":
-			if not DayFlow.can_fish(arrive):
+			if not DayFlow.can_fish(arrive, GameState.day_fished) and not Story.pending(id, GameState.day, arrive, GameState.flags).is_empty():
+				_action = "talk" # 낚시 시간은 아니지만 기다리는 사람이 있다 (해솔이 낚시 같은 이야기). 이야기만 보고 지도로
+				_go_btn.text = "들어가기" if here else "가기"
+			elif not DayFlow.can_fish(arrive, GameState.day_fished):
 				_action = ""
-				_go_btn.text = "지금은 낚시 시간이 아니에요"
+				_go_btn.text = "오늘 낮 낚시는 했어요" if GameState.day_fished and DayFlow.can_fish(arrive) else "지금은 낚시 시간이 아니에요"
 				_sheet_desc.text = GameState.line(loc.desc) + "
-새벽 5시~11시, 밤 9시~11시 반에 낚시할 수 있어요."
+낮 낚시는 아침 6시~오후 5시 사이 하루 한 번(세 시간), 밤 낚시는 9시~11시 반이에요."
+		"flat":
+			var ft := Flat.open_times(GameState.day)
+			var fwhen := "오늘 물 빠지는 때: " + Spots.times_text(ft) if not ft.is_empty() else "오늘은 낮에 물이 안 빠져요."
+			var funtil := Flat.open_until(GameState.day, arrive)
+			if funtil < 0:
+				_action = ""
+				_go_btn.text = "지금은 물이 차 있어요"
+			else:
+				_go_btn.text = ("들어가기" if here else "가기") + " (물 들어오는 %s)" % Bus.clock(funtil)
+			_sheet_desc.text = GameState.line(loc.desc) + "\n" + fwhen
+		"rocks":
+			var times := Spots.rocks_fishing_times(GameState.day)
+			var when := "오늘 물 빠지는 낚시 시간: " + Spots.times_text(times) if not times.is_empty() else "오늘은 낚시 시간에 물이 안 빠져요."
+			if not Spots.can_fish_rocks(GameState.day, arrive, GameState.day_fished):
+				_action = ""
+				_go_btn.text = "지금은 물이 차 있어요" if DayFlow.can_fish(arrive, GameState.day_fished) else ("오늘 낮 낚시는 했어요" if GameState.day_fished and DayFlow.can_fish(arrive) else "지금은 낚시 시간이 아니에요")
+			else:
+				_go_btn.text = "들어가기" if here else "가기 (물 들어오는 %s)" % Bus.clock(Spots.rocks_end(GameState.day, arrive))
+			_sheet_desc.text = GameState.line(loc.desc) + "
+" + when
 		"market":
 			if not Market.is_open(arrive):
 				_action = ""
@@ -451,11 +478,27 @@ func _select(id: String) -> void:
 				elif DayFlow.can_open_shop(arrive, false):
 					_action = "open"
 					_go_btn.text = "가게 열기" if arrive >= DayFlow.SHOP_OPEN else "가게 열기 (저녁 6시로)"
+		"bus":
+			var dep := Bus.next_departure(arrive)
+			var come := Bus.visitors(GameState.reputation, GameState.day)
+			var note := "
+오늘 저녁 버스로 외지 손님이 %d명쯤 와요." % come if come > 0 and not GameState.opened_today else ""
+			if dep < 0:
+				_sheet_desc.text = "읍내 가는 버스는 오늘 끝났어요. 아침 8시에 첫차가 와요." + note
+			elif GameState.money < Bus.FARE:
+				_action = ""
+				_go_btn.text = "차비가 모자라요"
+				_sheet_desc.text = "읍내 장터까지 %d분, 차비 %s." % [Bus.RIDE, GameState.format_won(Bus.FARE)] + note
+			else:
+				_action = "bus"
+				_go_btn.text = "%s 버스 타기" % Bus.clock(dep)
+				_sheet_desc.text = "읍내 장터까지 %d분, 차비 %s. 돌아오는 버스는 오전 10시, 오후 1시, 4시, 7시예요." % [Bus.RIDE, GameState.format_won(Bus.FARE)] + note
 		"home":
 			if GameState.opened_today or GameState.time_minutes >= DayFlow.SHOP_CLOSE:
 				_action = "sleep"
 				_go_btn.text = "집에 가서 자기"
 	_go_btn.disabled = _action.is_empty()
+	_fill_extras(id, arrive)
 	var was_open := _sheet.visible
 	_sheet.show()
 	if not was_open:
@@ -481,6 +524,13 @@ func _travel() -> void:
 	if _action == "open":
 		UiKit.go_to(self, SERVICE_SCENE)
 		return
+	if _action == "bus":
+		# 정류장에서 버스를 기다렸다가 타고 읍내로 (차비는 탈 때 낸다)
+		GameState.spend(Bus.FARE)
+		GameState.time_minutes = Bus.next_departure(GameState.time_minutes) + Bus.RIDE
+		Sound.play_sfx("step")
+		UiKit.go_to(self, TOWN_SCENE)
+		return
 	if _action == "sleep":
 		GameState.end_day()
 		Sound.play_sfx("step")
@@ -491,12 +541,21 @@ func _travel() -> void:
 		_show_notices.call_deferred(2.6)
 		return
 	# 이야기 사건이 있으면 지도 위 대사창으로 먼저 보여 주고 이어서 들어간다 (Story)
+	var talk_only := _action == "talk"
 	var ev := Story.pending(id, GameState.day, GameState.time_minutes, GameState.flags)
 	if not ev.is_empty():
 		_refresh_hud()
 		_play_story(ev.lines, func():
 			Story.finish(ev, GameState)
-			_enter(id))
+			if talk_only:
+				_refresh_hud()
+				_rebuild_pins()
+				_drawer.refresh_dot()
+			else:
+				_enter(id))
+		return
+	if talk_only:
+		_refresh_hud()
 		return
 	_enter(id)
 
@@ -570,3 +629,112 @@ func _show_toast(t: String) -> void:
 	tw.tween_property(_toast, "modulate:a", 1.0, UiKit.MOTION_BASE)
 	tw.tween_interval(3.8) # 2.2초는 읽기 전에 사라졌다
 	tw.tween_property(_toast, "modulate:a", 0.0, UiKit.MOTION_SLOW)
+
+
+# ─── 선물, 앱, 메뉴 개발 (11-19) ────────────────────────
+
+func _fill_extras(id: String, arrive: int) -> void:
+	for c in _extras.get_children():
+		c.queue_free()
+	var who := Friends.who_at(id, arrive, GameState.flags)
+	if not who.is_empty():
+		var h := Friends.hearts(Friends.points(GameState, who))
+		var call: String = Friends.person(who).call
+		var gb := UiKit.action("%s께 선물하기  %s" % [call, Friends.heart_text(h)] if Friends.can_give(GameState, who) else "%s  %s · 오늘은 선물했어요" % [call, Friends.heart_text(h)], "mint", true)
+		gb.disabled = not Friends.can_give(GameState, who) or Friends.giftables(GameState).is_empty()
+		gb.pressed.connect(_extra_go.bind(id, "gift", who))
+		_extras.add_child(gb)
+	var app := AppWork.available_at(GameState, id)
+	if not app.is_empty() and arrive + AppWork.WORK_MINUTES <= DayFlow.SLEEP_AT:
+		var ab := UiKit.action("앱 만들어 주기 〈%s〉 %d/%d" % [AppWork.app(app).title, AppWork.stage(GameState, app) + 1, AppWork.app(app).stages.size()], "sun", true)
+		ab.pressed.connect(_extra_go.bind(id, "app", app))
+		_extras.add_child(ab)
+	if id == "shop" and arrive + Menu.LAB_MINUTES <= DayFlow.SHOP_OPEN and Menu.RECIPES.keys().any(func(r): return Menu.learned(GameState.flags, r)):
+		var n := Menu.to_test(GameState.flags).size()
+		var lb := UiKit.action("메뉴 개발" + (" · 시험할 요리 %d" % n if n > 0 else ""), "sun", true)
+		lb.pressed.connect(_extra_go.bind(id, "lab", ""))
+		_extras.add_child(lb)
+
+
+func _extra_go(id: String, kind: String, data: String) -> void:
+	GameState.time_minutes += Locations.travel_minutes(GameState.current_location, id)
+	GameState.current_location = id
+	_close_sheet()
+	_refresh_hud()
+	match kind:
+		"gift":
+			_open_gift(data)
+		"app":
+			GameState.flags["app_now"] = data
+			UiKit.go_to(self, APP_SCENE)
+		"lab":
+			UiKit.go_to(self, LAB_SCENE)
+
+
+func _build_gift_sheet() -> void:
+	_gift_sheet = Control.new()
+	_gift_sheet.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_gift_sheet)
+	var dim := UiKit.scrim(0.45)
+	dim.gui_input.connect(func(e):
+		if e is InputEventMouseButton and e.pressed:
+			_gift_sheet.hide())
+	_gift_sheet.add_child(dim)
+	var panel := UiKit.paper_panel(UiKit.SPACE_LG, UiKit.RADIUS_LG)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	panel.offset_left = 16
+	panel.offset_right = -16
+	panel.offset_bottom = -20
+	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_gift_sheet.add_child(panel)
+	var v := UiKit.vbox(UiKit.SPACE_MD)
+	panel.add_child(v)
+	_gift_title = UiKit.text("", "h2", UiKit.INK)
+	v.add_child(_gift_title)
+	v.add_child(UiKit.paragraph("하루에 한 번 줄 수 있어요. 좋아하는 걸 주면 더 친해져요", "caption", UiKit.INK_SOFT))
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 520)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(scroll)
+	_gift_list = UiKit.vbox(UiKit.SPACE_SM)
+	_gift_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_gift_list)
+	_gift_sheet.hide()
+
+
+func _open_gift(who: String) -> void:
+	if _gift_sheet == null:
+		_build_gift_sheet()
+	_gift_who = who
+	_gift_title.text = "%s께 선물  %s" % [Friends.person(who).call, Friends.heart_text(Friends.hearts(Friends.points(GameState, who)))]
+	for c in _gift_list.get_children():
+		c.queue_free()
+	for g in Friends.giftables(GameState):
+		var b := UiKit.action("%s  ·  %d" % [g.name, g.count], "secondary")
+		b.custom_minimum_size = Vector2(0, 68)
+		b.pressed.connect(_give.bind(g))
+		_gift_list.add_child(b)
+	_gift_sheet.show()
+	UiKit.fade_in(_gift_sheet, UiKit.MOTION_BASE)
+
+
+func _give(g: Dictionary) -> void:
+	var who := _gift_who
+	var r := Friends.give(GameState, who, g)
+	_gift_sheet.hide()
+	if r.is_empty():
+		return
+	Sound.play_sfx("coin" if r.taste != "base" else "tap")
+	var lines := [{"speaker": "", "text": "%s에게 %s 건넸다." % [Friends.person(who).call, Josa.attach(g.name, "을/를")]}]
+	lines.append({"speaker": who, "face": "smile" if r.taste != "base" else "", "text": Friends.react(r.taste)})
+	if int(r.hearts) > int(r.hearts_before):
+		lines.append({"speaker": who, "face": "smile", "text": r.line})
+		lines.append({"speaker": "", "text": "%s 더 친해졌어요. %s" % [Josa.attach(Friends.person(who).call, "와/과"), Friends.heart_text(int(r.hearts))]})
+	if not str(r.learned).is_empty():
+		var rc := Menu.recipe(r.learned)
+		lines.append({"speaker": who, "text": rc.tip})
+		lines.append({"speaker": "", "text": "%s 요리법을 배웠어요. 저녁 장사 전에 식당에서 메뉴 개발을 해 봐요." % rc.name})
+		GameState.note("%s %s 요리법을 알려 줬다." % [Josa.attach(Friends.person(who).call, "이/가"), rc.name], 3)
+	_play_story(lines, func():
+		_refresh_hud()
+		_drawer.refresh_dot())

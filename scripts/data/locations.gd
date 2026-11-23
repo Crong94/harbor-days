@@ -8,7 +8,7 @@ extends RefCounted
 ## 핀은 보통 pos 위에 서서 아래 끝이 pos를 가리킨다. "pin": "below"면 pos 아래에 매달린다 (위에 자리가 없을 때).
 ## unlock은 GameState.flags 이름이다. 빈 문자열이면 처음부터 열려 있다.
 ## 할 일이 아직 없는 곳(마을회관, 분교, 민박)은 그곳 이야기가 생길 때 켤 표시로 잠가 둔다 (hall_open, met_haesol, met_jiwoo)
-## "hidden": true인 곳은 열리기 전까지 지도에 점도 보이지 않는다 (숨은 장소).
+## 잠긴 곳은 열리기 전까지 지도에 아무것도 보이지 않는다. "hidden": true는 찾아야 열리는 숨은 장소 표시.
 
 const LIST := {
 	"shop": {
@@ -61,7 +61,7 @@ const LIST := {
 	},
 	"hall": {
 		"name": "마을회관", "pos": Vector2(0.329, 0.459), "unlock": "hall_open",
-		"scene": "", "desc": "게시판과 마을 의뢰",
+		"scene": "res://scenes/village/hall.tscn", "desc": "게시판에 붙은 마을 의뢰를 들어준다",
 	},
 	"school": {
 		"name": "물빛분교", "pos": Vector2(0.555, 0.488), "unlock": "met_haesol",
@@ -71,9 +71,13 @@ const LIST := {
 		"name": "등대민박", "pos": Vector2(0.254, 0.198), "unlock": "met_jiwoo",
 		"scene": "", "desc": "방 다섯 개짜리 민박",
 	},
+	"flat": {
+		"name": "물빛 갯벌", "pos": Vector2(0.300, 0.770), "unlock": "flat_open",
+		"scene": "res://scenes/flat/flat.tscn", "desc": "물이 빠지면 드러나는 갯벌. 바지락, 동죽, 칠게, 가끔 낙지",
+	},
 	"rocks": {
 		"name": "검은여 갯바위", "pos": Vector2(0.749, 0.586), "unlock": "learned_tide",
-		"scene": "", "desc": "물때를 알아야 들어갈 수 있는 중급 낚시터",
+		"scene": "res://scenes/fishing/fishing.tscn", "desc": "물때를 알아야 들어갈 수 있는 중급 낚시터",
 	},
 	"hidden_rocks": {
 		"name": "숨은 갯바위", "pos": Vector2(0.866, 0.571), "unlock": "found_hidden_rocks", "hidden": true,
@@ -118,9 +122,9 @@ static func is_unlocked(id: String, flags: Dictionary) -> bool:
 	return cond.is_empty() or flags.get(cond, false)
 
 
-## 지도에 핀이나 점을 보여 줄지. 숨은 장소는 열리기 전까지 안 보인다.
+## 지도에 핀을 보여 줄지. 열린 곳만 보인다 (11-19 사용자 요청: 잠긴 곳 위 검은 점 없앰. 숨은 장소도 같다)
 static func is_visible(id: String, flags: Dictionary) -> bool:
-	return not get_loc(id).get("hidden", false) or is_unlocked(id, flags)
+	return is_unlocked(id, flags)
 
 
 ## 두 장소 사이 이동 시간(분). 5분 단위로 반올림한다.

@@ -33,12 +33,12 @@ func _ready() -> void:
 	who.offset_right = 210
 	who.offset_top = GameHeader.BOTTOM + 90.0
 	who.offset_bottom = GameHeader.BOTTOM + 650.0
+	who.hide() # 대화는 대화창 오른쪽 아래 일러스트로 (11-23). 전신 그림은 띄우지 않는다
 	add_child(who)
 
 	_build_top_bar()
 	_build_card()
 	_dialogue = DialogueBox.new()
-	_dialogue.on_stage = ["sundeok"] # 할머니가 이미 크게 서 있다. 주인공 얼굴은 나온다
 	add_child(_dialogue)
 	_dialogue.finished.connect(_on_dialogue_finished)
 	Sound.play_bgm("town")

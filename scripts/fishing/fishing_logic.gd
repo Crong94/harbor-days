@@ -40,7 +40,15 @@ const DRIFT_MISS := 0.5 # 흘러간 정도를 포인트와의 거리로 칠 때 
 const MEND_SAFE := 1.4 # 이만큼(초) 넘게 계속 잡으면 찌가 끌려온다
 const MEND_DRAG := 0.06 # 끌려올 때 1초에 줄어드는 거리
 const FORGIVING_WAIT := 3.0
-## 어종별 버릇 (FishDB habit): dive 처음에 바위로 세게 파고듦, shake 짧고 잦게 처박음, long 길게 차고 나감, jump 바늘털이
+## 어종별 버릇 (FishDB habit): dive 처음에 바위로 세게 파고듦, shake 짧고 잦게 처박음, long 길게 차고 나감, jump 바늘털이,
+## tap 짧고 가볍게 툭툭 (볼락), side 몸을 눕혀 같은 쪽으로 버팀 (망상어), hole 발밑에 와서 바위틈으로 처박음 (쏨뱅이)
+const SIDE_KEEP := 0.8 # side: 앞서 간 쪽으로 다시 차고 나갈 확률
+const SIDE_REEL := 0.7 # side: 몸을 눕혀 버티는 동안 덜 끌려온다
+const HOLE_AT := 0.3 # hole: 이 거리 안으로 들어오면 한 번 바위틈으로 처박는다
+const HOLE_HP := 0.3 # hole: 처박을 때 되살아나는 체력
+const LONG_POWER := 1.2 # long(감성돔): 차고 나가는 힘. 힘겨루기 장력을 낮출 때 감성돔 난이도는 그대로 두려고 올림
+const REST_MULT := 1.7 # 차고 나간 뒤 쉬는 시간 배율 (2026-11-19 사용자: 힘겨루기가 너무 자주 나온다)
+const BEAT_BASE := 3.1 # 당기는 힘이 오르내리는 박자 (FishDB beat가 없을 때)
 const JUMP_CHANCE := 0.45
 const JUMP_TIME := 0.7
 
@@ -63,7 +71,7 @@ const FAIL_SKIP_AFTER := 0.45 # 실패 안내가 뜬 뒤 이만큼 지나면 눌
 ## 장력 오르는 속도 (2026-11-10 낮춤. 사람 반응 0.35초를 넣은 tools/fight_balance.gd로 맞췄다)
 const TENSION_REEL := 0.12 # 누르고 감을 때 기본
 const TENSION_PULL := 0.24 # 물고기가 당기는 힘만큼 더
-const TENSION_RUN_HELD := 0.42 # 차고 나가는데 그대로 감을 때
+const TENSION_RUN_HELD := 0.3 # 차고 나가는데 그대로 감을 때 (2026-11-19 0.42에서 낮춤: 힘겨루기 동안 장력이 천천히 오르게)
 const TENSION_RUN_FREE := 0.12 # 차고 나가는데 손을 뗐을 때
 ## 장력 구간: 이보다 낮으면 느슨함(파랑, 감는 힘이 덜 들어간다), DANGER부터 위험(빨강). 그 사이가 알맞음(초록)
 const TENSION_SLACK := 0.2
@@ -99,6 +107,9 @@ var bite_depth := 0.0 # 입질 때 찌가 잠긴 진행도 0~1
 var jumps := 0
 var jump_t := 0.0
 var run_count := 0
+var hole_dived := false # hole: 발밑 처박기를 했는지
+var run_dir_last := 0 # side: 앞서 차고 나간 쪽
+var beat_ticks := 0 # 당김 박자가 한 바퀴 돌 때마다 하나씩 (화면에서 진동)
 
 ## 캐스팅 포인트
 var point_depth := 0.5 # 처음 값. 화면에서 장비를 넣은 뒤 new_point()로 정한다
@@ -118,7 +129,9 @@ var escape := 0.0 # 차고 나가는 걸 그냥 두면 차오른다. 1이 되면
 
 ## 오늘의 바다와 미끼 (화면에서 넣는다)
 var bait := "krill"
+var spot := "breakwater" # 낚시터 (Spots). 나오는 고기와 크기가 달라진다
 var weather := "sunny"
+var month := 0 # 게임 달 (1~12). 0이면 철을 따지지 않는다 (테스트)
 var bite_mult := 1.0 # 물때, 날씨에 따른 입질 속도 (클수록 빨리)
 
 ## 장비 능력치 (GearDB.apply로 넣는다)
@@ -127,6 +140,7 @@ var reel_mult := 1.0 # 감는 속도
 var tension_mult := 1.0 # 장력이 오르는 정도 (작을수록 버티기 쉬움)
 var hook_bonus := 0.0 # 챔질 여유 (초)
 var slack_bonus := 0.0 # 느슨함을 버티는 추가 시간 (초)
+var land_at := 0.0 # 뜰채: 거리가 이만큼 남으면 바로 떠 올린다 (KitDB net)
 
 var rng := RandomNumberGenerator.new()
 
@@ -141,6 +155,7 @@ var _rest_time := 0.0
 var _run_power := 0.0
 var _size_bonus := 0.0
 var _mend_hold := 0.0
+var _beat := 0.0
 
 
 ## 다음 캐스팅 포인트를 정한다. 던질 수 있는 거리 안에서 고른다.
@@ -302,9 +317,9 @@ func _hook() -> void:
 			boost *= 2.0
 		fish_id = FishDB.pick_ctx(rng, {
 			"brightness": brightness, "depth": cast_power, "bait": bait,
-			"weather": weather, "rare_boost": boost,
+			"weather": weather, "rare_boost": boost, "spot": spot, "month": month,
 		})
-	fish_size = FishDB.roll_size(rng, fish_id, _size_bonus)
+	fish_size = FishDB.roll_size(rng, fish_id, _size_bonus + float(Spots.get_spot(spot).size_bonus))
 	tension = 0.3
 	distance = 1.0
 	fish_hp = 0.75 if hook_grade == "perfect" else 1.0
@@ -316,6 +331,10 @@ func _hook() -> void:
 	jumps = 0
 	jump_t = 0.0
 	run_count = 0
+	hole_dived = false
+	run_dir_last = 0
+	_beat = 0.0
+	beat_ticks = 0
 	_rest_time = rng.randf_range(0.6, 1.2)
 	if habit() == "dive":
 		_rest_time = 0.15 # 우럭: 물자마자 바위로 파고든다
@@ -368,18 +387,36 @@ func fish_strength() -> float:
 func fish_pull() -> float:
 	if exhausted:
 		return 0.15
-	var wave := 0.6 + 0.4 * sin(_t * 3.1)
+	var wave := 0.6 + 0.4 * sin(_beat)
 	var run := _run_power if run_dir != 0 else 0.0
 	return clampf(fish_strength() * wave + run * 0.6, 0.0, 1.6)
+
+
+## 당기는 힘이 오르내리는 박자 (1초에 도는 라디안). 볼락은 툭툭 빠르게, 감성돔은 묵직하게 느리게
+func beat() -> float:
+	return float(FishDB.get_fish(fish_id).get("beat", BEAT_BASE))
 
 
 func _update_reel(dt: float, held: bool) -> void:
 	var s := fish_strength()
 	var easy := 0.7 if forgiving else 1.0
 	var tm := gear_tension() * easy
+	_beat += beat() * dt
+	if _beat >= TAU:
+		_beat -= TAU
+		beat_ticks += 1
 
 	# 물고기 움직임: 쉬다가 왼쪽이나 오른쪽으로 차고 나간다. 어종마다 버릇이 다르다 (habit)
 	var hb := habit()
+	# 쏨뱅이: 다 끌려왔다 싶을 때(지친 뒤라도) 발밑 바위틈으로 한 번 세게 처박는다
+	if hb == "hole" and not hole_dived and distance < HOLE_AT and jump_t <= 0.0:
+		hole_dived = true
+		exhausted = false
+		fish_hp = maxf(fish_hp, HOLE_HP)
+		run_dir = -1 if rng.randf() < 0.5 else 1
+		run_count += 1
+		_run_time = 1.1
+		_run_power = (0.8 + s * 0.6) * easy
 	if jump_t > 0.0:
 		# 바늘털이: 물 위로 뛰어올라 머리를 턴다. 줄이 순간 느슨해지고, 손을 떼고 있으면 바늘이 빠진다
 		jump_t -= dt
@@ -396,6 +433,9 @@ func _update_reel(dt: float, held: bool) -> void:
 					_rest_time = rng.randf_range(0.8, 1.6)
 				else:
 					run_dir = -1 if rng.randf() < 0.5 else 1
+					if hb == "side" and run_dir_last != 0 and rng.randf() < SIDE_KEEP:
+						run_dir = run_dir_last # 망상어: 몸을 눕혀 늘 가던 쪽으로 간다
+					run_dir_last = run_dir
 					run_count += 1
 					_run_time = rng.randf_range(0.7, 1.4) * (0.7 + s * 0.6)
 					_run_power = (0.5 + s * 0.6) * easy
@@ -408,18 +448,27 @@ func _update_reel(dt: float, held: bool) -> void:
 							_run_time *= 0.5
 						"long":
 							_run_time *= 1.5
+							_run_power *= LONG_POWER
+						"tap":
+							_run_time *= 0.45 # 볼락: 짧고 가볍게 툭툭
+							_run_power *= 0.75
+						"side":
+							_run_time *= 1.2
+							_run_power *= 0.8
 		else:
 			_run_time -= dt
 			if _run_time <= 0.0:
 				run_dir = 0
-				_rest_time = rng.randf_range(0.9, 2.0) * (1.3 - s * 0.5) / easy
+				_rest_time = rng.randf_range(0.9, 2.0) * (1.3 - s * 0.5) / easy * REST_MULT
 				if hb == "shake":
 					_rest_time *= 0.45 # 노래미: 짧게 자주 처박는다
+				elif hb == "tap":
+					_rest_time *= 0.55
 
 	countering = run_dir != 0 and held and steer * run_dir <= -COUNTER_STEER
 	if run_dir != 0 and not countering:
 		fish_x = clampf(fish_x + run_dir * 0.9 * dt, -1.0, 1.0)
-		escape += (0.12 + s * 0.22) * easy * dt
+		escape += (0.2 + s * 0.3) * easy * dt # 힘겨루기가 드문 만큼 한 번 한 번이 중요하다 (11-19 0.12+s*0.22에서 올림)
 	else:
 		fish_x = move_toward(fish_x, 0.0, (0.9 if countering else 0.35) * dt)
 		escape = maxf(0.0, escape - (0.45 if countering else 0.2) * dt)
@@ -467,11 +516,13 @@ func _update_reel(dt: float, held: bool) -> void:
 	if held:
 		var k := 0.35 + 0.65 * (1.0 - fish_hp)
 		if run_dir != 0 and not countering:
-			k *= 0.4
+			k *= 0.8 if hb == "tap" else 0.4 # 볼락의 툭툭은 가벼워서 감기는 건 그대로
 		if exhausted:
 			k = EXHAUSTED_REEL
 		elif tension < TENSION_SLACK:
 			k *= 0.6 # 줄이 느슨하면 감아도 덜 끌려온다 (알맞은 장력을 유지하는 게 요령)
+		if hb == "side" and not exhausted and not countering:
+			k *= SIDE_REEL
 		distance -= REEL_SPEED * k * reel_mult * dt
 	distance = clampf(distance, 0.0, 1.0)
 
@@ -484,7 +535,7 @@ func _update_reel(dt: float, held: bool) -> void:
 		_fail("jumped" if jump_t > 0.0 else "escaped")
 	elif _slack_time >= (SLACK_LIMIT_FORGIVING if forgiving else SLACK_LIMIT) + slack_bonus:
 		_fail("slack")
-	elif distance <= 0.0:
+	elif distance <= land_at:
 		catch_count += 1
 		forgiving = false
 		run_dir = 0

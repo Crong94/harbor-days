@@ -37,20 +37,21 @@ const WALK_SPEED := 0.42 # 주인공, 서빙 알바 걷는 속도 (그림 비율
 const GUEST_SPEED := 0.4
 const HELPER_AUTO := [0.3, 1.3] # 주방 알바는 다 익고 이 사이에 담는다 (거의 노릇노릇)
 
-## 2026-11-17 홀 구조 3안 (사용자 결정, 회사 PC 그림 세션): 배경 bg_shop_hall_night (982x1602).
-## 위 오른쪽 주방 앞 바 4석, 왼쪽 창가 선반 2석, 가운데 테이블 둘 (4인씩), 오른쪽 칸막이 2인 테이블. 모두 16석.
-## 좌표는 배경 px를 W, H로 나눈 비율. 자리 좌표는 엉덩이 바닥(앉는 면) 기준이다 (그림 세션 앉은손님_확인그림.py 값)
+## 2026-11-18 식당 4안 (회사 PC 그림 세션 확정, Shop4): 빈 바탕 shop4/bg_night (982x1602)에 가구를 낱장으로 얹는다.
+## 배치는 3안 그대로: 위 오른쪽 ㄱ자 카운터 앞 바 4석, 왼쪽 창가 바 2석, 가운데 테이블 둘 (4인씩), 오른쪽 아래 칸막이 2인석. 모두 16석.
+## 좌표는 바탕 px를 W, H로 나눈 비율. 자리 좌표는 엉덩이 바닥 (그림 세션 4안_합친확인그림.py에서 스툴 크기로 계산한 값).
+## 옆모습은 엉덩이 뒤쪽 끝 x, 나머지는 가운데 x
 const W := 982.0
 const H := 1602.0
 
-## 손님 자리 (엉덩이 바닥). 0~3 주방 앞 바, 4·5 창가, 6·7 가운데 테이블 위쪽, 8·9 아래쪽,
-## 10·11 아래 테이블 위쪽, 12·13 아래쪽, 14·15 칸막이
+## 손님 자리 (엉덩이 바닥). 0~3 카운터 앞 바, 4·5 창가, 6·7 위 테이블 위쪽 줄, 8·9 아래쪽 줄,
+## 10·11 아래 테이블 위쪽 줄, 12·13 아래쪽 줄, 14·15 칸막이
 const SEATS := [
-	Vector2(518 / W, 639 / H), Vector2(622 / W, 639 / H), Vector2(723 / W, 639 / H), Vector2(824 / W, 639 / H),
-	Vector2(230 / W, 639 / H), Vector2(198 / W, 786 / H),
-	Vector2(333 / W, 784 / H), Vector2(422 / W, 784 / H), Vector2(335 / W, 903 / H), Vector2(424 / W, 903 / H),
-	Vector2(247 / W, 1015 / H), Vector2(337 / W, 1015 / H), Vector2(248 / W, 1157 / H), Vector2(337 / W, 1157 / H),
-	Vector2(698 / W, 1060 / H), Vector2(846 / W, 1060 / H),
+	Vector2(478 / W, 645.5 / H), Vector2(593 / W, 645.5 / H), Vector2(708 / W, 645.5 / H), Vector2(823 / W, 645.5 / H),
+	Vector2(224.5 / W, 618.8 / H), Vector2(224.5 / W, 918.8 / H),
+	Vector2(307 / W, 802.6 / H), Vector2(394 / W, 802.6 / H), Vector2(311 / W, 942.6 / H), Vector2(396 / W, 942.6 / H),
+	Vector2(307 / W, 1054.6 / H), Vector2(394 / W, 1054.6 / H), Vector2(311 / W, 1194.6 / H), Vector2(396 / W, 1194.6 / H),
+	Vector2(645.5 / W, 1165.9 / H), Vector2(860.5 / W, 1165.9 / H),
 ]
 ## 앉은 그림: back 등을 보임, front 얼굴을 보임 (테이블 너머), side 옆모습 (오른쪽을 봄. SEAT_FLIP이면 왼쪽)
 const SEAT_VIEW := ["back", "back", "back", "back", "side", "side", "front", "front", "back", "back",
@@ -59,39 +60,42 @@ const SEAT_FLIP := [false, false, false, false, true, true, false, false, false,
 	false, false, false, false, false, true]
 ## 서빙 자리 (주인공이 서서 내는 곳, 발끝)
 const SPOTS := [
-	Vector2(518 / W, 735 / H), Vector2(622 / W, 735 / H), Vector2(723 / W, 735 / H), Vector2(824 / W, 735 / H),
-	Vector2(262 / W, 650 / H), Vector2(252 / W, 796 / H),
-	Vector2(258 / W, 800 / H), Vector2(505 / W, 800 / H), Vector2(258 / W, 905 / H), Vector2(505 / W, 905 / H),
-	Vector2(425 / W, 1035 / H), Vector2(425 / W, 1035 / H), Vector2(425 / W, 1150 / H), Vector2(425 / W, 1150 / H),
-	Vector2(690 / W, 1165 / H), Vector2(840 / W, 1165 / H),
+	Vector2(478 / W, 748 / H), Vector2(593 / W, 748 / H), Vector2(708 / W, 748 / H), Vector2(823 / W, 748 / H),
+	Vector2(252 / W, 708 / H), Vector2(252 / W, 1005 / H),
+	Vector2(307 / W, 745 / H), Vector2(394 / W, 745 / H), Vector2(470 / W, 990 / H), Vector2(470 / W, 990 / H),
+	Vector2(470 / W, 1060 / H), Vector2(470 / W, 1060 / H), Vector2(470 / W, 1210 / H), Vector2(470 / W, 1210 / H),
+	Vector2(612 / W, 1190 / H), Vector2(760 / W, 1238 / H),
 ]
-## 다 먹고 간 빈 그릇 자리 (바, 선반, 테이블 위)
+## 다 먹고 간 빈 그릇 자리 (카운터, 창가 바, 테이블 위)
 const PLATE_SPOTS := [
-	Vector2(518 / W, 578 / H), Vector2(622 / W, 578 / H), Vector2(723 / W, 578 / H), Vector2(824 / W, 578 / H),
-	Vector2(150 / W, 618 / H), Vector2(122 / W, 765 / H),
-	Vector2(333 / W, 805 / H), Vector2(422 / W, 805 / H), Vector2(335 / W, 850 / H), Vector2(424 / W, 850 / H),
-	Vector2(247 / W, 1040 / H), Vector2(337 / W, 1040 / H), Vector2(248 / W, 1085 / H), Vector2(337 / W, 1085 / H),
-	Vector2(748 / W, 1010 / H), Vector2(800 / W, 1010 / H),
+	Vector2(478 / W, 585 / H), Vector2(593 / W, 585 / H), Vector2(708 / W, 585 / H), Vector2(823 / W, 585 / H),
+	Vector2(122 / W, 640 / H), Vector2(122 / W, 940 / H),
+	Vector2(307 / W, 835 / H), Vector2(394 / W, 835 / H), Vector2(311 / W, 880 / H), Vector2(396 / W, 880 / H),
+	Vector2(307 / W, 1087 / H), Vector2(394 / W, 1087 / H), Vector2(311 / W, 1132 / H), Vector2(396 / W, 1132 / H),
+	Vector2(732 / W, 1095 / H), Vector2(778 / W, 1095 / H),
 ]
 
-## 걷는 길: 바닥의 빈 곳을 잇는 한 줄 (A 왼쪽 위 - B 왼쪽 길과 바 앞 띠가 만나는 곳 - C 가운데 위 - M 가운데 - E 문 앞)
-const LANE := [Vector2(258 / W, 590 / H), Vector2(258 / W, 725 / H), Vector2(530 / W, 725 / H),
-	Vector2(530 / W, 1040 / H), Vector2(530 / W, 1165 / H)]
+## 걷는 길: 바닥의 빈 곳을 잇는 한 줄
+##   0 창가 아래 - 1 창가 위 - 2 홀 자리 앞 (HOME_LANE) - 3 가운데 통로 위 - 4 가운데 - 5 문 앞 (ENTRY_LANE)
+const LANE := [Vector2(240 / W, 1005 / H), Vector2(240 / W, 740 / H), Vector2(390 / W, 740 / H),
+	Vector2(545 / W, 740 / H), Vector2(545 / W, 1000 / H), Vector2(545 / W, 1200 / H)]
+const HOME_LANE := 2
+const ENTRY_LANE := 5
 ## 자리마다 서빙 자리로 들어가는 길 점 (LANE 번호)
-const SEAT_ACCESS := [[1, 2], [1, 2], [1, 2], [1, 2], [0, 1], [0, 1],
-	[1], [2, 3], [1], [2, 3], [3], [3], [3, 4], [3, 4], [4], [4]]
+const SEAT_ACCESS := [[2, 3], [3], [3], [3], [1], [0],
+	[1, 2], [2], [4], [4], [4], [4], [5], [5], [5], [5]]
 
-## 주방
-const COOK_SPOT := Vector2(590 / W, 515 / H) # 요리사 발끝 (화구 앞)
-const BURNERS := [Vector2(655 / W, 452 / H), Vector2(725 / W, 447 / H)] # 화구 불 두 개
-## 완성 접시 내놓는 자리 (주방 바 왼쪽 날개 위, 홀 쪽)
-const PASS_SPOTS := [Vector2(385 / W, 440 / H), Vector2(398 / W, 490 / H), Vector2(412 / W, 540 / H)]
-const KITCHEN_EXIT := Vector2(258 / W, 470 / H)
-const HALL_HOME := Vector2(232 / W, 560 / H) # 홀 담당(주인공)이 접시를 기다리는 자리 (내놓는 자리 옆)
+## 주방: 요리사는 오른쪽 벽 옆모습 화구 둘 앞에 선다
+const COOK_SPOT := Vector2(770 / W, 515 / H) # 요리사 발끝 (화구 앞)
+const BURNERS := [Vector2(849 / W, 365 / H), Vector2(849 / W, 443 / H)] # 화구 위 냄비 자리
+## 완성 접시 내놓는 자리 (카운터 꺾이는 모서리 픽업대 위)
+const PASS_SPOTS := [Vector2(328 / W, 575 / H), Vector2(366 / W, 575 / H), Vector2(404 / W, 575 / H)]
+const KITCHEN_EXIT := Vector2(330 / W, 390 / H) # 카운터 세로 팔 위 직원 통로
+const HALL_HOME := Vector2(390 / W, 772 / H) # 홀 담당(주인공)이 접시를 기다리는 자리 (픽업대 아래)
 const START := COOK_SPOT
 
 ## 손님 입구 (아래 가운데 문)
-const ENTRANCE := Vector2(480 / W, 1192 / H)
+const ENTRANCE := Vector2(491 / W, 1240 / H)
 
 var time := 0.0
 var inventory: Array = []
@@ -134,17 +138,31 @@ const FRY_PRICE := 1.25
 const FRY_ART := "bungjangeo-twigim"
 var fry := false
 var _fry_rng := RandomNumberGenerator.new()
+## 새 메뉴 (Menu, 11-19): 메뉴판에 오른 요리 id들. 손님이 고르면 그 재료를 seafood와 pantry(채소)에서 쓴다
+var menu: Array = []
+var seafood := {}
+var today := 0
+## 영업 개편 (ServicePlan, 11-19): setup 전에 넣는다. plan이 비면 예전 규칙(손님이 메뉴를 고른다)
+var plan := {}
+var flags := {}
+var price_mult := 1.0
+var patience_mult := 1.0
+var extra_guests := 0
+var regular_names: Array = []
+var angry_list: Array = [] # 화나서 간 손님 {"guest", "kind", "reason"}
 var events: Array = [] # 화면 연출용 한 번짜리 알림 {type, ...}
 
 
-## 오늘 손님 명단. 날짜로 정해져서 같은 날은 늘 같다
-func setup(day: int, inv: Array, names: Array) -> void:
+## 오늘 손님 명단. 날짜로 정해져서 같은 날은 늘 같다.
+## visitors: 저녁 버스로 오는 외지 손님 수 (Bus.visitors). 마지막 무리로 늦게 온다
+func setup(day: int, inv: Array, names: Array, visitors := 0) -> void:
 	inventory = inv
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("영업-%d" % day)
 	_rng.seed = hash("자리-%d" % day)
 	_fry_rng.seed = hash("튀김-%d" % day)
-	var n := rng.randi_range(GUESTS_MIN, GUESTS_MAX)
+	var locals := maxi(1, rng.randi_range(GUESTS_MIN, GUESTS_MAX) + extra_guests)
+	var n := locals + maxi(0, visitors)
 	schedule.clear()
 	var last := OPEN_SECONDS * LAST_ARRIVAL
 	var groups: Array = []
@@ -153,12 +171,18 @@ func setup(day: int, inv: Array, names: Array) -> void:
 		var g := mini(left, rng.randi_range(1, GROUP_MAX))
 		groups.append(g)
 		left -= g
+	var who := 0 # 몇 번째 손님인지. locals 뒤는 버스 손님
 	for gi in groups.size():
 		var t0 := 2.0 + (last - 6.0) * gi / maxf(1.0, groups.size() - 1.0) + rng.randf_range(-4.0, 4.0)
 		for k in int(groups[gi]):
 			var t := t0 + k * rng.randf_range(0.8, 1.6)
-			schedule.append({"t": clampf(t, 1.0, last), "name": names[rng.randi() % names.size()] if not names.is_empty() else "손님"})
+			var name: String = names[rng.randi() % names.size()] if not names.is_empty() else "손님"
+			if who >= locals:
+				name = Bus.VISITOR_NAMES[who % Bus.VISITOR_NAMES.size()]
+			schedule.append({"t": clampf(t, 1.0, last), "name": name})
+			who += 1
 	schedule.sort_custom(func(a, b): return a.t < b.t)
+	ServicePlan.assign_kinds(schedule, regular_names, day)
 	player = HALL_HOME if helper_kitchen else COOK_SPOT
 
 
@@ -277,7 +301,7 @@ func _to_pass(c: Dictionary, q: String) -> void:
 # 같은 생선을 시킨 손님이면 누구에게 줘도 된다 (두 손님의 주문을 맞바꾼다). 다른 요리를 시킨 손님은 안 받는다.
 
 const MAX_TASKS := 3
-const HELPER_HOME := Vector2(245 / W, 470 / H) # 서빙 알바가 기다리는 자리 (주인공 뒤)
+const HELPER_HOME := Vector2(290 / W, 772 / H) # 서빙 알바가 기다리는 자리 (주인공 옆)
 
 var selected := -1 # 고른 접시 (주문한 guest index). 아직 내놓는 자리에 있다
 var tasks: Array = [] # 줄 선 일 [{type: "serve", dish} / {type: "clear", seat}]
@@ -406,7 +430,7 @@ static func _route(from: Vector2, from_access: Array, to: Vector2, to_access: Ar
 
 ## 홀 자리, 알바 자리, 주방에서 LANE에 올라타는 점
 static func _home_access(from: Vector2) -> Array:
-	return [4] if from.distance_to(ENTRANCE) < 0.02 else [0]
+	return [ENTRY_LANE] if from.distance_to(ENTRANCE) < 0.02 else [HOME_LANE]
 
 
 ## from에서 그 자리 서빙 자리까지 가는 길 (주방 안이면 주방 출구로 먼저 나온다)
@@ -421,7 +445,7 @@ static func _path_to_guest(from: Vector2, seat: int) -> Array:
 ## 그 자리 서빙 자리에서 홀 자리(또는 주방)로 돌아가는 길
 static func _path_home(seat: int, home: Vector2) -> Array:
 	var to := KITCHEN_EXIT if home.distance_to(COOK_SPOT) < 0.01 else home
-	var path := _route(SPOTS[seat], SEAT_ACCESS[seat], to, [0])
+	var path := _route(SPOTS[seat], SEAT_ACCESS[seat], to, [HOME_LANE])
 	if to != home:
 		path.append(home)
 	return path
@@ -561,6 +585,8 @@ func patience_of(seat: int) -> float:
 ## 한 접시 값: 구이는 DayFlow.dish_price, 튀김은 그보다 FRY_PRICE배
 static func dish_price_of(fish_id: String, size_cm: float, dish: String) -> int:
 	var base := DayFlow.dish_price(fish_id, size_cm)
+	if Menu.RECIPES.has(dish):
+		return Menu.price(dish, base)
 	if dish != "fry":
 		return base
 	return int(roundf(base * FRY_PRICE / 500.0) * 500.0)
@@ -575,6 +601,8 @@ func same_order(a: int, b: int) -> bool:
 static func dish_art_id(fish_id: String, dish: String) -> String:
 	if dish == "fry":
 		return FRY_ART
+	if Menu.RECIPES.has(dish):
+		return Menu.art(dish, fish_id)
 	return FishDB.get_fish(fish_id).get("grill", "bollak-gui")
 
 
@@ -590,8 +618,13 @@ static func pay(price: int, waited: float) -> int:
 func _serve(gi: int, by_player: bool) -> void:
 	var g: Dictionary = guests[gi]
 	var q: String = g.get("quality", "good")
-	var price := pay(int(roundf(g.price * float(QUALITY_PRICE.get(q, 1.0)) / 500.0) * 500.0), g.wait)
-	var heart: bool = g.wait <= PATIENCE * QUICK and q != "burnt"
+	var pat := float(g.get("patience", PATIENCE))
+	var quick: bool = g.wait <= pat * QUICK
+	var price := pay(int(roundf(g.price * float(QUALITY_PRICE.get(q, 1.0)) / 500.0) * 500.0), g.wait * PATIENCE / pat)
+	var kind: String = g.get("kind", "normal")
+	var st := ServicePlan.settle(kind, price, q, quick)
+	price = int(st.price)
+	var heart: bool = st.heart
 	var side := Sides.take(pantry, reserve)
 	var extra := Sides.bonus(side)
 	price += extra
@@ -600,7 +633,7 @@ func _serve(gi: int, by_player: bool) -> void:
 	g.paid = price
 	sales += price
 	served.append({"guest": g.name, "fish": g.fish, "size": g.size, "price": price, "heart": heart, "side": side, "quality": q,
-		"dish": g.get("dish", "grill")})
+		"dish": g.get("dish", "grill"), "kind": kind})
 	events.append({"type": "served", "guest": gi, "heart": heart, "price": price, "side": side, "quality": q, "helper": not by_player})
 
 
@@ -658,10 +691,27 @@ func _arrive() -> void:
 		var e: Dictionary = inventory[fi]
 		inventory.remove_at(fi)
 		var seat: int = seats[_rng.randi() % seats.size()]
-		var dish := "fry" if fry and _fry_rng.randf() < FRY_SHARE else "grill"
+		var dish := ""
+		if not plan.is_empty():
+			# 메뉴판에 적은 대로 낸다. 새 메뉴 재료가 떨어졌거나 회인데 오늘 잡은 고기가 아니면 구이로
+			dish = ServicePlan.dish_for(plan, e.id, flags)
+			if Menu.RECIPES.has(dish):
+				var fresh_ok: bool = not Menu.recipe(dish).get("fresh", false) or int(e.get("day", today)) == today
+				if Menu.can_make(dish, pantry, seafood) and fresh_ok:
+					Menu.take(dish, pantry, seafood)
+				else:
+					dish = "grill"
+		else:
+			dish = Menu.pick(menu, e, today, pantry, seafood, _fry_rng)
+			if dish.is_empty():
+				dish = "fry" if fry and _fry_rng.randf() < FRY_SHARE else "grill"
+			else:
+				Menu.take(dish, pantry, seafood)
+		var kind: String = s.get("kind", "normal")
 		var g := {
 			"name": s.name, "seat": seat, "fish": e.id, "size": e.size, "entry": e, "dish": dish,
-			"price": dish_price_of(e.id, e.size, dish), "state": GuestState.WALKING,
+			"price": int(roundf(dish_price_of(e.id, e.size, dish) * price_mult / 500.0) * 500.0), "state": GuestState.WALKING,
+			"kind": kind, "patience": patience_of(seat) * patience_mult * float(ServicePlan.KINDS[kind].patience),
 			"wait": 0.0, "eat": 0.0, "cooked": false, "quality": "",
 			"pos": ENTRANCE, "path": entry_path(seat), "dir": Vector2.UP,
 		}
@@ -671,7 +721,7 @@ func _arrive() -> void:
 
 ## 문에서 그 자리까지 걷는 길: 문 앞에서 가운데 길을 따라 서빙 자리까지 와서 자리에 앉는다
 static func entry_path(seat: int) -> Array:
-	return _route(ENTRANCE, [4], SPOTS[seat], SEAT_ACCESS[seat]) + [SEATS[seat]]
+	return _route(ENTRANCE, [ENTRY_LANE], SPOTS[seat], SEAT_ACCESS[seat]) + [SEATS[seat]]
 
 
 func _walk_guests(dt: float) -> void:
@@ -695,7 +745,7 @@ func _wait(dt: float) -> void:
 		match g.state:
 			GuestState.SEATED:
 				g.wait += dt
-				if g.wait >= patience_of(g.seat):
+				if g.wait >= float(g.get("patience", patience_of(g.seat))):
 					_leave_angry(gi)
 			GuestState.EATING:
 				g.eat += dt
@@ -710,7 +760,10 @@ func _leave_angry(gi: int) -> void:
 	var g: Dictionary = guests[gi]
 	g.state = GuestState.LEFT
 	angry += 1
-	events.append({"type": "angry", "guest": gi})
+	# 왜 화났는지: 접시가 나와 있었는데 안 날랐나(pass), 아직 굽는 중이었나(kitchen)
+	var reason := "pass" if pass_dishes.has(gi) or holding == gi else "kitchen"
+	angry_list.append({"guest": g.name, "kind": g.get("kind", "normal"), "reason": reason})
+	events.append({"type": "angry", "guest": gi, "reason": reason})
 	if queue.has(gi):
 		queue.erase(gi)
 		inventory.append(g.entry)

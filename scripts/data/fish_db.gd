@@ -2,14 +2,25 @@ class_name FishDB
 extends RefCounted
 ## 북쪽 방파제 어종. 그림은 assets/art/fish_<id>.png (docs/물고기_그림_목록.md)
 ##
-## rarity: common 일반, rare 희귀, legend 전설
+## rarity: common 일반, rare 희귀, legend 전설. 남해 방파제에서 실제로 얼마나 흔한지로 정한다
+##   (학공치는 겨울에 떼로 몰려와 흔하다. 우럭은 방파제에선 볼락, 노래미보다 드물다. 감성돔은 꾼들이 노리는 귀한 고기)
 ## strength: 당기는 힘 0~1 (파이팅 체력과 줄다리기 세기)
 ## weight: 기본 출현 가중치
 ## night: 어두운 걸 좋아하는 정도 -1~1 (볼락은 밝아지면 숨고, 학공치는 낮에 수면 가까이 올라온다)
 ## zone: 던진 거리별 출현 배율 [발밑, 중간, 먼 물] (바다 한 접시 species.json zone)
 ## weather: 날씨별 배율 (SeaDay.WEATHER id)
 ## catalog: Catalog(바다 한 접시 데이터) 어종 id, grill: 생선구이 레시피 id
-## habit: 줄다리기 버릇 (FishingLogic). dive 처음에 바위로 세게 파고듦, shake 짧고 잦게 처박음, long 길게 차고 나감, jump 바늘털이
+## min_cm, max_cm: 방파제에서 낚이는 크기 폭. max_cm은 FishBase 최대 전장을 넘지 않게 잡는다 (2026-11-23 사용자 요청, 실제 어종 자료 반영)
+## legal_cm: 포획금지체장. 이 크기 이하는 잡아도 놓아줘야 한다 (수산자원관리법 시행령 별표 2: 볼락 15, 조피볼락 23, 감성돔 25cm 이하).
+##   노래미(쥐노래미 아님), 망상어, 쏨뱅이, 학공치는 금지체장이 없다
+## season_floor: 철이 아닐 때 출현 배율의 바닥. 달별 배율은 바다 한 접시 데이터(Catalog.month_factor)를 쓰고,
+##   여름에도 방파제에서 잡히는 고기(노래미, 쏨뱅이, 망상어 등)가 아예 사라지지 않게 이 값 밑으로는 안 내린다.
+##   학공치는 늦가을부터 봄까지 오는 겨울 고기라 여름엔 거의 없다 (기본 0.3)
+## bycatch: 보통 먹지 않고 놓아주는 고기 (망상어. 사용자 11-24). 값이 싸고 주문과 의뢰, 선물로 찾는 사람이 없다.
+##   팔거나 식당에 내는 건 막지 않는다 (굳이 팔려면 팔 수 있다. 사용자 11-24). 손님은 값진 생선부터 받으니 자연히 마지막에 나간다
+## habit: 줄다리기 버릇 (FishingLogic). dive 처음에 바위로 세게 파고듦, shake 짧고 잦게 처박음, long 길게 차고 나감, jump 바늘털이(수면 위로 뛰어 머리를 턴다. 농어),
+##   tap 짧고 가볍게 툭툭, side 몸을 눕혀 같은 쪽으로 버팀, hole 발밑에서 바위틈으로 처박음
+## beat: 당기는 힘이 오르내리는 박자 (낚싯대 떨림과 진동). 클수록 잘게 툭툭, 작을수록 묵직하게
 
 const RARITY := {
 	"common": {"name": "일반", "color": Color("7fb59a"), "price": 1.0},
@@ -20,55 +31,63 @@ const RARITY := {
 const FISH := {
 	"bolak": {
 		"name": "볼락", "rarity": "common",
-		"min_cm": 12.0, "max_cm": 26.0, "strength": 0.45, "price": 4000,
+		"min_cm": 12.0, "max_cm": 30.0, "legal_cm": 15.0, "strength": 0.45, "price": 4000, "stamina": 0.75,
 		"weight": 6.0, "night": 0.8, "zone": [1.6, 1.0, 0.4],
 		"weather": {"cloudy": 1.3, "rain": 1.2},
-		"catalog": "bollak", "grill": "bollak-gui",
+		"habit": "tap", "beat": 7.5, "catalog": "bollak", "grill": "bollak-gui",
 		"desc": "눈이 크고 어두운 바다를 좋아하는 물고기. 새벽과 밤에 잘 물고 해가 뜨면 바위틈에 숨는다.",
 	},
 	"mangsang": {
 		"name": "망상어", "rarity": "common",
-		"min_cm": 12.0, "max_cm": 25.0, "strength": 0.35, "price": 2500,
+		"min_cm": 12.0, "max_cm": 27.0, "strength": 0.35, "price": 800, "bycatch": true,
 		"weight": 4.0, "night": 0.0, "zone": [1.6, 1.0, 0.5],
 		"weather": {},
-		"catalog": "mangsangeo", "grill": "mangsangeo-gui",
-		"desc": "몸이 납작하고 은빛이 도는 방파제 단골. 알 대신 새끼를 낳는 물고기다.",
+		"habit": "side", "beat": 2.0, "catalog": "mangsangeo", "grill": "mangsangeo-gui",
+		"desc": "몸이 납작하고 은빛이 도는 방파제 단골. 알 대신 새끼를 낳는다. 살이 무르고 맛이 덜해서 꾼들은 보통 놓아준다.",
 	},
 	"noraemi": {
 		"name": "노래미", "rarity": "common",
-		"min_cm": 15.0, "max_cm": 32.0, "strength": 0.55, "price": 5000,
+		"min_cm": 12.0, "max_cm": 30.0, "strength": 0.55, "price": 5000,
 		"weight": 3.0, "night": 0.1, "zone": [1.4, 1.0, 0.6],
 		"weather": {"windy": 1.2},
-		"habit": "shake", "catalog": "noraemi", "grill": "noraemi-gui",
+		"beat": 5.5, "habit": "shake", "catalog": "noraemi", "grill": "noraemi-gui",
 		"desc": "바위틈에 숨어 사는 얼룩무늬 물고기. 작아도 끌어올릴 때 힘이 좋다.",
 	},
 	"ssombaengi": {
 		"name": "쏨뱅이", "rarity": "common",
-		"min_cm": 12.0, "max_cm": 28.0, "strength": 0.5, "price": 6000,
+		"min_cm": 12.0, "max_cm": 32.0, "strength": 0.5, "price": 6000,
 		"weight": 2.4, "night": 0.5, "zone": [1.3, 1.0, 0.6],
 		"weather": {"cloudy": 1.2},
-		"catalog": "ssombaengi", "grill": "ssombaengi-gui",
+		"habit": "hole", "beat": 3.4, "catalog": "ssombaengi", "grill": "ssombaengi-gui",
 		"desc": "붉고 울퉁불퉁한 바위 물고기. 등가시가 따가우니 잡을 때 조심한다.",
 	},
 	"ureok": {
 		"name": "우럭", "rarity": "rare",
-		"min_cm": 18.0, "max_cm": 45.0, "strength": 0.7, "price": 9000,
+		"min_cm": 18.0, "max_cm": 45.0, "legal_cm": 23.0, "strength": 0.7, "price": 9000,
 		"weight": 1.3, "night": 0.6, "zone": [1.0, 1.2, 0.8],
 		"weather": {"cloudy": 1.3, "rain": 1.4},
-		"habit": "dive", "catalog": "ureok", "grill": "ureok-gui",
+		"beat": 2.6, "habit": "dive", "catalog": "ureok", "grill": "ureok-gui",
 		"desc": "바위틈의 듬직한 대장. 한번 물면 바위로 파고들어서 처음 힘싸움이 세다.",
 	},
 	"hakgongchi": {
-		"name": "학공치", "rarity": "rare",
-		"min_cm": 25.0, "max_cm": 40.0, "strength": 0.3, "price": 7000,
-		"weight": 1.2, "night": -0.7, "zone": [0.2, 0.9, 1.8],
-		"weather": {"sunny": 1.4},
-		"habit": "jump", "catalog": "hakgongchi", "grill": "hakgongchi-gui",
-		"desc": "바늘처럼 뾰족한 아래턱을 가진 은빛 물고기. 맑은 낮에 먼 물 수면에서 떼 지어 다닌다.",
+		"name": "학공치", "rarity": "common",
+		"min_cm": 15.0, "max_cm": 35.0, "strength": 0.25, "price": 6000, "stamina": 0.6,
+		"weight": 2.5, "night": -0.7, "zone": [0.7, 1.3, 1.1], "season_floor": 0.03,
+		"weather": {},
+		"beat": 8.5, "habit": "tap", "catalog": "hakgongchi", "grill": "hakgongchi-gui",
+		"desc": "바늘처럼 뾰족한 아래턱을 가진 은빛 물고기. 겨울에 방파제로 몰려와 수면 바로 아래를 떼 지어 다닌다. 몸이 가늘고 가벼워서 파르르 떨며 금방 끌려온다.",
+	},
+	"nongeo": {
+		"name": "농어", "rarity": "rare",
+		"min_cm": 25.0, "max_cm": 72.0, "legal_cm": 30.0, "strength": 0.8, "price": 10000, "stamina": 1.3,
+		"weight": 0.9, "night": 0.4, "zone": [0.4, 1.0, 1.6],
+		"weather": {"windy": 1.5, "rain": 1.2},
+		"beat": 3.0, "habit": "jump", "catalog": "nongeo", "grill": "nongeo-gui",
+		"desc": "은빛 몸에 입이 큰 사냥꾼. 늦봄부터 가을까지 파도가 일어 물이 흐린 날 잘 문다. 걸리면 물 위로 뛰어올라 머리를 흔들며 바늘을 턴다.",
 	},
 	"gamseongdom": {
 		"name": "감성돔", "rarity": "legend",
-		"min_cm": 25.0, "max_cm": 52.0, "strength": 1.05, "price": 28000, "gear_help": 0.6, "stamina": 2.0,
+		"min_cm": 22.0, "max_cm": 52.0, "legal_cm": 25.0, "strength": 1.05, "price": 28000, "gear_help": 0.6, "stamina": 2.0,
 		"weight": 0.22, "night": 0.3, "zone": [0.2, 0.8, 1.8],
 		"weather": {"cloudy": 1.4, "windy": 1.5},
 		"habit": "long", "catalog": "gamseongdom", "grill": "gamseongdom-gui",
@@ -86,7 +105,7 @@ static func rarity(id: String) -> Dictionary:
 
 
 ## 지금 상황에서 한 종이 나올 가중치.
-## ctx: brightness(0~1), depth(던진 거리 0~1), bait(미끼 id), weather(SeaDay id), rare_boost(희귀 이상 배율)
+## ctx: brightness(0~1), depth(던진 거리 0~1), bait(미끼 id), weather(SeaDay id), rare_boost(희귀 이상 배율), spot(낚시터 id)
 static func weight_of(id: String, ctx: Dictionary) -> float:
 	var f := get_fish(id)
 	if f.is_empty():
@@ -105,10 +124,31 @@ static func weight_of(id: String, ctx: Dictionary) -> float:
 		w *= BaitDB.like_mult(bait, id)
 	# 날씨
 	w *= f.weather.get(ctx.get("weather", ""), 1.0)
+	# 철 (1~12월. 0이면 따지지 않는다)
+	w *= season_mult(id, int(ctx.get("month", 0)))
+	# 낚시터 (갯바위는 바위 고기와 감성돔이 잘 나온다. Spots)
+	w *= Spots.fish_mult(ctx.get("spot", "breakwater"), id)
 	# 연속 PERFECT 같은 버프
 	if f.rarity != "common":
 		w *= ctx.get("rare_boost", 1.0)
 	return w
+
+
+## 그 달에 얼마나 잘 나오는지. 바다 한 접시 달별 배율을 쓰되 season_floor 밑으로는 안 내린다
+static func season_mult(id: String, month: int) -> float:
+	var f := get_fish(id)
+	if f.is_empty() or month < 1 or month > 12:
+		return 1.0
+	return maxf(Catalog.month_factor(f.get("catalog", id), month), float(f.get("season_floor", 0.3)))
+
+
+## 그 어종이 제철인 달들 (도감 표시)
+static func season_months(id: String) -> Array:
+	var out: Array = []
+	for m in range(1, 13):
+		if season_mult(id, m) >= 1.0:
+			out.append(m)
+	return out
 
 
 ## 가중치대로 한 종을 고른다.
@@ -148,6 +188,9 @@ static func habit_text(id: String) -> String:
 		"shake": "짧게 자주 처박아요. 좌우를 부지런히 맞춰요",
 		"long": "한 번 차고 나가면 길게 가요. 장력을 식히며 버텨요",
 		"jump": "물 위로 뛰어올라 바늘을 털어요. 뛰는 동안 손을 떼지 마요",
+		"tap": "툭툭 가볍게 자주 당겨요. 손맛이 잘고 빨리 올라와요",
+		"side": "납작한 몸을 눕혀 같은 쪽으로만 버텨요. 반대로 끌어 줘요",
+		"hole": "다 끌려왔다 싶을 때 발밑 바위틈으로 처박아요. 끝까지 버텨요",
 	}.get(get_fish(id).get("habit", ""), "")
 
 
@@ -170,6 +213,25 @@ static func stars(id: String, size_cm: float) -> int:
 	var f := get_fish(id)
 	var k := inverse_lerp(f.min_cm, f.max_cm, size_cm)
 	return 3 if k >= 0.72 else (2 if k >= 0.4 else 1)
+
+
+## 포획금지체장 이하라 놓아줘야 하는지
+static func must_release(id: String, size_cm: float) -> bool:
+	var f := get_fish(id)
+	return f.has("legal_cm") and size_cm <= float(f.legal_cm)
+
+
+## 보통 먹지 않고 놓아주는 고기인지
+static func is_bycatch(id: String) -> bool:
+	return bool(get_fish(id).get("bycatch", false))
+
+
+## 놓아줘야 하는 까닭 한 줄 (잡은 카드)
+static func legal_text(id: String) -> String:
+	var f := get_fish(id)
+	if not f.has("legal_cm"):
+		return ""
+	return "%s %dcm 이하는 법으로 놓아줘야 해요" % [f.name, int(f.legal_cm)]
 
 
 ## 그 어종 최대 크기의 90% 이상이면 대물
