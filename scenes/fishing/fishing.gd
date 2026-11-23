@@ -112,6 +112,7 @@ var _box_list: VBoxContainer
 var _box_forced := false
 var _bite_base := 1.0 # 날씨, 도구까지 넣은 입질 배율. 여기에 물때(Tide)를 곱한다
 var _box_just: Dictionary = {} # 방금 잡은 고기 (목록에 표시)
+var _box_just_slot: VBoxContainer # 아이스박스 창 맨 위 "방금 잡은 고기" 칸
 var _dialogue: DialogueBox
 
 var _card_root: Control
@@ -1158,9 +1159,13 @@ func _build_box_sheet() -> void:
 	v.add_child(_box_title)
 	_box_desc = UiKit.paragraph("", "caption", UiKit.INK_SOFT)
 	v.add_child(_box_desc)
+	# 방금 잡은 고기: 목록 위에 따로 두고 쿨러 안 고기와 견주어 본다 (사용자 11-24)
+	_box_just_slot = UiKit.vbox(UiKit.SPACE_XS)
+	v.add_child(_box_just_slot)
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 600)
+	scroll.custom_minimum_size = Vector2(0, 520)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.scroll_deadzone = 8 # 손가락으로 끌면 스크롤 (줄을 눌러 시작해도)
 	v.add_child(scroll)
 	_box_list = UiKit.vbox(UiKit.SPACE_SM)
 	_box_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1183,19 +1188,29 @@ func _open_box(forced: bool) -> void:
 func _fill_box() -> void:
 	for c in _box_list.get_children():
 		c.queue_free()
+	for c in _box_just_slot.get_children():
+		c.queue_free()
 	var inv: Array = GameState.inventory
 	_box_title.text = ("아이스박스가 꽉 찼어요" if _box_forced else "아이스박스") + "  %d/%d" % [inv.size(), GameState.icebox_size]
-	_box_desc.text = "한 마리를 바다에 놓아줘야 해요. 놓아준 고기는 돌아오지 않아요" if _box_forced else "놓아줄 고기를 골라요. 바깥을 누르면 닫혀요"
+	_box_desc.text = "한 마리를 바다에 놓아줘야 해요. 방금 잡은 고기를 놓아줘도 돼요" if _box_forced else "놓아줄 고기를 골라요. 바깥을 누르면 닫혀요"
+	# 방금 잡은 고기는 맨 위에 따로 (쿨러에 있을 때만)
+	var just_in := not _box_just.is_empty() and inv.has(_box_just)
+	_box_just_slot.visible = just_in
+	if just_in:
+		_box_just_slot.add_child(UiKit.text("방금 잡은 고기", "label", UiKit.CORAL_DEEP))
+		_box_just_slot.add_child(_box_row(_box_just, true))
+		_box_just_slot.add_child(UiKit.text("아이스박스 안 (싼 것부터)", "label", UiKit.INK_SOFT))
 	# 싼 고기부터 (놓아줄 만한 것이 위에)
-	var idx: Array = range(inv.size())
+	var idx: Array = range(inv.size()).filter(func(i): return not (just_in and inv[i] == _box_just))
 	idx.sort_custom(func(a, b): return FishDB.value_of(inv[a].id, inv[a].size) < FishDB.value_of(inv[b].id, inv[b].size))
 	for i in idx:
 		_box_list.add_child(_box_row(inv[i]))
 
 
-func _box_row(e: Dictionary) -> PanelContainer:
+func _box_row(e: Dictionary, highlight := false) -> PanelContainer:
 	var row := PanelContainer.new()
-	row.add_theme_stylebox_override("panel", UiKit.box(Color(UiKit.NOTE_DARK, 0.28), 16, Color(UiKit.NOTE_DARK, 0.6), 1, 10))
+	row.mouse_filter = Control.MOUSE_FILTER_PASS # 줄을 눌러 끌어도 목록이 스크롤되게
+	row.add_theme_stylebox_override("panel", UiKit.box(Color(UiKit.SUN, 0.28) if highlight else Color(UiKit.NOTE_DARK, 0.28), 16, Color(UiKit.SUN, 0.9) if highlight else Color(UiKit.NOTE_DARK, 0.6), 2 if highlight else 1, 10))
 	var h := UiKit.hbox(UiKit.SPACE_MD)
 	h.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(h)
@@ -1206,14 +1221,35 @@ func _box_row(e: Dictionary) -> PanelContainer:
 	var tv := UiKit.vbox(-2)
 	tv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(tv)
-	var just := e == _box_just
-	tv.add_child(UiKit.text("%s %.1fcm%s" % [FishDB.get_fish(e.id).name, e.size, "  · 방금 잡음" if just else ""], "title", UiKit.INK))
-	tv.add_child(UiKit.text("값 %s  ·  %s" % [GameState.format_won(FishDB.value_of(e.id, e.size)), FishLine.stage(e, GameState.day).name], "caption", UiKit.INK_SOFT))
+	tv.mouse_filter = Control.MOUSE_FILTER_PASS
+	tv.add_child(UiKit.text("%s %.1fcm" % [FishDB.get_fish(e.id).name, e.size], "title", UiKit.INK))
+	var val := FishDB.value_of(e.id, e.size)
+	var info := "값 %s  ·  %s" % [GameState.format_won(val), FishLine.stage(e, GameState.day).name]
+	# 방금 잡은 고기와 견주기: 더 싸면 놓아줄 후보
+	if not highlight and not _box_just.is_empty() and GameState.inventory.has(_box_just):
+		var jv := FishDB.value_of(_box_just.id, _box_just.size)
+		if val < jv:
+			info += "  ·  방금 것보다 %s 쌈" % GameState.format_won(jv - val)
+		elif val > jv:
+			info += "  ·  방금 것보다 %s 비쌈" % GameState.format_won(val - jv)
+	var il := UiKit.text(info, "caption", UiKit.INK_SOFT)
+	il.add_theme_font_size_override("font_size", 17)
+	tv.add_child(il)
 	var b := UiKit.game_button("놓아주기", UiKit.TEAL_BTN, Vector2(132, 52))
 	b.pressed.connect(func():
 		GameState.release_fish(e)
 		Sound.play_sfx("slip", 0.05, -4.0)
-		_pop_text("%s 바다로" % FishDB.get_fish(e.id).name, UiKit.FOAM, Vector2(size.x / 2.0, size.y * 0.42), 34)
+		var rep := 0
+		if highlight:
+			# 방금 잡아 아직 살아 있는 고기: 오늘 조과에 놓아줌으로 남고 평판도 오른다
+			for i in range(GameState.caught_today.size() - 1, -1, -1):
+				var ce: Dictionary = GameState.caught_today[i]
+				if ce.id == e.id and is_equal_approx(float(ce.size), float(e.size)) and not ce.get("released", false):
+					ce["released"] = true
+					rep = GameState.reward_release(ce)
+					break
+			_box_just = {}
+		_pop_text("%s 바다로%s" % [FishDB.get_fish(e.id).name, "  평판 +1" if rep > 0 else ""], UiKit.FOAM, Vector2(size.x / 2.0, size.y * 0.42), 34)
 		if _box_forced and not GameState.is_overfull():
 			_box_forced = false
 			_box_sheet.hide()
