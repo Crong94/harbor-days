@@ -208,6 +208,7 @@ func _ready() -> void:
 	sea = SeaDay.of(GameState.day)
 	order = {} if tutorial else GameState.today_order()
 	logic.weather = sea.weather
+	logic.month = int(Calendar.date(GameState.day).month)
 	logic.bite_mult = sea.bite
 	logic.bait = GameState.equipped_bait
 	logic.spot = spot
@@ -295,8 +296,14 @@ func _ready() -> void:
 			if got.is_empty():
 				intro.append({"speaker": "", "text": "밤새 둔 통발을 걷었다. 오늘은 빈 통발이다."})
 			else:
-				var parts := PackedStringArray(got.map(func(e): return "%s %.0fcm" % [FishDB.get_fish(e.id).name, e.size]))
-				intro.append({"speaker": "", "text": "밤새 둔 통발을 걷었다. %s. 아이스박스에 넣었다." % ", ".join(parts)})
+				var kept := got.filter(func(e): return not e.get("released", false))
+				var freed := got.filter(func(e): return e.get("released", false))
+				var parts := PackedStringArray(kept.map(func(e): return "%s %.0fcm" % [FishDB.get_fish(e.id).name, e.size]))
+				if not kept.is_empty():
+					intro.append({"speaker": "", "text": "밤새 둔 통발을 걷었다. %s. 아이스박스에 넣었다." % ", ".join(parts)})
+				if not freed.is_empty():
+					var small := PackedStringArray(freed.map(func(e): return "%s %.0fcm" % [FishDB.get_fish(e.id).name, e.size]))
+					intro.append({"speaker": "", "text": "%s %s는 너무 작아서 바다로 돌려보냈다." % [("통발에 든" if kept.is_empty() else "그중"), ", ".join(small)]})
 		intro.append({"speaker": "{player}", "text": "오늘은 뭐가 물려나."})
 		_play_story(intro)
 		return

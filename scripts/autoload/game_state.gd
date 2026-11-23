@@ -367,12 +367,16 @@ func buy_kit(id: String) -> String:
 	return ""
 
 
-## 방파제에 오면 통발을 걷는다: 든 고기를 아이스박스에 넣고(넘치면 화면이 고르게 한다) 넣은 것을 돌려준다
+## 방파제에 오면 통발을 걷는다: 든 고기를 아이스박스에 넣고(넘치면 화면이 고르게 한다) 걷은 것을 돌려준다.
+## 포획금지체장 이하는 넣지 않고 놓아준다 ("released": true로 표시해 돌려준다)
 func haul_traps() -> Array:
 	var got := trap_fish.duplicate()
 	trap_fish.clear()
 	for e in got:
-		store_catch(e, false)
+		if FishDB.must_release(e.id, e.size):
+			e["released"] = true
+		else:
+			store_catch(e, false)
 		caught_today.append(e)
 	return got
 

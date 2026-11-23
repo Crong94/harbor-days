@@ -13,6 +13,9 @@ extends RefCounted
 ## min_cm, max_cm: 방파제에서 낚이는 크기 폭. max_cm은 FishBase 최대 전장을 넘지 않게 잡는다 (2026-11-23 사용자 요청, 실제 어종 자료 반영)
 ## legal_cm: 포획금지체장. 이 크기 이하는 잡아도 놓아줘야 한다 (수산자원관리법 시행령 별표 2: 볼락 15, 조피볼락 23, 감성돔 25cm 이하).
 ##   노래미(쥐노래미 아님), 망상어, 쏨뱅이, 학공치는 금지체장이 없다
+## season_floor: 철이 아닐 때 출현 배율의 바닥. 달별 배율은 바다 한 접시 데이터(Catalog.month_factor)를 쓰고,
+##   여름에도 방파제에서 잡히는 고기(노래미, 쏨뱅이, 망상어 등)가 아예 사라지지 않게 이 값 밑으로는 안 내린다.
+##   학공치는 늦가을부터 봄까지 오는 겨울 고기라 여름엔 거의 없다 (기본 0.3)
 ## habit: 줄다리기 버릇 (FishingLogic). dive 처음에 바위로 세게 파고듦, shake 짧고 잦게 처박음, long 길게 차고 나감, jump 바늘털이(농어처럼 수면 위로 뛰어 머리를 터는 고기용. 지금 7종에는 없음),
 ##   tap 짧고 가볍게 툭툭, side 몸을 눕혀 같은 쪽으로 버팀, hole 발밑에서 바위틈으로 처박음
 ## beat: 당기는 힘이 오르내리는 박자 (낚싯대 떨림과 진동). 클수록 잘게 툭툭, 작을수록 묵직하게
@@ -67,7 +70,7 @@ const FISH := {
 	"hakgongchi": {
 		"name": "학공치", "rarity": "common",
 		"min_cm": 15.0, "max_cm": 35.0, "strength": 0.25, "price": 6000, "stamina": 0.6,
-		"weight": 2.5, "night": -0.7, "zone": [0.7, 1.3, 1.1],
+		"weight": 2.5, "night": -0.7, "zone": [0.7, 1.3, 1.1], "season_floor": 0.03,
 		"weather": {},
 		"beat": 8.5, "habit": "tap", "catalog": "hakgongchi", "grill": "hakgongchi-gui",
 		"desc": "바늘처럼 뾰족한 아래턱을 가진 은빛 물고기. 겨울에 방파제로 몰려와 수면 바로 아래를 떼 지어 다닌다. 몸이 가늘고 가벼워서 파르르 떨며 금방 끌려온다.",
@@ -111,12 +114,31 @@ static func weight_of(id: String, ctx: Dictionary) -> float:
 		w *= BaitDB.like_mult(bait, id)
 	# 날씨
 	w *= f.weather.get(ctx.get("weather", ""), 1.0)
+	# 철 (1~12월. 0이면 따지지 않는다)
+	w *= season_mult(id, int(ctx.get("month", 0)))
 	# 낚시터 (갯바위는 바위 고기와 감성돔이 잘 나온다. Spots)
 	w *= Spots.fish_mult(ctx.get("spot", "breakwater"), id)
 	# 연속 PERFECT 같은 버프
 	if f.rarity != "common":
 		w *= ctx.get("rare_boost", 1.0)
 	return w
+
+
+## 그 달에 얼마나 잘 나오는지. 바다 한 접시 달별 배율을 쓰되 season_floor 밑으로는 안 내린다
+static func season_mult(id: String, month: int) -> float:
+	var f := get_fish(id)
+	if f.is_empty() or month < 1 or month > 12:
+		return 1.0
+	return maxf(Catalog.month_factor(f.get("catalog", id), month), float(f.get("season_floor", 0.3)))
+
+
+## 그 어종이 제철인 달들 (도감 표시)
+static func season_months(id: String) -> Array:
+	var out: Array = []
+	for m in range(1, 13):
+		if season_mult(id, m) >= 1.0:
+			out.append(m)
+	return out
 
 
 ## 가중치대로 한 종을 고른다.

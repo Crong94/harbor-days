@@ -57,7 +57,14 @@ static func posted_on(day: int, coop_open := false, flags = null) -> Array:
 			pick = pool[rng.randi() % pool.size()]
 		else:
 			# 어제, 그제 붙은 생선과 겹치지 않게 날짜만큼 밀어서 고른다
-			pick = FISH_POOL[(rng.randi() % 3 + day * 3 + i * 2) % FISH_POOL.size()]
+			var k: int = rng.randi() % 3 + day * 3 + i * 2
+			pick = FISH_POOL[k % FISH_POOL.size()]
+			# 철이 아닌 고기(여름 학공치)는 다음 칸으로 넘긴다
+			var month := int(Calendar.date(day).month)
+			for step in FISH_POOL.size():
+				pick = FISH_POOL[(k + step) % FISH_POOL.size()]
+				if FishDB.season_mult(pick[0], month) >= 0.3:
+					break
 		var kind := "produce" if produce else "fish"
 		var item: String = pick[0]
 		var count: int = pick[1]

@@ -1378,6 +1378,28 @@ func _test_fishing_depth() -> void:
 		jumped += h.jumps
 	_eq(jumped, 0, "학공치는 바늘털이를 안 함")
 	_eq(FishDB.FISH.hakgongchi.strength < FishDB.FISH.bolak.strength, true, "학공치는 볼락보다 힘이 약함")
+	# 철: 학공치는 겨울 고기라 여름엔 거의 없다. 여름에도 노래미는 남는다
+	_eq(FishDB.weight_of("hakgongchi", {"month": 1}) > FishDB.weight_of("hakgongchi", {"month": 7}) * 10.0, true, "학공치는 겨울에 많고 여름엔 거의 없음")
+	_eq(FishDB.season_mult("noraemi", 7) >= 0.3, true, "여름에도 노래미는 나옴")
+	_eq(FishDB.weight_of("bolak", {}) == FishDB.weight_of("bolak", {"month": 0}), true, "달을 안 주면 철을 안 따짐")
+	_eq(DexInfo.season_text([1, 2, 3, 11, 12]), "11월~3월", "제철 구간 (해를 넘김)")
+	_eq(DexInfo.season_text([3, 4, 5, 10, 11]), "3월~5월, 10월~11월", "제철 구간 둘")
+	_eq(DexInfo.season_text(range(1, 13)), "사계절", "사계절")
+	var summer_hak := 0
+	for dd in range(120, 200):
+		if Orders.of(dd).get("fish", "") == "hakgongchi" and Calendar.date(dd).month in [6, 7, 8]:
+			summer_hak += 1
+		for po in Board.posted_on(dd):
+			if po.get("item", "") == "hakgongchi" and Calendar.date(dd).month in [6, 7, 8]:
+				summer_hak += 1
+	_eq(summer_hak, 0, "여름엔 학공치 주문과 의뢰가 없음")
+	# 통발에 든 작은 고기는 아이스박스에 넣지 않고 놓아준다
+	var gs_trap = load("res://scripts/autoload/game_state.gd").new()
+	gs_trap.trap_fish = [{"id": "bolak", "size": 13.0, "day": 3}, {"id": "bolak", "size": 20.0, "day": 3}]
+	var hauled: Array = gs_trap.haul_traps()
+	_eq(gs_trap.inventory.size(), 1, "통발 작은 볼락은 놓아줌")
+	_eq(hauled[0].get("released", false), true, "놓아준 통발 고기 표시")
+	gs_trap.free()
 	# 포획금지체장: 이하는 놓아줘야 한다 (수산자원관리법 시행령 별표 2)
 	_eq(FishDB.must_release("bolak", 15.0), true, "볼락 15cm는 놓아줌")
 	_eq(FishDB.must_release("bolak", 15.1), false, "볼락 15.1cm는 가져감")

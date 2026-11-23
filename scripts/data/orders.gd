@@ -73,7 +73,10 @@ static func of(day: int, flags = null) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("주문-%d" % day)
 	var c: Dictionary = who[rng.randi() % who.size()]
-	var p: Array = POOL[rng.randi() % POOL.size()]
+	# 철이 아닌 고기(여름 학공치)는 주문하지 않는다
+	var month := int(Calendar.date(day).month)
+	var pool := POOL.filter(func(q): return FishDB.season_mult(q[0], month) >= 0.3)
+	var p: Array = pool[rng.randi() % pool.size()]
 	var fish: String = p[0]
 	var f := FishDB.get_fish(fish)
 	# 너무 작은 건 안 받는다: 최소 크기와 평균 사이

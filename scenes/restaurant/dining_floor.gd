@@ -22,6 +22,8 @@ const GUEST_H := CHAR_H
 const SHEET_WALK_SCALE := 1.2
 ## 주인공 걷기 시트 한 칸 높이. 시트 안 몸이 칸의 66%라 여울, 세라(몸 키 약 195px)와 같은 키가 되게 크게 그린다
 const PLAYER_H := CHAR_H * 1.5
+## 주인공 서기 시트 3칸 (걷기 시트와 같은 칸 높이, 발 높이). 없으면 걷기 시트의 STAND_CELL
+const STAND_SHEET := "sd/stand"
 ## 서 있을 때 쓰는 걷기 시트 칸. 0번은 앞으로 한 발을 든 칸이라 늘 한 발을 들고 서 있는 것처럼 보였다 (11-19 사용자). 1번은 두 발이 땅에 닿는다
 const STAND_CELL := 1
 ## 앉은 시트 px → 배경 px (그림 세션 확인 그림의 K. 바른 자세 시트를 이 배율로 놓으면 의자 크기와 맞는다)
@@ -40,6 +42,7 @@ const TRAY := {
 	"sd/serve_walk": [[0.037, 0.562, 0.41], [0.039, 0.562, 0.41], [], [], [0.268, 0.537, 0.43], [0.231, 0.537, 0.47], [0.245, 0.537, 0.47], [0.247, 0.54, 0.43]],
 	"staff/yeoul_sd_walk": [[0.059, 0.537, 0.55], [0.051, 0.536, 0.55], [], [], [0.331, 0.537, 0.33], [0.327, 0.537, 0.34], [0.352, 0.532, 0.29], [0.264, 0.539, 0.39]],
 	"staff/yeoul_sd_react": [[], [0.12, 0.558, 0.5], []],
+	"sd/stand": [[], [0.0, 0.545, 0.38], []],
 }
 
 var logic := DiningLogic.new()
@@ -768,7 +771,9 @@ func _draw_cook(ci: Control) -> void:
 	if logic.at_stove() or logic.player.distance_to(DiningLogic.COOK_SPOT) < 0.01:
 		# 주인공이 조리대 뒤에 서 있다. 굽는 중이면 살짝 들썩인다
 		var bob := absf(sin(_t * 6.0)) * 2.0 if not logic.cooking.is_empty() else 0.0
-		if _has_sheet("sd/walk"):
+		if _has_sheet(STAND_SHEET):
+			_draw_cell(ci, STAND_SHEET, 3, 0, at + Vector2(0, -bob), PLAYER_H, false)
+		elif _has_sheet("sd/walk"):
 			_draw_cell(ci, "sd/walk", 8, STAND_CELL, at + Vector2(0, -bob), PLAYER_H, false)
 
 
@@ -874,6 +879,13 @@ func _draw_player_walk(ci: Control) -> void:
 	var sheet := "sd/serve_walk" if logic.holding >= 0 or logic.carrying_dirty else "sd/walk"
 	if not _has_sheet(sheet):
 		return
+	if not moving and _has_sheet(STAND_SHEET):
+		# 서기 시트: 0 빈손 대기, 1 빈 쟁반 들기, 2 숨쉬기 (0과 번갈아)
+		var sc := 1 if logic.holding >= 0 or logic.carrying_dirty else (2 if fmod(_t, 2.4) > 1.8 else 0)
+		_draw_cell(ci, STAND_SHEET, 3, sc, pp, PLAYER_H, false)
+		if logic.holding >= 0:
+			_dish_on_tray(ci, logic.holding, STAND_SHEET, 3, sc, pp, PLAYER_H, false)
+		return
 	var cell := GuestSD.walk_cell(logic.player_dir, _t) if moving else STAND_CELL
 	var flip := cell >= 4 and logic.player_dir.x < 0.0
 	_draw_cell(ci, sheet, 8, cell, pp, PLAYER_H, flip)
@@ -900,8 +912,11 @@ func _draw_helper(ci: Control) -> void:
 
 func _caption(ci: Control, font: Font, at: Vector2, t: String) -> void:
 	var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x
-	var x := clampf(at.x - w / 2.0, 8.0, size.x - w - 8.0)
+	var x := clampf(at.x - w / 2.0, 26.0, size.x - w - 26.0)
 	var y := at.y + sin(_t * 4.0) * 2.0
+	# 지붕, 바닥 그림 위에서도 읽히게 반투명 둥근 띠를 깐다
+	var asc := font.get_ascent(24)
+	ci.draw_style_box(UiKit.box(Color(UiKit.NIGHT_DEEP, 0.72), 22), Rect2(x - 18.0, y - asc - 10.0, w + 36.0, asc + font.get_descent(24) + 20.0))
 	ci.draw_string_outline(font, Vector2(x, y), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, 9, UiKit.OUTLINE)
 	ci.draw_string(font, Vector2(x, y), t, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, UiKit.FOAM)
 

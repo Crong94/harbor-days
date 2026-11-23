@@ -32,6 +32,7 @@ static func facts(id: String) -> Array:
 	var out := [
 		["사는 곳", where],
 		["잘 무는 때", when],
+		["제철", season_text(FishDB.season_months(id))],
 		["좋아하는 날씨", ", ".join(PackedStringArray(weather_names)) if not weather_names.is_empty() else "가리지 않아요"],
 		["좋아하는 미끼", ", ".join(PackedStringArray(baits)) if not baits.is_empty() else "크릴로도 충분해요"],
 		["힘", "●".repeat(power) + "○".repeat(5 - power)],
@@ -40,3 +41,24 @@ static func facts(id: String) -> Array:
 	if not habit.is_empty():
 		out.append(["버릇", habit])
 	return out
+
+
+## 제철 달들을 이어진 구간으로. 예: [1, 2, 3, 11, 12] → "11월~3월"
+static func season_text(months: Array) -> String:
+	if months.is_empty() or months.size() >= 12:
+		return "사계절"
+	# 철이 시작하는 달: 앞 달이 철이 아닌 달
+	var parts: Array = []
+	for m in months:
+		var prev: int = 12 if int(m) == 1 else int(m) - 1
+		if prev in months:
+			continue
+		var end: int = m
+		while true:
+			var nx: int = 1 if end == 12 else end + 1
+			if nx in months and nx != m:
+				end = nx
+			else:
+				break
+		parts.append("%d월" % m if end == m else "%d월~%d월" % [m, end])
+	return ", ".join(PackedStringArray(parts))
