@@ -418,8 +418,11 @@ func _test_fun() -> void:
 
 	# 어종: 학공치는 먼 물, 볼락은 가까운 물. 미끼를 좋아하면 잘 나온다
 	var near := FishDB.weight_of("hakgongchi", {"brightness": 1.0, "depth": 0.05})
-	var far := FishDB.weight_of("hakgongchi", {"brightness": 1.0, "depth": 0.95})
-	_eq(far > near * 3.0, true, "학공치는 먼 물")
+	var mid := FishDB.weight_of("hakgongchi", {"brightness": 1.0, "depth": 0.5})
+	_eq(mid > near and near > mid * 0.4, true, "학공치는 방파제 앞 표층에 떼로 몰려온다 (발밑에도 나옴)")
+	for id in FishDB.FISH:
+		var fd: Dictionary = FishDB.FISH[id]
+		_eq(fd.min_cm < fd.max_cm and fd.max_cm <= {"bolak": 36.0, "mangsang": 30.0, "noraemi": 33.0, "ssombaengi": 36.0, "ureok": 65.0, "hakgongchi": 40.0, "gamseongdom": 60.0}.get(id, 100.0), true, "%s 크기가 실제 최대 전장 안" % id)
 	_eq(FishDB.weight_of("bolak", {"brightness": 0.0, "depth": 0.1}) > FishDB.weight_of("bolak", {"brightness": 0.0, "depth": 0.9}), true, "볼락은 가까운 물")
 	_eq(FishDB.weight_of("ureok", {"bait": "worm"}) > FishDB.weight_of("ureok", {"bait": "krill"}), true, "우럭은 청갯지렁이를 좋아함")
 	_eq(FishDB.weight_of("gamseongdom", {"rare_boost": 2.0}) > FishDB.weight_of("gamseongdom", {}), true, "물 오름은 희귀 어종을 늘림")
@@ -1360,25 +1363,21 @@ func _test_fishing_depth() -> void:
 	for i in 30:
 		u.update(1.0 / 60.0, true)
 	_eq(u.run_count >= 1, true, "우럭은 물자마자 차고 나감")
-	# 학공치는 바늘털이를 한다. 손을 떼고 있으면 빠진다
+	# 학공치는 가볍고 바늘털이를 하지 않는다 (실제 습성)
 	var jumped := 0
-	var lost_by_jump := 0
-	for sd in 12:
+	for sd in 6:
 		var h := _new_logic(60 + sd)
-		h.forgiving = false
 		h.force_first_fish = "hakgongchi"
 		_cast(h)
 		_run_until(h, [S.BITE], func(_x): return false, 20.0)
 		h.press()
 		var t := 0.0
 		while h.state == S.REELING and t < 20.0:
-			h.update(1.0 / 60.0, h.jump_t <= 0.0 and h.tension < 0.6)
+			h.update(1.0 / 60.0, h.tension < 0.6)
 			t += 1.0 / 60.0
 		jumped += h.jumps
-		if h.fail_reason == "jumped":
-			lost_by_jump += 1
-	_eq(jumped > 0, true, "학공치 바늘털이 (%d번)" % jumped)
-	_eq(lost_by_jump > 0, true, "바늘털이 때 손을 떼면 놓침 (%d번)" % lost_by_jump)
+	_eq(jumped, 0, "학공치는 바늘털이를 안 함")
+	_eq(FishDB.FISH.hakgongchi.strength < FishDB.FISH.bolak.strength, true, "학공치는 볼락보다 힘이 약함")
 	# 지친 물고기는 감아도 장력이 오르지 않는다
 	var e := _new_logic(80)
 	e.forgiving = false
@@ -1427,7 +1426,7 @@ func _test_journal() -> void:
 	for id in FishDB.FISH:
 		_eq(DexInfo.facts(id).size() >= 5, true, "%s 낚는 요령" % id)
 	_eq(DexInfo.facts("bolak")[1][1], "어두운 새벽과 밤", "볼락은 어두울 때")
-	_eq(DexInfo.facts("hakgongchi")[0][1], "먼 물", "학공치는 먼 물")
+	_eq(DexInfo.facts("hakgongchi")[0][1], "중간", "학공치는 방파제 앞 중간 거리")
 	_eq(DexInfo.facts("ureok").back()[0], "버릇", "우럭 버릇")
 	_eq(Locations.is_unlocked("hall", {"chapter2_done": true}), false, "마을회관은 할 일이 생길 때까지 잠김")
 

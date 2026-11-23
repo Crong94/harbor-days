@@ -9,7 +9,8 @@ extends RefCounted
 ## zone: 던진 거리별 출현 배율 [발밑, 중간, 먼 물] (바다 한 접시 species.json zone)
 ## weather: 날씨별 배율 (SeaDay.WEATHER id)
 ## catalog: Catalog(바다 한 접시 데이터) 어종 id, grill: 생선구이 레시피 id
-## habit: 줄다리기 버릇 (FishingLogic). dive 처음에 바위로 세게 파고듦, shake 짧고 잦게 처박음, long 길게 차고 나감, jump 바늘털이,
+## min_cm, max_cm: 방파제에서 낚이는 크기 폭. max_cm은 FishBase 최대 전장을 넘지 않게 잡는다 (2026-11-23 사용자 요청, 실제 어종 자료 반영)
+## habit: 줄다리기 버릇 (FishingLogic). dive 처음에 바위로 세게 파고듦, shake 짧고 잦게 처박음, long 길게 차고 나감, jump 바늘털이(농어처럼 수면 위로 뛰어 머리를 터는 고기용. 지금 7종에는 없음),
 ##   tap 짧고 가볍게 툭툭, side 몸을 눕혀 같은 쪽으로 버팀, hole 발밑에서 바위틈으로 처박음
 ## beat: 당기는 힘이 오르내리는 박자 (낚싯대 떨림과 진동). 클수록 잘게 툭툭, 작을수록 묵직하게
 
@@ -22,7 +23,7 @@ const RARITY := {
 const FISH := {
 	"bolak": {
 		"name": "볼락", "rarity": "common",
-		"min_cm": 12.0, "max_cm": 26.0, "strength": 0.45, "price": 4000, "stamina": 0.75,
+		"min_cm": 12.0, "max_cm": 30.0, "strength": 0.45, "price": 4000, "stamina": 0.75,
 		"weight": 6.0, "night": 0.8, "zone": [1.6, 1.0, 0.4],
 		"weather": {"cloudy": 1.3, "rain": 1.2},
 		"habit": "tap", "beat": 7.5, "catalog": "bollak", "grill": "bollak-gui",
@@ -30,7 +31,7 @@ const FISH := {
 	},
 	"mangsang": {
 		"name": "망상어", "rarity": "common",
-		"min_cm": 12.0, "max_cm": 25.0, "strength": 0.35, "price": 2500,
+		"min_cm": 12.0, "max_cm": 27.0, "strength": 0.35, "price": 2500,
 		"weight": 4.0, "night": 0.0, "zone": [1.6, 1.0, 0.5],
 		"weather": {},
 		"habit": "side", "beat": 2.0, "catalog": "mangsangeo", "grill": "mangsangeo-gui",
@@ -38,7 +39,7 @@ const FISH := {
 	},
 	"noraemi": {
 		"name": "노래미", "rarity": "common",
-		"min_cm": 15.0, "max_cm": 32.0, "strength": 0.55, "price": 5000,
+		"min_cm": 12.0, "max_cm": 30.0, "strength": 0.55, "price": 5000,
 		"weight": 3.0, "night": 0.1, "zone": [1.4, 1.0, 0.6],
 		"weather": {"windy": 1.2},
 		"beat": 5.5, "habit": "shake", "catalog": "noraemi", "grill": "noraemi-gui",
@@ -46,7 +47,7 @@ const FISH := {
 	},
 	"ssombaengi": {
 		"name": "쏨뱅이", "rarity": "common",
-		"min_cm": 12.0, "max_cm": 28.0, "strength": 0.5, "price": 6000,
+		"min_cm": 12.0, "max_cm": 32.0, "strength": 0.5, "price": 6000,
 		"weight": 2.4, "night": 0.5, "zone": [1.3, 1.0, 0.6],
 		"weather": {"cloudy": 1.2},
 		"habit": "hole", "beat": 3.4, "catalog": "ssombaengi", "grill": "ssombaengi-gui",
@@ -62,11 +63,11 @@ const FISH := {
 	},
 	"hakgongchi": {
 		"name": "학공치", "rarity": "rare",
-		"min_cm": 25.0, "max_cm": 40.0, "strength": 0.3, "price": 7000,
-		"weight": 1.2, "night": -0.7, "zone": [0.2, 0.9, 1.8],
-		"weather": {"sunny": 1.4},
-		"beat": 4.2, "habit": "jump", "catalog": "hakgongchi", "grill": "hakgongchi-gui",
-		"desc": "바늘처럼 뾰족한 아래턱을 가진 은빛 물고기. 맑은 낮에 먼 물 수면에서 떼 지어 다닌다.",
+		"min_cm": 15.0, "max_cm": 35.0, "strength": 0.25, "price": 7000, "stamina": 0.6,
+		"weight": 1.2, "night": -0.7, "zone": [0.7, 1.3, 1.1],
+		"weather": {},
+		"beat": 8.5, "habit": "tap", "catalog": "hakgongchi", "grill": "hakgongchi-gui",
+		"desc": "바늘처럼 뾰족한 아래턱을 가진 은빛 물고기. 겨울에 방파제로 몰려와 수면 바로 아래를 떼 지어 다닌다. 몸이 가늘고 가벼워서 파르르 떨며 금방 끌려온다.",
 	},
 	"gamseongdom": {
 		"name": "감성돔", "rarity": "legend",

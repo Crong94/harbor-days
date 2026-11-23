@@ -502,7 +502,7 @@ func _watch_fight_events(delta: float) -> void:
 		_last_beat = 0
 		_hole_seen = false
 		return
-	# 어종 버릇: 바늘털이 (학공치), 첫 파고들기 (우럭)
+	# 어종 버릇: 바늘털이 (jump 고기, 지금은 없음), 첫 파고들기 (우럭)
 	if logic.jumps != _last_jumps:
 		_last_jumps = logic.jumps
 		if logic.jumps > 0:
