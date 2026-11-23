@@ -224,13 +224,21 @@ func _start_cooking() -> void:
 	_cook_hint.text = "세라가 칼을 잡았어요. 잠깐만 기다려요" if style == "raw" else "세라가 불 앞에 섰어요. 잠깐만 기다려요"
 	_stars.hide()
 	_gauge.hide()
-	_cook_panel.show()
-	UiKit.fade_in(_cook_panel, 0.3)
 	_guest.hide()
+	# 영업 판 위에서 세라가 화구에 올려 만드는 걸 보여 주고(말풍선 막대가 찬다), 다 되면 결과 창을 띄운다
+	_floor.start_special_cook(special_fish.id, _pick_dish, SPECIAL_COOK_SEC)
 	Sound.play_sfx("sizzle", 0.05, -6.0)
 	var tw := create_tween()
-	tw.tween_interval(1.8)
-	tw.tween_callback(_special_served)
+	tw.tween_interval(SPECIAL_COOK_SEC + 0.5)
+	tw.tween_callback(func():
+		_floor.special_cook = {}
+		_cook_panel.show()
+		UiKit.fade_in(_cook_panel, 0.3)
+		_special_served())
+
+
+## 특별 손님 한 접시를 세라가 만드는 시간 (판 위에서 보여 준다)
+const SPECIAL_COOK_SEC := 3.2
 
 
 static func special_stars(wanted: bool, order_done: bool, fresh: bool) -> int:
@@ -386,7 +394,9 @@ func _show_ledger() -> void:
 	var served: int = result.get("served", []).size()
 	_ledger_rows.add_child(_row("보통 손님", "%d명" % served, "+" + GameState.format_won(int(result.get("sales", 0))), UiKit.SEA))
 	for line in ServicePlan.ledger_lines(result):
-		_ledger_rows.add_child(UiKit.paragraph(line, "caption", UiKit.INK_SOFT))
+		var lp := UiKit.paragraph(line, "caption", UiKit.INK_SOFT)
+		lp.add_theme_font_size_override("font_size", LEDGER_NOTE_PX) # 폰에서도 읽히게 (11-23)
+		_ledger_rows.add_child(lp)
 	if special_price > 0:
 		var note := "직접 구운 한 접시" + ((" + " + Sides.name_of(special_side)) if special_side != "" else "")
 		_ledger_rows.add_child(_row(special.name, note, "+" + GameState.format_won(special_price), UiKit.SEA))
@@ -396,7 +406,7 @@ func _show_ledger() -> void:
 	if int(result.get("missed", 0)) > 0:
 		_ledger_rows.add_child(_row("돌아간 손님", "%d명" % result.missed, "", UiKit.INK_MUTED))
 	if int(result.get("sold_out", 0)) > 0:
-		_ledger_rows.add_child(_row("재료 소진", "일찍 닫음, 못 받은 손님 %d명" % result.sold_out, "", UiKit.INK_MUTED))
+		_ledger_rows.add_child(_row("재료가 떨어짐", "일찍 닫아서 못 받은 손님 %d명" % result.sold_out, "", UiKit.INK_MUTED))
 	if wage_paid > 0:
 		var names := []
 		for id in GameState.staff.values():
@@ -413,7 +423,9 @@ func _show_ledger() -> void:
 		var note := "남은 생선 %d마리는 내일 팔아요" % GameState.inventory.size()
 		if old > 0:
 			note = "남은 생선 %d마리 중 %d마리는 오늘 밤 상해요" % [GameState.inventory.size(), old]
-		_ledger_rows.add_child(UiKit.text(note, "caption", UiKit.CORAL_DEEP if old > 0 else UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
+		var sl := UiKit.text(note, "caption", UiKit.CORAL_DEEP if old > 0 else UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER)
+		sl.add_theme_font_size_override("font_size", LEDGER_NOTE_PX)
+		_ledger_rows.add_child(sl)
 	_ledger.show()
 	UiKit.fade_in(_ledger, 0.4)
 	_night_btn.grab_focus()
@@ -685,11 +697,19 @@ func _place_decor(kind: String, id: String) -> void:
 
 
 ## 한 줄: 이름, 설명, 금액
+## 장부 설명 글자 (caption 15px는 폰에서 너무 작았다)
+const LEDGER_NOTE_PX := 19
+
+
 func _row(key: String, note: String, amount: String, color: Color, strong := false) -> HBoxContainer:
 	var h := UiKit.hbox(UiKit.SPACE_MD)
 	h.add_child(UiKit.text(key, "title" if strong else "body", UiKit.INK))
 	if not note.is_empty():
-		h.add_child(UiKit.text(note, "caption", UiKit.INK_MUTED))
+		var nl := UiKit.text(note, "caption", UiKit.INK_SOFT)
+		nl.add_theme_font_size_override("font_size", LEDGER_NOTE_PX)
+		nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		h.add_child(nl)
 	h.add_child(UiKit.spacer())
 	if not amount.is_empty():
 		h.add_child(UiKit.text(amount, "h2" if strong else "title", color))

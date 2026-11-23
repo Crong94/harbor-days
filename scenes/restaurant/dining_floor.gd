@@ -425,6 +425,8 @@ func _process(delta: float) -> void:
 	_t += delta
 	_helper_bow = maxf(0.0, _helper_bow - delta)
 	_update_sera(delta)
+	if not special_cook.is_empty():
+		special_cook.t = minf(float(special_cook.t) + delta, float(special_cook.total))
 	if _started and not _done:
 		logic.update(delta)
 		_handle_events()
@@ -634,10 +636,9 @@ func _draw_floor() -> void:
 	_draw_decor_items(ci, true) # 화구, 도구
 	# 화구 위 조리 도구: 요리법마다 맞는 도구 (구이 석쇠, 튀김 튀김솥, 국물 들통, 조림 웍, 회 칼).
 	# 구이만 석쇠 위에 생선이 보이고 익는 색이 든다. 나머지는 도구만 살짝 흔들리고, 익는 정도는 옆 말풍선이 알려 준다
-	for c in logic.cooking:
+	for c in _cook_rows():
 		var bp := to_screen(DiningLogic.BURNERS[c.burner])
-		var g: Dictionary = logic.guests[c.guest]
-		var style := SpecialGuest.style_of(g.get("dish", "grill"))
+		var style := SpecialGuest.style_of(_cook_dish(c))
 		var tool: Texture2D = _tool_tex(style)
 		var jig := sin(_t * (14.0 if style != "soup" else 6.0) + c.burner) * (1.2 if style != "braise" else 2.4)
 		var tint := Color(1, 1, 1).lerp(Color(0.85, 0.6, 0.35), clampf(DiningLogic.doneness(c), 0.0, 1.0))
@@ -651,7 +652,7 @@ func _draw_floor() -> void:
 			ci.draw_texture_rect(tool, tr, false)
 			top = tr.position.y + th * 0.18 # 석쇠 윗면
 		if style == "grill" or tool == null:
-			var ft: Texture2D = _fish_tex.get(g.fish)
+			var ft: Texture2D = _fish_art(_cook_fish(c))
 			if ft:
 				var w := 46.0
 				var h := w * ft.get_height() / float(ft.get_width())
@@ -810,10 +811,12 @@ func _draw_burner_ui(ci: Control, font: Font) -> void:
 	var tip := _bubble_anchor()
 	var r0 := _row_rect(0, rows.size())
 	var mid := (r0.position.y + _row_rect(rows.size() - 1, rows.size()).end.y) / 2.0
-	# 말풍선 꼬리 (오른쪽 요리사 쪽)
-	var tail := PackedVector2Array([Vector2(r0.end.x - 4.0, mid - 10.0), Vector2(r0.end.x - 4.0, mid + 10.0), Vector2(tip.x, tip.y)])
-	ci.draw_colored_polygon(tail, UiKit.PAPER)
-	ci.draw_polyline(PackedVector2Array([tail[0], tail[2], tail[1]]), UiKit.OUTLINE, 3.0, true)
+	# 말풍선 꼬리 (오른쪽 요리사 쪽). 요리사가 접시를 내러 자리를 비우면 꼬리는 숨긴다
+	var cook_here := _sera_pos.distance_to(DiningLogic.COOK_SPOT) < 0.02 if logic.helper_kitchen else logic.at_stove()
+	if cook_here:
+		var tail := PackedVector2Array([Vector2(r0.end.x - 4.0, mid - 10.0), Vector2(r0.end.x - 4.0, mid + 10.0), Vector2(tip.x, tip.y)])
+		ci.draw_colored_polygon(tail, UiKit.PAPER)
+		ci.draw_polyline(PackedVector2Array([tail[0], tail[2], tail[1]]), UiKit.OUTLINE, 3.0, true)
 	for k in rows.size():
 		var c: Dictionary = rows[k]
 		var r := _row_rect(k, rows.size())
@@ -834,7 +837,7 @@ func _draw_burner_ui(ci: Control, font: Font) -> void:
 			else:
 				col = UiKit.DANGER
 		ci.draw_style_box(UiKit.chunky(bg, 16, 0, 3), r)
-		var ft: Texture2D = _fish_tex.get(logic.guests[c.guest].fish)
+		var ft: Texture2D = _fish_art(_cook_fish(c))
 		if ft:
 			var w := 36.0
 			var h := w * ft.get_height() / float(ft.get_width())
@@ -847,14 +850,39 @@ func _draw_burner_ui(ci: Control, font: Font) -> void:
 			_caption(ci, font, Vector2(r.get_center().x, _row_rect(rows.size() - 1, rows.size()).end.y + 30.0), "지금 눌러요!")
 
 
-## 굽는 중인 것만 화구 순서대로
+## 굽는 중인 것만 화구 순서대로. 특별 손님 한 접시(special_cook)도 끼운다
 func _cook_rows() -> Array:
 	var out := []
 	for b in DiningLogic.STOVES:
 		for x in logic.cooking:
 			if int(x.burner) == b:
 				out.append(x)
+	if not special_cook.is_empty():
+		out.append(special_cook)
 	return out
+
+
+## 특별 손님 한 접시: 영업이 끝난 뒤 세라가 화구에서 만든다 (service.gd가 정하고 지운다).
+## {"burner", "fish", "dish", "t", "total", "guest": -1}
+var special_cook := {}
+
+
+func start_special_cook(fish: String, dish: String, total: float) -> void:
+	special_cook = {"burner": 0, "fish": fish, "dish": dish, "t": 0.0, "total": total, "guest": -1}
+
+
+func _cook_fish(c: Dictionary) -> String:
+	return c.fish if c.has("fish") else logic.guests[c.guest].fish
+
+
+func _cook_dish(c: Dictionary) -> String:
+	return c.dish if c.has("dish") else logic.guests[c.guest].get("dish", "grill")
+
+
+func _fish_art(id: String) -> Texture2D:
+	if not _fish_tex.has(id):
+		_fish_tex[id] = _load_art("fish_" + id)
+	return _fish_tex[id]
 
 
 ## 말풍선 꼬리 끝: 요리사 가슴 왼쪽
@@ -1048,6 +1076,8 @@ const SERA_COOK_LOOP := [0, 1, 2, 3, 2, 3, 4, 2, 3]
 
 
 func _sera_cook_cell() -> int:
+	if not special_cook.is_empty():
+		return (5 if int(_t * 2.0) % 2 == 0 else 6) if DiningLogic.doneness(special_cook) >= 1.0 else SERA_COOK_LOOP[int(_t * 2.5) % SERA_COOK_LOOP.size()]
 	if logic.cooking.is_empty():
 		return 7
 	for c in logic.cooking:
