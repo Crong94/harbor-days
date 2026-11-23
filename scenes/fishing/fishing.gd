@@ -124,11 +124,13 @@ var _card_badges: HBoxContainer
 var _card_value: Label
 var _card_star_row: HBoxContainer
 var _card_continue: Label
+var _card_keep: Button # 쿨러에 넣기 (금지체장 이하면 잠김)
+var _card_free: Button # 놓아주기
+var _card_entry: Dictionary = {} # 카드에 뜬 고기. 쿨러에 넣을지 놓아줄지 고른 뒤에 정해진다
 var _card_lock := 0.0 # 카드가 튀어나오는 동안은 눌러도 닫히지 않게
 var _card_order: PanelContainer
 var _card_new := false
 var _card_record := false
-var _card_released := {} # 아이스박스가 꽉 차서 놓아준 고기
 var _card_box: Label
 var _summary: Control
 var _summary_title: Label
@@ -351,9 +353,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		var at: Vector2 = event.position if event is InputEventMouseButton else Vector2(size.x / 2.0, size.y - 160.0)
 		_touches.append({"t": 0.0, "p": at})
 		if logic.state == FishingLogic.State.CAUGHT:
-			if _landing <= 0.0 and _card_lock <= 0.0:
-				Sound.play_sfx("tap", 0.05, -6.0)
-				_close_card()
+			# 카드는 아래 단추(놓아주기, 쿨러에 넣기)로만 닫는다. 스페이스는 기본 선택
+			if event is InputEventKey and _card_root.visible and _landing <= 0.0 and _card_lock <= 0.0:
+				if _card_keep.visible and not _card_keep.disabled:
+					_keep_catch()
+				else:
+					_free_catch()
 		else:
 			var before := logic.state
 			logic.press()
@@ -655,6 +660,8 @@ func _on_hooked() -> void:
 	_last_tension_level = 0
 	_trail.clear()
 	# 조작 안내는 첫 줄다리기 때만 (첫날 튜토리얼의 첫 물고기)
+	if tutorial and FishDB.must_release(logic.fish_id, logic.fish_size):
+		logic.fish_size = snappedf(float(FishDB.get_fish(logic.fish_id).legal_cm) + 1.0 + randf() * 4.0, 0.1) # 첫날 볼락은 식당에 써야 해서 놓아줄 크기로 안 나오게
 	if tutorial and not _tutor_fight_shown:
 		_tutor_fight_shown = true
 		_guide_on = true
@@ -732,8 +739,7 @@ func _play_state_sound(s: int) -> void:
 func _record_catch() -> void:
 	var entry := {"id": logic.fish_id, "size": logic.fish_size, "perfect": logic.hook_grade == "perfect", "day": GameState.day}
 	GameState.caught_today.append(entry)
-	_card_released = GameState.store_catch(entry, false) # 꽉 차면 카드를 닫은 뒤 놓아줄 고기를 고른다 (_open_box)
-	_box_just = GameState.inventory.back()
+	_card_entry = entry # 쿨러에 넣을지 놓아줄지는 카드에서 고른다 (_keep_catch, _free_catch)
 	var best: float = GameState.dex.get(logic.fish_id, 0.0)
 	_card_new = best == 0.0
 	_card_record = best > 0.0 and logic.fish_size > best
@@ -1280,8 +1286,21 @@ func _build_card() -> void:
 	v.add_child(_card_order)
 	_card_box = UiKit.text("", "caption", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(_card_box)
-	_card_continue = UiKit.text("눌러서 계속", "label", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER)
+	_card_continue = UiKit.text("", "label", UiKit.CORAL_DEEP, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(_card_continue)
+	# 고르기: 놓아주기 / 쿨러에 넣기
+	var btns := UiKit.hbox(UiKit.SPACE_MD, BoxContainer.ALIGNMENT_CENTER)
+	v.add_child(btns)
+	_card_free = UiKit.game_button("놓아주기", UiKit.TEAL_BTN, Vector2(250, 76), 26)
+	_card_free.pressed.connect(func():
+		if _card_lock <= 0.0:
+			_free_catch())
+	btns.add_child(_card_free)
+	_card_keep = UiKit.game_button("쿨러에 넣기", UiKit.CORAL, Vector2(250, 76), 26)
+	_card_keep.pressed.connect(func():
+		if _card_lock <= 0.0:
+			_keep_catch())
+	btns.add_child(_card_keep)
 	_card_root.hide()
 
 
@@ -1309,27 +1328,30 @@ func _show_card() -> void:
 		tags.append("PERFECT 챔질")
 	if logic.cast_grade == "nice":
 		tags.append("NICE CAST")
-	_card_value.text = "값 %s%s" % [GameState.format_won(FishDB.value_of(id, logic.fish_size)), ("  ·  " + "  ·  ".join(PackedStringArray(tags))) if not tags.is_empty() else ""]
+	if FishDB.must_release(id, logic.fish_size):
+		_card_value.text = "  ·  ".join(PackedStringArray(tags)) # 놓아줄 고기라 값은 안 보인다
+	else:
+		_card_value.text = "값 %s%s" % [GameState.format_won(FishDB.value_of(id, logic.fish_size)), ("  ·  " + "  ·  ".join(PackedStringArray(tags))) if not tags.is_empty() else ""]
 	# 주문
 	_card_order.hide()
-	if not tutorial:
-		var reward := GameState.offer_to_order(id, logic.fish_size)
-		if Orders.matches(order, id, logic.fish_size) or reward > 0:
-			var lbl := _card_order.get_child(0) as Label
-			if reward > 0:
-				lbl.text = "주문 완료! +%s" % GameState.format_won(reward)
-				Sound.play_sfx("coin")
-			else:
-				lbl.text = "주문 %d/%d" % [GameState.order_filled, order.count]
-			_card_order.show()
+	if not tutorial and not GameState.order_done and Orders.matches(order, id, logic.fish_size):
+		(_card_order.get_child(0) as Label).text = "주문에 맞는 고기예요. 쿨러에 넣으면 보내요"
+		_card_order.show()
 	# 아이스박스 자리
 	var cap := GameState.icebox_size
-	if GameState.is_overfull():
-		_card_box.text = "아이스박스가 꽉 찼어요. 놓아줄 고기를 골라요"
+	if GameState.icebox_free() <= 0:
+		_card_box.text = "아이스박스 %d / %d. 넣으려면 한 마리를 빼야 해요" % [GameState.inventory.size(), cap]
 		_card_box.add_theme_color_override("font_color", UiKit.CORAL_DEEP)
 	else:
 		_card_box.text = "아이스박스 %d / %d" % [GameState.inventory.size(), cap]
-		_card_box.add_theme_color_override("font_color", UiKit.CORAL_DEEP if GameState.icebox_free() == 0 else UiKit.INK_SOFT)
+		_card_box.add_theme_color_override("font_color", UiKit.INK_SOFT)
+	# 금지체장 이하는 쿨러에 못 넣는다. 첫날 튜토리얼 볼락은 놓아줄 수 없다 (식당 첫 손님 재료)
+	var small := FishDB.must_release(id, logic.fish_size)
+	_card_continue.text = FishDB.legal_text(id) if small else ""
+	_card_continue.visible = small
+	_card_keep.disabled = small
+	_card_keep.text = "작아서 못 넣어요" if small else "쿨러에 넣기"
+	_card_free.visible = not tutorial
 	var rare := rar != FishDB.RARITY.common
 	Sound.play_sfx("newfish" if (_card_new or rare) else "catch")
 	_card_root.show()
@@ -1377,8 +1399,38 @@ func _animate_card(stars: int) -> void:
 		bc.scale = Vector2(0.3, 0.3)
 		bc.create_tween().tween_property(bc, "scale", Vector2.ONE, 0.3).set_delay(0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	# 닫을 수 있을 때 "눌러서 계속"이 나타난다
-	_card_continue.modulate.a = 0.0
-	_card_continue.create_tween().tween_property(_card_continue, "modulate:a", 1.0, 0.25).set_delay(_card_lock)
+	for b in [_card_free, _card_keep]:
+		b.modulate.a = 0.0
+		b.create_tween().tween_property(b, "modulate:a", 1.0, 0.25).set_delay(_card_lock)
+
+
+## 쿨러에 넣는다. 주문에 맞으면 보내고, 꽉 차면 카드를 닫은 뒤 뺄 고기를 고른다
+func _keep_catch() -> void:
+	if _card_entry.is_empty() or FishDB.must_release(_card_entry.id, _card_entry.size):
+		return
+	Sound.play_sfx("tap", 0.05, -6.0)
+	GameState.store_catch(_card_entry, false)
+	_box_just = GameState.inventory.back()
+	if not tutorial:
+		var reward := GameState.offer_to_order(_card_entry.id, _card_entry.size)
+		if reward > 0:
+			Sound.play_sfx("coin")
+			_pop_text("주문 완료! +%s" % GameState.format_won(reward), UiKit.SUN, Vector2(size.x / 2.0, size.y * 0.42), 36, true)
+		elif Orders.matches(order, _card_entry.id, _card_entry.size) and not GameState.order_done:
+			_pop_text("주문 %d/%d" % [GameState.order_filled, order.count], UiKit.SEA, Vector2(size.x / 2.0, size.y * 0.42), 32)
+	_card_entry = {}
+	_close_card()
+
+
+## 바다로 돌려보낸다. 오늘 조과 기록에는 "놓아줌"으로 남는다
+func _free_catch() -> void:
+	if _card_entry.is_empty() or tutorial:
+		return
+	_card_entry["released"] = true
+	Sound.play_sfx("slip", 0.05, -4.0)
+	_pop_text("%s 바다로" % FishDB.get_fish(_card_entry.id).name, UiKit.FOAM, Vector2(size.x / 2.0, size.y * 0.42), 34)
+	_card_entry = {}
+	_close_card()
 
 
 func _close_card() -> void:
@@ -1453,7 +1505,8 @@ func _show_summary() -> void:
 		c.queue_free()
 	var total := 0
 	for e in GameState.caught_today:
-		total += FishDB.value_of(e.id, e.size)
+		if not e.get("released", false):
+			total += FishDB.value_of(e.id, e.size)
 		_summary_list.add_child(_catch_row(e))
 	if GameState.caught_today.is_empty():
 		_summary_list.add_child(UiKit.text("오늘은 한 마리도 못 잡았다.", "body", UiKit.INK_SOFT, HORIZONTAL_ALIGNMENT_CENTER))
@@ -1484,6 +1537,8 @@ func _catch_row(e: Dictionary) -> PanelContainer:
 	var rar := FishDB.rarity(e.id)
 	if rar != FishDB.RARITY.common:
 		h.add_child(UiKit.badge(rar.name, rar.color, Color.WHITE))
+	if e.get("released", false):
+		h.add_child(UiKit.badge("놓아줌", UiKit.SEA, Color.WHITE))
 	h.add_child(UiKit.spacer())
 	var st := UiKit.text("★".repeat(FishDB.stars(e.id, e.size)), "label", UiKit.SUN)
 	h.add_child(st)

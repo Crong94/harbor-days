@@ -1378,6 +1378,17 @@ func _test_fishing_depth() -> void:
 		jumped += h.jumps
 	_eq(jumped, 0, "학공치는 바늘털이를 안 함")
 	_eq(FishDB.FISH.hakgongchi.strength < FishDB.FISH.bolak.strength, true, "학공치는 볼락보다 힘이 약함")
+	# 포획금지체장: 이하는 놓아줘야 한다 (수산자원관리법 시행령 별표 2)
+	_eq(FishDB.must_release("bolak", 15.0), true, "볼락 15cm는 놓아줌")
+	_eq(FishDB.must_release("bolak", 15.1), false, "볼락 15.1cm는 가져감")
+	_eq(FishDB.must_release("ureok", 23.0), true, "우럭 23cm는 놓아줌")
+	_eq(FishDB.must_release("gamseongdom", 24.0), true, "감성돔 24cm는 놓아줌")
+	_eq(FishDB.must_release("hakgongchi", 15.0), false, "학공치는 금지체장 없음")
+	_eq(FishDB.legal_text("bolak"), "볼락 15cm 이하는 법으로 놓아줘야 해요", "금지체장 안내")
+	for id in FishDB.FISH:
+		var fo: Dictionary = FishDB.FISH[id]
+		if fo.has("legal_cm"):
+			_eq(snappedf(lerpf(fo.min_cm, fo.max_cm, 0.25), 1.0) > fo.legal_cm, true, "%s 주문 최소 크기는 금지체장보다 큼" % id)
 	# 지친 물고기는 감아도 장력이 오르지 않는다
 	var e := _new_logic(80)
 	e.forgiving = false

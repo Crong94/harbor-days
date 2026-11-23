@@ -11,6 +11,8 @@ extends RefCounted
 ## weather: 날씨별 배율 (SeaDay.WEATHER id)
 ## catalog: Catalog(바다 한 접시 데이터) 어종 id, grill: 생선구이 레시피 id
 ## min_cm, max_cm: 방파제에서 낚이는 크기 폭. max_cm은 FishBase 최대 전장을 넘지 않게 잡는다 (2026-11-23 사용자 요청, 실제 어종 자료 반영)
+## legal_cm: 포획금지체장. 이 크기 이하는 잡아도 놓아줘야 한다 (수산자원관리법 시행령 별표 2: 볼락 15, 조피볼락 23, 감성돔 25cm 이하).
+##   노래미(쥐노래미 아님), 망상어, 쏨뱅이, 학공치는 금지체장이 없다
 ## habit: 줄다리기 버릇 (FishingLogic). dive 처음에 바위로 세게 파고듦, shake 짧고 잦게 처박음, long 길게 차고 나감, jump 바늘털이(농어처럼 수면 위로 뛰어 머리를 터는 고기용. 지금 7종에는 없음),
 ##   tap 짧고 가볍게 툭툭, side 몸을 눕혀 같은 쪽으로 버팀, hole 발밑에서 바위틈으로 처박음
 ## beat: 당기는 힘이 오르내리는 박자 (낚싯대 떨림과 진동). 클수록 잘게 툭툭, 작을수록 묵직하게
@@ -24,7 +26,7 @@ const RARITY := {
 const FISH := {
 	"bolak": {
 		"name": "볼락", "rarity": "common",
-		"min_cm": 12.0, "max_cm": 30.0, "strength": 0.45, "price": 4000, "stamina": 0.75,
+		"min_cm": 12.0, "max_cm": 30.0, "legal_cm": 15.0, "strength": 0.45, "price": 4000, "stamina": 0.75,
 		"weight": 6.0, "night": 0.8, "zone": [1.6, 1.0, 0.4],
 		"weather": {"cloudy": 1.3, "rain": 1.2},
 		"habit": "tap", "beat": 7.5, "catalog": "bollak", "grill": "bollak-gui",
@@ -56,7 +58,7 @@ const FISH := {
 	},
 	"ureok": {
 		"name": "우럭", "rarity": "rare",
-		"min_cm": 18.0, "max_cm": 45.0, "strength": 0.7, "price": 9000,
+		"min_cm": 18.0, "max_cm": 45.0, "legal_cm": 23.0, "strength": 0.7, "price": 9000,
 		"weight": 1.3, "night": 0.6, "zone": [1.0, 1.2, 0.8],
 		"weather": {"cloudy": 1.3, "rain": 1.4},
 		"beat": 2.6, "habit": "dive", "catalog": "ureok", "grill": "ureok-gui",
@@ -72,7 +74,7 @@ const FISH := {
 	},
 	"gamseongdom": {
 		"name": "감성돔", "rarity": "legend",
-		"min_cm": 25.0, "max_cm": 52.0, "strength": 1.05, "price": 28000, "gear_help": 0.6, "stamina": 2.0,
+		"min_cm": 22.0, "max_cm": 52.0, "legal_cm": 25.0, "strength": 1.05, "price": 28000, "gear_help": 0.6, "stamina": 2.0,
 		"weight": 0.22, "night": 0.3, "zone": [0.2, 0.8, 1.8],
 		"weather": {"cloudy": 1.4, "windy": 1.5},
 		"habit": "long", "catalog": "gamseongdom", "grill": "gamseongdom-gui",
@@ -179,6 +181,20 @@ static func stars(id: String, size_cm: float) -> int:
 	var f := get_fish(id)
 	var k := inverse_lerp(f.min_cm, f.max_cm, size_cm)
 	return 3 if k >= 0.72 else (2 if k >= 0.4 else 1)
+
+
+## 포획금지체장 이하라 놓아줘야 하는지
+static func must_release(id: String, size_cm: float) -> bool:
+	var f := get_fish(id)
+	return f.has("legal_cm") and size_cm <= float(f.legal_cm)
+
+
+## 놓아줘야 하는 까닭 한 줄 (잡은 카드)
+static func legal_text(id: String) -> String:
+	var f := get_fish(id)
+	if not f.has("legal_cm"):
+		return ""
+	return "%s %dcm 이하는 법으로 놓아줘야 해요" % [f.name, int(f.legal_cm)]
 
 
 ## 그 어종 최대 크기의 90% 이상이면 대물
