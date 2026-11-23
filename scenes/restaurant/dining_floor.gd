@@ -20,6 +20,8 @@ const CHAR_H := 195.0
 const GUEST_H := CHAR_H
 ## 걷기 시트는 칸 위 여백이 커서 이만큼 키워 그린다 (GuestSD.WALK_SCALE과 같은 값)
 const SHEET_WALK_SCALE := 1.2
+## 주인공 걷기 시트 한 칸 높이. 시트 안 몸이 칸의 66%라 여울, 세라(몸 키 약 195px)와 같은 키가 되게 크게 그린다
+const PLAYER_H := CHAR_H * 1.5
 ## 서 있을 때 쓰는 걷기 시트 칸. 0번은 앞으로 한 발을 든 칸이라 늘 한 발을 들고 서 있는 것처럼 보였다 (11-19 사용자). 1번은 두 발이 땅에 닿는다
 const STAND_CELL := 1
 ## 앉은 시트 px → 배경 px (그림 세션 확인 그림의 K. 바른 자세 시트를 이 배율로 놓으면 의자 크기와 맞는다)
@@ -767,7 +769,7 @@ func _draw_cook(ci: Control) -> void:
 		# 주인공이 조리대 뒤에 서 있다. 굽는 중이면 살짝 들썩인다
 		var bob := absf(sin(_t * 6.0)) * 2.0 if not logic.cooking.is_empty() else 0.0
 		if _has_sheet("sd/walk"):
-			_draw_cell(ci, "sd/walk", 8, STAND_CELL, at + Vector2(0, -bob), CHAR_H * SHEET_WALK_SCALE, false)
+			_draw_cell(ci, "sd/walk", 8, STAND_CELL, at + Vector2(0, -bob), PLAYER_H, false)
 
 
 ## 화구 고리: 굽는 중(하늘색 차오름) → 노릇노릇(금빛, 지금 누르기) → 지나감(주황) → 타기 직전(빨강)
@@ -828,7 +830,7 @@ func _cook_rows() -> Array:
 ## 말풍선 꼬리 끝: 요리사 가슴 왼쪽
 func _bubble_anchor() -> Vector2:
 	var at := to_screen(DiningLogic.COOK_SPOT)
-	var body := SERA_BODY_H if logic.helper_kitchen else CHAR_H * SHEET_WALK_SCALE * 0.67
+	var body := SERA_BODY_H if logic.helper_kitchen else PLAYER_H * 0.67
 	return Vector2(at.x - body * 0.28, at.y - body * 0.6)
 
 
@@ -874,9 +876,9 @@ func _draw_player_walk(ci: Control) -> void:
 		return
 	var cell := GuestSD.walk_cell(logic.player_dir, _t) if moving else STAND_CELL
 	var flip := cell >= 4 and logic.player_dir.x < 0.0
-	_draw_cell(ci, sheet, 8, cell, pp, CHAR_H * SHEET_WALK_SCALE, flip)
+	_draw_cell(ci, sheet, 8, cell, pp, PLAYER_H, flip)
 	if logic.holding >= 0:
-		_dish_on_tray(ci, logic.holding, sheet, 8, cell, pp, CHAR_H * SHEET_WALK_SCALE, flip)
+		_dish_on_tray(ci, logic.holding, sheet, 8, cell, pp, PLAYER_H, flip)
 
 
 func _draw_helper(ci: Control) -> void:
