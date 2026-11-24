@@ -522,6 +522,18 @@ func _settle_sheet(id: String, was_open: bool) -> void:
 	_center_on(id)
 
 
+## 뒤로가기 (BackButton): 열린 것 하나를 닫았으면 true
+func on_back() -> bool:
+	for s in [_gift_sheet, _tank_sheet]:
+		if s and s.visible:
+			s.hide()
+			return true
+	if _drawer.is_open():
+		_drawer.close()
+		return true
+	return false
+
+
 func _close_sheet() -> void:
 	_sheet.hide()
 	_selected = ""

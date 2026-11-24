@@ -2047,6 +2047,11 @@ func _test_sides() -> void:
 	_eq(WeekGoals.close_day(gs).size() >= 1, true, "이루면 소식")
 	_eq(gs.money > before, true, "상금")
 	_eq(gs.week, {}, "일요일이 끝나면 새로 셈")
+	# 자판이 입력 칸을 가리면 그만큼 밀기, 뒤로가기 한 번에 꺼지지 않기
+	_eq(KeyboardLift.lift(600.0, 1280.0, 0.0), 0.0, "자판이 없으면 그대로")
+	_eq(KeyboardLift.lift(1000.0, 1280.0, 500.0), 1000.0 + KeyboardLift.GAP - 780.0, "자판 위로 올림")
+	_eq(KeyboardLift.lift(300.0, 1280.0, 500.0), 0.0, "안 가리면 그대로")
+	_eq(bool(ProjectSettings.get_setting("application/config/quit_on_go_back")), false, "뒤로가기 한 번에 꺼지지 않음")
 	# 고기 떼
 	_eq(SeaDay.school(1), "", "첫날은 떼 없음")
 	_eq(range(3, 60).any(func(d): return SeaDay.school(d) != ""), true, "가끔 떼가 들어옴")

@@ -229,6 +229,7 @@ func _hang_sign() -> void:
 			tw_shake.tween_property(_shop_edit, "position:x", dx, 0.05)
 		return
 	_hung = true
+	_shop_edit.release_focus()
 	var n := _shop_edit.text.strip_edges()
 	GameState.shop_name = n if not n.is_empty() else GameState.DEFAULT_SHOP_NAME
 	_shop_label.text = GameState.shop_name
@@ -266,7 +267,7 @@ func _on_dialogue_finished() -> void:
 		_board.show()
 		_form.show()
 		UiKit.rise_in(_form, 0.1)
-		_shop_edit.grab_focus()
+		add_child(KeyboardLift.make(self, _shop_edit)) # 자판은 이름 칸을 눌렀을 때만 올라온다 (11-24)
 		return
 	_lead.text = GameState.line("{player}의 작은 식당, {shop}")
 	_next_btn.show()

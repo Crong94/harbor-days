@@ -86,7 +86,7 @@ const SEAT_ACCESS := [[2, 3], [3], [3], [3], [1], [0],
 	[1, 2], [2], [4], [4], [4], [4], [5], [5], [5], [5]]
 
 ## 주방: 요리사는 오른쪽 벽 옆모습 화구 둘 앞에 선다
-const COOK_SPOT := Vector2(742 / W, 520 / H) # 요리사 발끝 (화구 앞)
+const COOK_SPOT := Vector2(752 / W, 520 / H) # 요리사 발끝 (화구 앞)
 const BURNERS := [Vector2(838 / W, 398 / H), Vector2(838 / W, 474 / H)] # 화구 위 냄비 자리
 ## 완성 접시 내놓는 자리 (카운터 꺾이는 모서리 픽업대 위)
 const PASS_SPOTS := [Vector2(328 / W, 575 / H), Vector2(366 / W, 575 / H), Vector2(404 / W, 575 / H)]

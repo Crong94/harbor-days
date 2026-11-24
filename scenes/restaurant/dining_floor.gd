@@ -15,29 +15,36 @@ signal finished(result: Dictionary)
 
 const BG := "shop4/bg_night"
 const BG_SIZE := Vector2(982, 1602)
-## 사람 키 (화면 px, 서 있는 키). 슬롯 설계 7차: SD 1.3배
-const CHAR_H := 195.0
-const GUEST_H := CHAR_H
+## 사람 키 (바탕 px, 발끝에서 머리끝). 주인공, 세라, 여울, 걷는 손님이 모두 같다 (11-24 사용자: 너무 크다, 식당 구조에 맞게, 손님도 같은 크기).
+## 앉은 손님 머리 크기(시트 182px × SEAT_K)와 서 있는 사람 머리 크기가 비슷해지는 값이다
+const BODY := 170.0
+var char_h: float: # 화면 px
+	get:
+		return bg_px(BODY)
 ## 걷기 시트는 칸 위 여백이 커서 이만큼 키워 그린다 (GuestSD.WALK_SCALE과 같은 값)
 const SHEET_WALK_SCALE := 1.2
 ## 주인공 걷기 시트 한 칸 높이. 시트 안 몸이 칸의 66%라 여울, 세라(몸 키 약 195px)와 같은 키가 되게 크게 그린다
-const PLAYER_H := CHAR_H * 1.5
+var player_h: float:
+	get:
+		return char_h * 1.502
 ## 주인공 서기 시트 3칸 (걷기 시트와 같은 칸 높이, 발 높이). 없으면 걷기 시트의 STAND_CELL
 const STAND_SHEET := "sd/stand"
 ## 서 있을 때 쓰는 걷기 시트 칸. 0번은 앞으로 한 발을 든 칸이라 늘 한 발을 들고 서 있는 것처럼 보였다 (11-19 사용자). 1번은 두 발이 땅에 닿는다
 const STAND_CELL := 1
 ## 앉은 시트 px → 배경 px (그림 세션 확인 그림의 K. 바른 자세 시트를 이 배율로 놓으면 의자 크기와 맞는다)
-const SEAT_K := 0.44
+const SEAT_K := 0.46
+## 시트 칸 아래 빈 여백 (칸 높이 비율). 발끝이 자리에 닿게 이만큼 내려 그린다
+const FOOT := {"sd/walk": 0.146, "sd/stand": 0.146, "sd/serve_walk": 0.146, "staff/yeoul_sd_walk": 0.098, "staff/yeoul_sd_react": 0.012, "staff/sera_sd_react": 0.031}
 const SEAT_LIFT := 30.0 # 앉은 그림이 없어 서 있는 그림으로 대신할 때 발을 자리보다 이만큼 위에
-const DISH := 50.0
+const DISH := 44.0
 const NIGHT_DIM := Color(0.85, 0.85, 0.85)
 ## 화구 고리 (오른쪽 벽 옆모습 화구 둘 위, 누르는 자리)
 ## 화구 위 조리 도구 (코지 cook_tool2 그림, 11-24). 요리 갈래(SpecialGuest.style_of)마다 하나
 const COOK_TOOLS := {"grill": "cook_tool2/grill", "fry": "cook_tool2/fryer", "soup": "cook_tool2/stockpot", "braise": "cook_tool2/wok", "raw": "cook_tool2/board"}
 ## 세라 요리법별 조리 시트 (4칸 한 줄. 손에 든 도구만 그려져 있다). 조림은 프라이팬 흔드는 v2 시트를 그대로 쓴다
 const SERA_STYLE_SHEETS := {"grill": "staff/sera_sd_cook_grill", "soup": "staff/sera_sd_cook_soup", "fry": "staff/sera_sd_cook_fry", "raw": "staff/sera_sd_cook_raw"}
-const COOK_TOOL_W := 72.0
-const COOK_TOOL_SINK := 14.0 # 도구 바닥을 화구 자리보다 이만큼 아래에
+const COOK_TOOL_W := 58.0
+const COOK_TOOL_SINK := 11.0 # 도구 바닥을 화구 자리보다 이만큼 아래에
 var _tool_cache := {}
 
 
@@ -100,7 +107,6 @@ var _helper_bow := 0.0 # 서빙 알바가 접시를 내려놓고 인사하는 �
 ## 노릇노릇이면 엄지 척, 타면 곤란한 얼굴 (반응 시트)
 const SERA_PASS := Vector2(445 / 982.0, 515 / 1602.0)
 ## 세라 걷기 시트는 칸 위아래 여백이 커서(인물 471/724, 발 아래 여백 107) 조리 시트(인물 832/887)와 키를 맞춰 크게 그린다
-const SERA_WALK_H := CHAR_H * 1.51
 const SERA_SPEED := 0.22
 const SERA_REACT_T := 0.9
 var _sera_pos := DiningLogic.COOK_SPOT
@@ -460,7 +466,8 @@ func _handle_events() -> void:
 				var g: Dictionary = logic.guests[gi]
 				var sd := GuestSD.new()
 				sd.guest_id = _faces.get(g.name, GuestSD.TEMP_FACES[0])
-				sd.size = Vector2(GUEST_H * 0.75, GUEST_H)
+				sd.size = Vector2(char_h * 0.75, char_h)
+				sd.body_h = char_h
 				sd.walk = "back"
 				sd.flip = false
 				if night:
@@ -657,7 +664,7 @@ func _draw_floor() -> void:
 		if style == "grill" or tool == null:
 			var ft: Texture2D = _fish_art(_cook_fish(c))
 			if ft:
-				var w := 46.0
+				var w := 38.0
 				var h := w * ft.get_height() / float(ft.get_width())
 				ci.draw_texture_rect(ft, Rect2(bp.x - w / 2.0, top - h * 0.55 + jig, w, h), false, tint)
 	_draw_burner_ui(ci, font)
@@ -682,7 +689,7 @@ func _draw_floor() -> void:
 			tex = _seat_dish.get(seat)
 		if tex == null:
 			continue
-		var w := 60.0
+		var w := 50.0
 		var h := w * tex.get_height() / float(tex.get_width())
 		if not faded:
 			_ellipse(ci, bp + Vector2(0, h * 0.35), 34.0 + sin(_t * 4.0) * 2.0, Color(UiKit.FOAM, 0.35), 3.0)
@@ -779,36 +786,35 @@ func _draw_cook(ci: Control) -> void:
 		var walk: String = StaffDB.COOK.get("sd_walk", "")
 		var react: String = StaffDB.COOK.get("sd_react", "")
 		if _sera_react > 0.0 and react != "" and _has_sheet(react):
-			_draw_cell(ci, react, 3, _sera_react_cell, to_screen(_sera_pos), CHAR_H * 1.05, false)
+			_draw_cell(ci, react, 3, _sera_react_cell, to_screen(_sera_pos), char_h * 1.058, false)
 			return
 		var grid: bool = StaffDB.COOK.get("grid", false)
 		if sera_moving() and walk != "" and _has_sheet(walk):
 			var wc := GuestSD.walk_cell(_sera_dir, _t)
 			if grid:
-				_draw_grid(ci, walk, wc, to_screen(_sera_pos), SERA_BODY_H, wc >= 4 and _sera_dir.x < 0.0)
+				_draw_grid(ci, walk, wc, to_screen(_sera_pos), sera_body_h, wc >= 4 and _sera_dir.x < 0.0)
 				return
-			var feet := to_screen(_sera_pos) + Vector2(0, SERA_WALK_H * 107.0 / 724.0 - CHAR_H * 1.05 * 27.0 / 887.0)
-			_draw_cell(ci, walk, 8, wc, feet, SERA_WALK_H, wc >= 4 and _sera_dir.x < 0.0)
+			_draw_cell(ci, walk, 8, wc, to_screen(_sera_pos), char_h * 1.51, wc >= 4 and _sera_dir.x < 0.0)
 			return
 		if cook != "" and _has_sheet(cook):
 			if grid:
 				# 굽는 중이면 그 요리법 시트(구이 집게, 국물 국자, 튀김 건지기, 회 칼질), 다 익어 담을 때와 쉴 때는 v2 시트
 				var style_sheet: String = SERA_STYLE_SHEETS.get(_sera_style(), "")
 				if style_sheet != "" and _has_sheet(style_sheet) and not _sera_plating():
-					_draw_grid(ci, style_sheet, int(_t * 2.5) % 4, at, SERA_BODY_H, false)
+					_draw_grid(ci, style_sheet, int(_t * 2.5) % 4, at, sera_body_h, false)
 					return
-				_draw_grid(ci, cook, _sera_cook_cell(), at, SERA_BODY_H, false)
+				_draw_grid(ci, cook, _sera_cook_cell(), at, sera_body_h, false)
 				return
 			var cell := (1 + int(_t * 4.0) % 2) if not logic.cooking.is_empty() else 0
-			_draw_cell(ci, cook, 4, cell, at, CHAR_H * 1.05, false)
+			_draw_cell(ci, cook, 4, cell, at, char_h * 1.022, false)
 		return
 	if logic.at_stove() or logic.player.distance_to(DiningLogic.COOK_SPOT) < 0.01:
 		# 주인공이 조리대 뒤에 서 있다. 굽는 중이면 살짝 들썩인다
 		var bob := absf(sin(_t * 6.0)) * 2.0 if not logic.cooking.is_empty() else 0.0
 		if _has_sheet(STAND_SHEET):
-			_draw_cell(ci, STAND_SHEET, 3, 0, at + Vector2(0, -bob), PLAYER_H, false)
+			_draw_cell(ci, STAND_SHEET, 3, 0, at + Vector2(0, -bob), player_h, false)
 		elif _has_sheet("sd/walk"):
-			_draw_cell(ci, "sd/walk", 8, STAND_CELL, at + Vector2(0, -bob), PLAYER_H, false)
+			_draw_cell(ci, "sd/walk", 8, STAND_CELL, at + Vector2(0, -bob), player_h, false)
 
 
 ## 화구 고리: 굽는 중(하늘색 차오름) → 노릇노릇(금빛, 지금 누르기) → 지나감(주황) → 타기 직전(빨강)
@@ -896,7 +902,7 @@ func _fish_art(id: String) -> Texture2D:
 ## 말풍선 꼬리 끝: 요리사 가슴 왼쪽
 func _bubble_anchor() -> Vector2:
 	var at := to_screen(DiningLogic.COOK_SPOT)
-	var body := SERA_BODY_H if logic.helper_kitchen else PLAYER_H * 0.67
+	var body := sera_body_h if logic.helper_kitchen else player_h * 0.67
 	return Vector2(at.x - body * 0.28, at.y - body * 0.6)
 
 
@@ -906,7 +912,7 @@ func _row_rect(k: int, n: int) -> Rect2:
 	var fr := floor_rect()
 	var x := maxf(tip.x - 18.0 - BUBBLE_W, fr.position.x + 8.0)
 	var h := n * BUBBLE_ROW_H + (n - 1) * BUBBLE_GAP
-	var top := tip.y - h / 2.0
+	var top := tip.y - h + 4.0 # 바 손님 주문 말풍선과 덜 겹치게 위로 쌓는다
 	return Rect2(x, top + k * (BUBBLE_ROW_H + BUBBLE_GAP), BUBBLE_W, BUBBLE_ROW_H)
 
 
@@ -943,15 +949,15 @@ func _draw_player_walk(ci: Control) -> void:
 	if not moving and _has_sheet(STAND_SHEET):
 		# 서기 시트: 0 빈손 대기, 1 빈 쟁반 들기, 2 숨쉬기 (0과 번갈아)
 		var sc := 1 if logic.holding >= 0 or logic.carrying_dirty else (2 if fmod(_t, 2.4) > 1.8 else 0)
-		_draw_cell(ci, STAND_SHEET, 3, sc, pp, PLAYER_H, false)
+		_draw_cell(ci, STAND_SHEET, 3, sc, pp, player_h, false)
 		if logic.holding >= 0:
-			_dish_on_tray(ci, logic.holding, STAND_SHEET, 3, sc, pp, PLAYER_H, false)
+			_dish_on_tray(ci, logic.holding, STAND_SHEET, 3, sc, pp, player_h, false)
 		return
 	var cell := GuestSD.walk_cell(logic.player_dir, _t) if moving else STAND_CELL
 	var flip := cell >= 4 and logic.player_dir.x < 0.0
-	_draw_cell(ci, sheet, 8, cell, pp, PLAYER_H, flip)
+	_draw_cell(ci, sheet, 8, cell, pp, player_h, flip)
 	if logic.holding >= 0:
-		_dish_on_tray(ci, logic.holding, sheet, 8, cell, pp, PLAYER_H, flip)
+		_dish_on_tray(ci, logic.holding, sheet, 8, cell, pp, player_h, flip)
 
 
 func _draw_helper(ci: Control) -> void:
@@ -963,12 +969,12 @@ func _draw_helper(ci: Control) -> void:
 	if moving and walk_sheet != "" and _has_sheet(walk_sheet):
 		var cell := GuestSD.walk_cell(logic.helper_dir, _t)
 		var flip := cell >= 4 and logic.helper_dir.x < 0.0
-		_draw_cell(ci, walk_sheet, 8, cell, at, CHAR_H * SHEET_WALK_SCALE, flip)
+		_draw_cell(ci, walk_sheet, 8, cell, at, char_h * SHEET_WALK_SCALE, flip)
 		if logic.helper_dish >= 0:
-			_dish_on_tray(ci, logic.helper_dish, walk_sheet, 8, cell, at, CHAR_H * SHEET_WALK_SCALE, flip)
+			_dish_on_tray(ci, logic.helper_dish, walk_sheet, 8, cell, at, char_h * SHEET_WALK_SCALE, flip)
 	elif react != "" and _has_sheet(react):
 		# 서 있을 때: 대기(쟁반 옆구리), 막 내려놓았으면 꾸벅 인사
-		_draw_cell(ci, react, 3, 2 if _helper_bow > 0.0 else 0, at, CHAR_H * 1.05, false)
+		_draw_cell(ci, react, 3, 2 if _helper_bow > 0.0 else 0, at, char_h * 1.022, false)
 
 
 func _caption(ci: Control, font: Font, at: Vector2, t: String) -> void:
@@ -986,6 +992,7 @@ func _caption(ci: Control, font: Font, at: Vector2, t: String) -> void:
 func _dish_on_tray(ci: Control, gi: int, path: String, n: int, i: int, feet: Vector2, cell_h: float, flip: bool) -> void:
 	if not TRAY.has(path):
 		return
+	feet.y += float(FOOT.get(path, 0.0)) * cell_h
 	var tr: Array = TRAY[path][i]
 	if tr.is_empty():
 		return
@@ -1033,6 +1040,7 @@ static func _sheet(path: String, n: int) -> Dictionary:
 
 ## 시트의 한 칸을 발이 feet에 오게 그린다. 칸 전체 높이를 cell_h로
 func _draw_cell(ci: Control, path: String, n: int, i: int, feet: Vector2, cell_h: float, flip: bool) -> void:
+	feet.y += float(FOOT.get(path, 0.0)) * cell_h
 	var e := _sheet(path, n)
 	var tex: Texture2D = e.tex
 	var src := Rect2(e.cuts[i], 0, e.cuts[i + 1] - e.cuts[i], tex.get_height())
@@ -1078,7 +1086,9 @@ func _caption_small(ci: Control, font: Font, at: Vector2, t: String, col: Color)
 # ─── 세라 v2 격자 시트 (11-19) ─────────────────────────
 
 ## 세라 몸 높이 (발끝에서 머리끝까지 화면 px). 예전 시트와 같은 키
-const SERA_BODY_H := CHAR_H * 1.05 * 0.946
+var sera_body_h: float:
+	get:
+		return char_h
 ## 조리 칸 차례: 굽는 동안 올리기 → 뒤집기 → 흔들기 둘 → 소금 → 흔들기 둘. 다 익은 접시가 있으면 담기 → 내밀기. 쉴 땐 기다리기
 const SERA_COOK_LOOP := [0, 1, 2, 3, 2, 3, 4, 2, 3]
 

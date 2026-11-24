@@ -132,7 +132,8 @@ func _show_paper() -> void:
 	_root.show()
 	UiKit.rise_in(_root, 0.0, 18.0)
 	UiKit.rise_in(_paper, 0.15)
-	_name_edit.grab_focus()
+	# 자판은 이름 칸을 눌렀을 때만 올라온다 (11-24)
+	add_child(KeyboardLift.make(self, _name_edit))
 
 
 func _sign() -> void:
@@ -144,6 +145,7 @@ func _sign() -> void:
 	var n := _name_edit.text.strip_edges()
 	GameState.player_name = n if not n.is_empty() else GameState.DEFAULT_PLAYER_NAME
 	_name_edit.text = GameState.player_name
+	_name_edit.release_focus()
 	_name_edit.editable = false
 	# 도장 찍듯 (인)이 붉게 바뀐다
 	Sound.play_sfx("stamp")

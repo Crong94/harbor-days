@@ -133,6 +133,11 @@ func open_menu() -> void:
 	menu_toggled.emit(true)
 
 
+func close_menu() -> void:
+	if _menu:
+		_menu.close()
+
+
 func is_menu_open() -> bool:
 	return _menu != null and _menu.is_open()
 
