@@ -146,8 +146,9 @@ func start(day: int, inventory: Array) -> void:
 	_staff.clear()
 	for role in GameState.staff:
 		_staff[role] = StaffDB.get_staff(GameState.staff[role])
-	logic.pantry = GameState.produce # 곁들임은 GameState에서 바로 빠진다
-	logic.reserve = Sides.reserve_for(GameState)
+	logic.pantry = GameState.produce # 요리 재료는 GameState에서 바로 빠진다
+	logic.reserve = Pantry.reserve_for(GameState)
+	KitchenDB.apply(logic, GameState.kitchen)
 	_load_decor()
 	_started = true
 	var names := {}
@@ -188,7 +189,7 @@ func _ready() -> void:
 func _build_shop4() -> void:
 	var dim := Shop4.NIGHT_TINT if night else Color.WHITE
 	for it in Shop4.ITEMS:
-		var tex := _load_art(Shop4.path(it[0], night, it[7]))
+		var tex := _load_art(Shop4.path(it[0], night, it[7], GameState.kitchen))
 		if tex:
 			_add_prop(tex, Shop4.rect_of(it, tex.get_size()), it[4], Color.WHITE if it[6] else dim)
 	var stools := []
@@ -435,7 +436,7 @@ func _process(delta: float) -> void:
 		if logic.is_over():
 			_done = true
 			finished.emit({"served": logic.served, "missed": logic.missed + logic.angry, "sales": logic.sales,
-				"side_sales": logic.side_sales, "sides": logic.served.filter(func(e): return e.side != "").size(),
+				"best_combo": logic.best_combo,
 				"angry": logic.angry, "sold_out": logic.turned_away, "hearts": logic.served.filter(func(e): return e.heart).size(),
 				"burnt": logic.burnt, "perfect": logic.perfect, "angry_list": logic.angry_list})
 	for p in _pops:
@@ -520,8 +521,8 @@ func _handle_events() -> void:
 							if is_instance_valid(sd2):
 								sd2.set_pose("eat"))
 				_pop(_bubble_pos(gi) + Vector2(0, -30), "+" + GameState.format_won(e.price), UiKit.SUN, e.heart)
-				if e.side != "":
-					_pop(_bubble_pos(gi) + Vector2(0, 4), Sides.name_of(e.side) + " 곁들임", UiKit.LEAF, false)
+				if int(e.combo) >= 2:
+					_pop(_bubble_pos(gi) + Vector2(0, 4), "하트 %d번 잇기!" % e.combo, UiKit.CORAL, false)
 			"angry":
 				var gi: int = e.guest
 				Sound.play_sfx("bad", 0.0, -6.0)

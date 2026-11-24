@@ -6,6 +6,7 @@ extends Control
 
 var night := false
 var decor := {} # 가게 꾸미기 (GameState.shop_decor를 부르는 쪽이 넣는다. 여기서 GameState를 부르면 헤드리스 시험에서 못 읽는다)
+var kitchen := {} # 주방 장비 단계 (GameState.kitchen)
 var _layers: Array = [] # [key, tex, rect(바탕 px), tint, src(바탕 띠, 없으면 Rect2())]
 var _bg: Texture2D
 
@@ -32,7 +33,7 @@ func _build() -> void:
 		return
 	var dim := Shop4.NIGHT_TINT if night else Color.WHITE
 	for it in Shop4.ITEMS:
-		var t := _tex(Shop4.path(it[0], night, it[7]))
+		var t := _tex(Shop4.path(it[0], night, it[7], kitchen))
 		if t:
 			_layers.append([float(it[4]), t, Shop4.rect_of(it, t.get_size()), Color.WHITE if it[6] else dim, Rect2()])
 	for st in Shop4.STOOLS:

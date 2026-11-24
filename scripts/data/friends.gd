@@ -18,33 +18,36 @@ const BASE := 3
 ## place: 지도 장소. time: [시작, 끝] (없으면 그곳이 열려 있을 때). met: 만난 표시
 const PEOPLE := {
 	"최순덕": {"call": "순덕 할머니", "place": "grandma", "met": "met_sundeok",
-		"love": ["fish:bolak"], "like": ["produce:daepa", "produce:mu", "produce:egg"],
+		"love": ["fish:bolak"], "like": ["produce:daepa", "produce:mu", "produce:egg", "goods:yakgwa"],
 		"lines": ["또 왔어? 들어와 앉아.", "{player|이/가} 오니까 집이 훤하네.", "{player|아/야}. 니는 우리 손주나 마찬가지여."],
-		"teach": {2: "jorim"}},
+		"teach": {1: "jorim", 2: "baechuguk"}},
 	"박만수": {"call": "만수 할아버지", "place": "breakwater", "met": "met_mansu", "time": [6 * 60, 12 * 60],
-		"love": ["fish:gamseongdom"], "like": ["fish:ureok", "fish:noraemi", "sea:nakji"],
+		"love": ["fish:gamseongdom", "goods:makgeolli"], "like": ["fish:ureok", "fish:noraemi", "sea:nakji"],
 		"lines": ["...뭘 이런 걸 다.", "오늘 물 좋다. 너도 앉아라.", "니는 바다 냄새가 나기 시작했다."],
-		"teach": {2: "maeuntang"}},
+		"teach": {1: "maeuntang"}},
 	"이준호": {"call": "준호", "place": "tackle", "met": "met_junho",
-		"love": ["fish:hakgongchi"], "like": ["produce:egg", "sea:ge"],
+		"love": ["fish:hakgongchi", "goods:coffee"], "like": ["produce:egg", "sea:ge"],
 		"lines": ["형 또 오셨어요? 커피 드실래요?", "형 덕분에 가게에 사람이 좀 와요.", "형은 진짜 우리 가게 일 번 단골이에요."],
-		"teach": {2: "hoe"}},
+		"teach": {1: "muchim", 2: "chobap"}},
 	"문경자": {"call": "경자 할머니", "place": "store", "met": "met_kyungja",
 		"love": ["sea:nakji"], "like": ["produce:kkaennip", "produce:egg", "fish:noraemi"],
-		"lines": ["외상은 안 된다. 농담이다.", "니 오면 장부 볼 맛이 난다.", "우리 가게 의자 하나는 니 자리다."]},
+		"lines": ["외상은 안 된다. 농담이다.", "니 오면 장부 볼 맛이 난다.", "우리 가게 의자 하나는 니 자리다."],
+		"teach": {1: "maneul", 2: "kkaennip"}},
 	"김복자": {"call": "복자 사장님", "place": "diner", "met": "met_bokja",
-		"love": ["sea:bajirak"], "like": ["produce:gochu", "produce:maneul", "fish:ssombaengi"],
+		"love": ["sea:bajirak"], "like": ["produce:gochu", "produce:maneul", "fish:ssombaengi", "goods:yakgwa"],
 		"lines": ["밥은 먹고 다니나?", "니 가게 소문 들었다. 잘 하데.", "니는 이제 우리 동네 사람이다."],
-		"teach": {1: "jiri", 3: "haemultang"}},
+		"teach": {1: "jiri", 2: "haemultang"}},
 	"오용팔": {"call": "용팔 아저씨", "place": "market", "met": "met_yongpal",
-		"love": ["fish:gamseongdom"], "like": ["fish:ureok", "sea:gul"],
+		"love": ["fish:gamseongdom"], "like": ["fish:ureok", "sea:gul", "goods:makgeolli"],
 		"lines": ["오, 물건 좋네.", "니가 오면 시장에 사람 냄새가 난다.", "언젠가 종 한번 같이 쳐 보자."]},
 	"정태식": {"call": "이장님", "place": "hall", "met": "met_taesik",
-		"love": ["produce:baechu"], "like": ["produce:mu", "fish:bolak"],
-		"lines": ["아이고 이런 걸 다.", "사장님 같은 분이 마을에 와서 다행이에요.", "마을 일은 사장님하고 의논해야겠어요."]},
+		"love": ["produce:baechu"], "like": ["produce:mu", "fish:bolak", "goods:coffee", "goods:yakgwa"],
+		"lines": ["아이고 이런 걸 다.", "사장님 같은 분이 마을에 와서 다행이에요.", "마을 일은 사장님하고 의논해야겠어요."],
+		"teach": {1: "pajjim"}},
 	"김해솔": {"call": "해솔이", "place": "school", "met": "met_haesol", "time": [14 * 60, 19 * 60],
-		"love": ["sea:ge"], "like": ["produce:egg", "fish:bolak"],
-		"lines": ["우와 이거 나 주는 거예요?", "삼촌 오늘도 낚시했어요?", "삼촌은 내 베프예요!"]},
+		"love": ["sea:ge", "goods:candy"], "like": ["produce:egg", "fish:bolak"],
+		"lines": ["우와 이거 나 주는 거예요?", "삼촌 오늘도 낚시했어요?", "삼촌은 내 베프예요!"],
+		"teach": {1: "jeon"}},
 }
 
 
@@ -102,10 +105,13 @@ static func giftables(gs: Object) -> Array:
 		out.append({"thing": "fish:" + id, "name": FishDB.get_fish(id).name, "count": gs.inventory.filter(func(x): return x.id == id).size(), "entry": by_fish[id]})
 	for id in gs.produce:
 		if int(gs.produce[id]) > 0:
-			out.append({"thing": "produce:" + id, "name": Sides.name_of(id), "count": int(gs.produce[id])})
+			out.append({"thing": "produce:" + id, "name": Pantry.name_of(id), "count": int(gs.produce[id])})
 	for id in gs.seafood:
 		if int(gs.seafood[id]) > 0:
 			out.append({"thing": "sea:" + id, "name": Flat.name_of(id), "count": int(gs.seafood[id])})
+	for id in gs.goods:
+		if int(gs.goods[id]) > 0 and Store.GOODS.has(id):
+			out.append({"thing": "goods:" + id, "name": Store.GOODS[id].name, "count": int(gs.goods[id])})
 	return out
 
 
@@ -132,6 +138,13 @@ static func give(gs: Object, name: String, g: Dictionary) -> Dictionary:
 			gs.seafood[parts[1]] = int(gs.seafood[parts[1]]) - 1
 			if int(gs.seafood[parts[1]]) <= 0:
 				gs.seafood.erase(parts[1])
+		"goods":
+			if int(gs.goods.get(parts[1], 0)) <= 0:
+				return {}
+			gs.goods[parts[1]] = int(gs.goods[parts[1]]) - 1
+			if int(gs.goods[parts[1]]) <= 0:
+				gs.goods.erase(parts[1])
+	WeekGoals.add(gs, "gifts")
 	var t := taste(name, thing)
 	var before := hearts(points(gs, name))
 	gs.friendship[name] = mini(points(gs, name) + gain(t), HEART * MAX_HEARTS)

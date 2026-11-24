@@ -45,6 +45,7 @@ func _ready() -> void:
 	var bg: Control = null
 	if Shop4View.has_art(false):
 		bg = Shop4View.new()
+		bg.kitchen = GameState.kitchen
 		bg.decor = GameState.shop_decor
 	else:
 		bg = UiKit.cover_art("bg_shop_hall_day")

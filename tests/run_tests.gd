@@ -971,42 +971,60 @@ func _test_month() -> void:
 	_eq(Calendar.season(93), "여름", "6월은 여름")
 	_eq(Calendar.is_month_start(32), true, "4월 1일은 달 첫날")
 	_eq(Calendar.next_month_start(1), 32, "다음 상환일은 32일차")
-	_eq(Loan.days_left(25), 7, "상환까지 이레")
+	_eq(Loan.days_left(1), 7, "첫 고비는 8일차 월요일")
+	_eq(Loan.days_left(8), 7, "낸 날부터 다시 이레")
+	_eq(Loan.is_pay_day(1), false, "첫날은 안 냄")
+	_eq(Loan.is_pay_day(8) and Loan.is_pay_day(15), true, "월요일마다")
+	_eq(Calendar.date(8).weekday, 1, "8일차는 월요일")
 	_eq(Loan.settle(1, 0, 100, 10, 0), {}, "첫날은 상환 없음")
-	_eq(Loan.settle(20, 999999, 100, 10, 0), {}, "달 중간엔 상환 없음")
-	var ok := Loan.settle(32, 900000, 30000000, 550000, 0)
-	_eq(ok.paid, 550000 + Loan.RENT + 50000, "통장이 넉넉하면 대출, 월세, 봄 공과금을 냄")
-	_eq(ok.debt, 30000000 - 550000, "갚은 만큼 대출이 줄어듦")
-	var bad := Loan.settle(32, 100000, 30000000, 550000, 0)
+	_eq(Loan.settle(20, 999999, 100, 10, 0), {}, "주 중간엔 상환 없음")
+	var wk := Loan.weekly(550000)
+	_eq(wk, 127000, "한 달 55만은 한 주 12만 7천")
+	var ok := Loan.settle(8, 900000, 30000000, 550000, 0)
+	_eq(ok.paid, wk + Loan.RENT + 12000, "통장이 넉넉하면 대출, 월세, 봄 공과금을 냄")
+	_eq(ok.debt, 30000000 - wk, "갚은 만큼 대출이 줄어듦")
+	_eq(ok.streak, 1, "제때 낸 주")
+	var bad := Loan.settle(8, 100000, 30000000, 550000, 0, 3)
 	_eq(bad.paid, 0, "모자라면 못 갚음")
-	_eq(bad.arrears, 800000, "못 낸 돈은 밀림")
-	var catch_up := Loan.settle(62, 2000000, 30000000, 550000, 800000)
-	_eq(catch_up.paid, 1600000, "다음 달엔 밀린 돈까지 냄")
+	_eq(bad.arrears, 185000, "못 낸 돈은 밀림")
+	_eq(bad.streak, 0, "밀리면 이어지던 주가 끊김")
+	var catch_up := Loan.settle(15, 2000000, 30000000, 550000, 185000)
+	_eq(catch_up.paid, 370000, "다음 주엔 밀린 돈까지 냄")
 	_eq(catch_up.arrears, 0, "밀린 돈 정리")
-	_eq(Loan.settle(32, 999999, 300000, 550000, 0).loan, 300000, "남은 대출보다 더 내지 않음")
-	_eq(Loan.settle(32, 999999, 0, 550000, 0).paid, 250000, "대출을 다 갚아도 월세와 공과금은 나감")
-	_eq(Loan.bills(Calendar.next_month_start(150)) > Loan.bills(32), true, "여름 공과금이 더 비쌈")
-	_eq(Loan.header_text(10, 550000, 0, 30000000), "", "상환일이 멀면 헤더에 안 보임")
-	_eq(Loan.header_text(29, 550000, 0, 30000000), "고정비 D-3 · 80만", "1일이 가까우면 보임")
+	_eq(catch_up.debt, 30000000 - wk * 2, "밀린 대출 몫도 잔액에서 줄어듦")
+	var cr := Loan.settle(29, 2000000, 30000000, 550000, 0, 3)
+	_eq(cr.credit, Loan.CREDIT, "네 주 이어서 내면 깎아 줌")
+	_eq(cr.debt, 30000000 - wk - Loan.CREDIT, "깎은 만큼 대출이 줄어듦")
+	_eq(Loan.settle(8, 999999, 30000, 550000, 0).loan, 30000, "남은 대출보다 더 내지 않음")
+	_eq(Loan.settle(8, 999999, 0, 550000, 0).paid, 58000, "대출을 다 갚아도 월세와 공과금은 나감")
+	_eq(Loan.bills(Calendar.next_month_start(150)) > Loan.bills(8), true, "여름 공과금이 더 비쌈")
+	_eq(Loan.header_text(9, 550000, 0, 30000000), "", "상환일이 멀면 헤더에 안 보임")
+	_eq(Loan.header_text(12, 550000, 0, 30000000), "고정비 D-3 · 19만", "월요일이 가까우면 보임")
 	_eq(Loan.notice(ok).contains("냈어요"), true, "고정비 알림")
 	_eq(Loan.notice(bad).contains("못 냈어요"), true, "연체 알림")
+	_eq(Loan.extra_amount(50000, 1000000), 0, "돈이 모자라면 더 못 갚음")
+	_eq(Loan.extra_amount(500000, 30000), 30000, "남은 빚만큼만 더 갚음")
 
 	var gs = load("res://scripts/autoload/game_state.gd").new()
-	gs.day = 31
+	gs.day = 7
 	gs.money = 900000
 	gs.end_day()
-	_eq(gs.day, 32, "4월 1일 아침")
-	_eq(gs.money, 100000, "고정비가 빠짐")
-	_eq(gs.debt, 30000000 - 550000, "대출 잔액")
+	_eq(gs.day, 8, "월요일 아침")
+	_eq(gs.money, 900000 - 185000, "고정비가 빠짐")
+	_eq(gs.debt, 30000000 - wk, "대출 잔액")
+	_eq(gs.pay_streak, 1, "제때 낸 주")
 	_eq(gs.notices.size(), 1, "상환 알림이 쌓임")
 	_eq(gs.pop_notices().size(), 1, "알림 꺼내기")
 	_eq(gs.notices.size(), 0, "꺼내면 비움")
-	gs.day = 61
+	gs.day = 14
 	gs.money = 100000
 	gs.end_day()
 	_eq(gs.money, 100000, "모자라면 그대로")
-	_eq(gs.arrears, 800000, "연체")
-	_eq(gs.missed_payments, 1, "연체한 달 수")
+	_eq(gs.arrears, 185000, "연체")
+	_eq(gs.missed_payments, 1, "연체한 주 수")
+	gs.money = 150000
+	_eq(gs.pay_extra(), 100000, "집에서 더 갚기")
+	_eq(gs.money, 50000, "더 갚은 돈이 빠짐")
 	gs.free()
 
 
@@ -1049,16 +1067,18 @@ func _test_icebox() -> void:
 	_eq(g2.inventory[0].size, o.min_cm - 2.0, "조건에 안 맞는 건 남음")
 	g2.free()
 
-	# 보통 손님은 비싼 고기를 안 산다
-	_eq(DayFlow.too_pricey("gamseongdom", 40.0), true, "감성돔은 보통 손님에게 비쌈")
+	# 비싼 고기도 구이로 팔 수 있지만 값 끝까지만 받는다. 제값은 회로
+	_eq(DayFlow.too_pricey("gamseongdom", 40.0), true, "감성돔은 구이로는 제값을 못 받음")
 	_eq(DayFlow.too_pricey("bolak", 20.0), false, "볼락은 괜찮음")
+	for id in FishDB.FISH:
+		_eq(DayFlow.grill_price(id, FishDB.FISH[id].max_cm) <= DayFlow.REGULAR_MAX, true, "%s 구이로 팔 수 있음" % id)
+	_eq(DiningLogic.dish_price_of("gamseongdom", 40.0, "grill"), DayFlow.REGULAR_MAX, "감성돔 구이는 값 끝")
+	_eq(DiningLogic.dish_price_of("gamseongdom", 40.0, "hoe"), DayFlow.dish_price("gamseongdom", 40.0), "감성돔 회는 제값")
 	var r := DayFlow.serve_regulars(5, [{"id": "gamseongdom", "size": 40.0}, {"id": "bolak", "size": 20.0}])
-	_eq(r.served.size(), 1, "볼락만 팔림")
-	_eq(r.served[0].fish, "bolak", "감성돔은 남김")
-	_eq(r.used, [1], "쓴 생선 자리")
+	_eq(r.served.size(), 2, "감성돔도 팔림")
+	_eq(r.served[0].price, DayFlow.REGULAR_MAX, "구이 값 끝")
 	_eq(DayFlow.special_price("gamseongdom", 52.0, 3), DayFlow.SPECIAL_MAX, "특별 손님 값에도 끝이 있음")
 	_eq(DayFlow.DISH_MIN > DayFlow.DISH_COST, true, "가장 싼 접시도 재료비보다 비싸다")
-	_eq(DayFlow.too_pricey("ureok", 40.0), true, "큰 우럭은 보통 손님에게 안 낸다 (돈 균형 11-16)")
 	_eq(Orders.call_name("최순덕"), "순덕 할머니", "부르는 이름")
 	for c in Orders.CUSTOMERS:
 		_eq(c.react.size(), 3, "%s 반응 세 가지" % c.name)
@@ -1104,9 +1124,9 @@ func _test_brief() -> void:
 	var b := DayBrief.build(gs)
 	_eq(b.title, "3월 31일 (수) 오늘", "서랍 제목")
 	_eq(b.stats[0].value, "42,000원", "맨 위 어제 번 돈")
-	_eq(b.stats[2].name, "고정비 D-1", "다음 달 고정비")
+	_eq(b.stats[2].name, "고정비 D-5", "다음 월요일 고정비")
 	var names: Array = b.sections.map(func(s): return s.name)
-	_eq(names, ["지금 할 일", "메인 이야기", "오늘의 바다", "아침 소식"], "서랍 분류 (만난 사람이 없으면 오늘 부탁 없음)")
+	_eq(names, ["지금 할 일", "메인 이야기", "이번 주 도전", "오늘의 바다", "아침 소식"], "서랍 분류 (만난 사람이 없으면 오늘 부탁 없음)")
 	var todo: Array = b.sections[0].rows
 	_eq(todo[0].target, "breakwater", "아침 6시엔 먼저 낚시")
 	_eq(todo[0].state, "~17:00", "낮 낚시 마감 시각")
@@ -1124,6 +1144,7 @@ func _test_brief() -> void:
 	_eq(todo.any(func(r): return r.target == "garden"), true, "다 자라면 거두기")
 	# 돈이 모자란 채 상환일이 가까우면 빨강
 	gs.money = 1000
+	gs.day = 34
 	_eq(DayBrief.build(gs).stats[2].tone, "bad", "상환 못 할 것 같으면 빨강")
 	gs.free()
 	_eq(FishLine.stage({"day": 5}, 5).name, "오늘 잡음", "오늘 잡은 생선")
@@ -1776,10 +1797,12 @@ func _test_dining() -> void:
 	_run_dining(f, true)
 	_eq(f.served.size(), 2, "생선 두 마리면 둘만")
 	_eq([f.missed, f.turned_away, f.sold_out], [0, f_n - 2, true], "나머지는 재료 소진으로 못 받음")
-	# 비싼 생선은 보통 손님에게 내지 않는다
+	# 비싼 생선도 낸다. 회 손님이 없으면 싱싱한 것은 아낀다
 	var g := DiningLogic.new()
 	g.setup(4, [{"id": "gamseongdom", "size": 40.0}], names)
-	_eq(g.pick_fish(), -1, "감성돔은 보통 손님에게 안 냄")
+	_eq(g.pick_fish(), 0, "감성돔은 회로 나감")
+	g.raw_left = 0
+	_eq(g.pick_fish(), -1, "회 손님이 없으면 아껴 둠")
 	# 값: 빨리 받으면 더, 아슬아슬하면 덜
 	_eq(DiningLogic.pay(10000, 5.0), 11500, "빨리 받으면 하트 값")
 	_eq(DiningLogic.pay(10000, 20.0), 10000, "보통이면 제값")
@@ -1928,38 +1951,106 @@ func _test_gear_help() -> void:
 	_eq(mono, true, "장비 단계가 오를수록 감성돔 장력도 덜 오름")
 
 
-## 식당 곁들임: 텃밭 채소와 달걀이 접시 값을 올린다. 부탁 몫은 남긴다 (Sides)
+## 비싼 생선 회, 채소 요리, 세라와 연구, 주방 장비, 경자상회, 주간 도전 (11-24)
 func _test_sides() -> void:
-	_eq(Sides.bonus("egg"), Sides.EGG_BONUS, "달걀 곁들임 값")
-	_eq(Sides.bonus("baechu"), int(CropDB.crop("baechu").bonus), "채소 곁들임 값은 CropDB")
-	_eq(Sides.bonus("없는것"), 0, "모르는 것은 0")
-	var pantry := {"daepa": 3, "egg": 2, "baechu": 0}
-	_eq(Sides.pick(pantry, {}), "egg", "값 큰 것부터 (달걀 700 > 대파 500)")
-	_eq(Sides.take(pantry, {}), "egg", "꺼내기")
-	_eq(pantry.egg, 1, "하나 줄어듦")
-	var only_daepa := {"daepa": 2}
-	_eq(Sides.pick(only_daepa, {"daepa": 2}), "", "부탁 몫 대파 2단은 남김")
-	_eq(Sides.pick({"daepa": 3}, {"daepa": 2}), "daepa", "남는 대파는 곁들임")
-	_eq(Sides.take({}, {}), "", "없으면 빈 문자열")
 	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.day = 4
 	gs.sundeok_quest = 1 # 둘째 부탁: 대파 2단
-	_eq(Sides.reserve_for(gs), {"daepa": 2}, "대파 부탁이면 남겨 둠")
+	_eq(Pantry.reserve_for(gs), {"daepa": 2}, "대파 부탁이면 남겨 둠")
+	_eq(Menu.can_make("pajjim", {"daepa": 2}, {}, {"daepa": 2}), false, "부탁 몫은 요리에 안 씀")
+	_eq(Menu.can_make("pajjim", {"daepa": 3}, {}, {"daepa": 2}), true, "남는 대파는 씀")
+	_eq(Menu.plates("jiri", {}, {"bajirak": 5}), 2, "바지락 다섯이면 두 접시")
 	gs.sundeok_quest = 3
-	_eq(Sides.reserve_for(gs), {}, "부탁을 다 들어주면 남길 것 없음")
-	gs.free()
-	# 영업: 곁들임이 있으면 값이 오르고 보관에서 빠진다
+	# 모든 채소가 요리에 쓰인다
+	for id in CropDB.CROPS:
+		_eq(Store.used_in(id).is_empty(), false, "%s 요리 재료" % id)
+	# 연구: 생선과 재료를 쓰고 바로 메뉴판에
+	_eq(Menu.can_research(gs, "jorim"), false, "재료가 없으면 못 함")
+	gs.inventory = [{"id": "bolak", "size": 20.0, "day": 4}, {"id": "noraemi", "size": 25.0, "day": 4}]
+	gs.produce = {"mu": 1, "daepa": 1}
+	_eq(Menu.research(gs, "jorim"), true, "무와 생선으로 조림")
+	_eq(Menu.on_menu(gs.flags, "jorim"), true, "바로 메뉴판에")
+	_eq(gs.inventory.size(), 1, "생선 한 마리 씀")
+	_eq(gs.produce, {"daepa": 1}, "무를 씀")
+	_eq(Menu.research(gs, "pajjim"), false, "하루에 하나")
+	gs.day = 5
+	_eq(Menu.can_research(gs, "pajjim"), true, "다음 날은 됨")
+	# 회: 싱싱한 감성돔은 회 손님에게 제값, 묵은 것은 구이
 	var a := DiningLogic.new()
-	a.setup(4, _fish_box(12), ["손님"])
-	a.pantry = {"egg": 2}
+	a.today = 4
+	a.plan = {"dishes": {}}
+	a.setup(4, [{"id": "gamseongdom", "size": 40.0, "day": 4}], ["손님"])
 	_run_dining(a, true)
-	var with_side := a.served.filter(func(e): return e.side == "egg").size()
-	_eq(with_side, 2, "달걀 두 개는 두 접시에")
-	_eq(a.pantry.egg, 0, "달걀 다 씀")
-	_eq(a.side_sales, Sides.EGG_BONUS * 2, "곁들임 매출")
+	_eq(a.served[0].dish, "hoe", "싱싱한 감성돔은 회")
+	_eq(a.served[0].price > 50000, true, "회는 제값")
 	var b := DiningLogic.new()
-	b.setup(4, _fish_box(12), ["손님"])
+	b.today = 4
+	b.plan = {"dishes": {}}
+	b.setup(4, [{"id": "gamseongdom", "size": 40.0, "day": 3}], ["손님"])
 	_run_dining(b, true)
-	_eq(a.sales - b.sales, Sides.EGG_BONUS * 2, "곁들임만큼 매출이 더 많음")
+	_eq(b.served[0].dish, "grill", "하루 지난 감성돔은 구이")
+	var many := []
+	for i in 5:
+		many.append({"id": "gamseongdom", "size": 40.0, "day": 4})
+	var c := DiningLogic.new()
+	c.today = 4
+	c.plan = {"dishes": {}}
+	c.setup(4, many, ["손님"])
+	_run_dining(c, true)
+	_eq(c.served.size(), DayFlow.raw_guests(4), "회 손님만큼만 팔고 남김")
+	_eq(c.inventory.size(), 5 - DayFlow.raw_guests(4), "나머지는 아이스박스에")
+	# 알아서 고르기: 값이 가장 나가는 요리
+	gs.inventory = [{"id": "bolak", "size": 20.0, "day": 5}]
+	gs.produce = {"mu": 1}
+	var plan := {"dishes": {}}
+	ServicePlan.auto_plan(gs, plan)
+	_eq(plan.dishes.bolak, "jorim", "무가 있으면 조림")
+	_eq(gs.produce, {"mu": 1}, "고르기만 하고 재료는 안 씀")
+	# 주방 장비
+	gs.money = 100000
+	_eq(Store.buy_gear(gs, "stove"), "", "가스레인지 2단계")
+	_eq(KitchenDB.level(gs.kitchen, "stove"), 2, "단계가 오름")
+	KitchenDB.apply(a, gs.kitchen)
+	_eq(a.cook_mult < 1.0, true, "굽는 시간이 짧아짐")
+	for id in KitchenDB.ORDER:
+		for lv in range(1, KitchenDB.MAX + 1):
+			_eq(ArtSlot.has_art(KitchenDB.art(id, lv)), true, "장비 그림 %s %d" % [id, lv])
+	# 냉장고: 상할 생선을 하루 더 (한 마리에 한 번)
+	gs.kitchen = {"fridge": 2}
+	gs.inventory = [{"id": "bolak", "size": 20.0, "day": 4}]
+	gs.day = 5
+	gs.end_day()
+	_eq(gs.inventory.size(), 1, "냉장고가 하루 더 살림")
+	gs.end_day()
+	_eq(gs.inventory.size(), 0, "두 번은 안 됨")
+	# 경자상회
+	gs.money = 100000
+	for i in Store.STOCK:
+		_eq(Store.buy_ingredient(gs, "mu"), "", "무 사기")
+	_eq(Store.buy_ingredient(gs, "mu").is_empty(), false, "하루 물건 수 끝")
+	gs.day += 1
+	_eq(Store.stock(gs, "mu"), Store.STOCK, "다음 날 다시 들어옴")
+	_eq(Store.buy_goods(gs, "makgeolli"), "", "막걸리 사기")
+	_eq(Friends.taste("박만수", "goods:makgeolli"), "love", "만수는 막걸리를 좋아함")
+	var g: Dictionary = Friends.giftables(gs).filter(func(x): return x.thing == "goods:makgeolli")[0]
+	_eq(Friends.give(gs, "박만수", g).taste, "love", "선물하기")
+	_eq(gs.goods.is_empty(), true, "선물이 빠짐")
+	_eq(int(gs.week.gifts), 1, "이번 주 선물 셈")
+	# 주간 도전
+	_eq(WeekGoals.goals(3), WeekGoals.goals(7), "같은 주는 같은 도전")
+	_eq(WeekGoals.goals(5).size(), 3, "세 가지")
+	gs.week = {}
+	gs.day = 14
+	var goal: Dictionary = WeekGoals.goals(14)[0]
+	gs.week[goal.id] = int(goal.goal)
+	var before: int = gs.money
+	_eq(WeekGoals.close_day(gs).size() >= 1, true, "이루면 소식")
+	_eq(gs.money > before, true, "상금")
+	_eq(gs.week, {}, "일요일이 끝나면 새로 셈")
+	# 고기 떼
+	_eq(SeaDay.school(1), "", "첫날은 떼 없음")
+	_eq(range(3, 60).any(func(d): return SeaDay.school(d) != ""), true, "가끔 떼가 들어옴")
+	gs.free()
 
 
 ## 지도 위 걷는 주민 (Walkers)
@@ -2358,7 +2449,7 @@ func _test_quests() -> void:
 		gs.flags[f] = true
 	_eq(Quests.main_quest(gs).id, "main_first_month", "다 만나면 첫 달 버티기")
 	gs.day = 40
-	_eq(Quests.main_quest(gs).id, "main_wait", "첫 달이 지나면 1막 끝")
+	_eq(Quests.main_quest(gs).id, "main_debt", "네 주를 버티면 대출 줄이기")
 	gs.arrears = 10000
 	_eq(Quests.main_quest(gs).goal.contains("밀린 돈"), true, "밀린 돈이 있으면 갚기")
 	gs.arrears = 0
@@ -2465,11 +2556,12 @@ func _test_kits() -> void:
 func _test_service_plan() -> void:
 	_eq(ServicePlan.dish_options("bolak", {}), ["grill"], "배운 게 없으면 구이뿐")
 	var fl := {"recipe_fish_fry": true, "menu_maeuntang": true, "menu_jorim": true}
-	_eq(ServicePlan.dish_options("ureok", fl), ["grill", "fry", "jorim", "maeuntang"], "우럭은 매운탕까지")
+	_eq(ServicePlan.dish_options("ureok", fl), ["grill", "fry", "hoe", "jorim", "maeuntang"], "우럭은 매운탕까지")
 	_eq(ServicePlan.dish_options("bolak", fl).has("maeuntang"), false, "볼락은 매운탕 안 됨")
 	var plan := {"price": "mid", "dishes": {}}
-	_eq(ServicePlan.next_dish(plan, "ureok", fl), "fry", "누르면 다음 요리")
+	_eq(ServicePlan.next_dish(plan, "ureok", fl), "jorim", "누르면 다음 요리 (우럭은 회부터)")
 	_eq(ServicePlan.dish_for(plan, "ureok", {}), "grill", "못 내는 요리면 구이")
+	_eq(ServicePlan.dish_for({"dishes": {}}, "gamseongdom", {}), "hoe", "감성돔은 처음부터 회")
 	var st := ServicePlan.settle("gourmet", 10000, "good", true)
 	_eq(st.heart, false, "미식가는 노릇노릇해야 하트")
 	_eq(int(ServicePlan.settle("gourmet", 10000, "perfect", true).price) > 10000, true, "미식가 만족하면 웃돈")
@@ -2533,7 +2625,8 @@ func _test_tide_times() -> void:
 
 ## 특별 손님 알아맞히기 대접 (11-19)
 func _test_special_guest() -> void:
-	_eq(SpecialGuest.styles_ok({}), ["grill"], "배운 게 없으면 구이만")
+	_eq(SpecialGuest.styles_ok({}), ["grill", "raw"], "배운 게 없으면 구이와 회")
+	_eq(SpecialGuest.styles_ok({}, "bolak"), ["grill"], "볼락은 회가 안 됨")
 	var ok := SpecialGuest.styles_ok({"recipe_fish_fry": true, "menu_maeuntang": true})
 	_eq(ok.has("fry") and ok.has("soup"), true, "튀김, 국물까지")
 	var w := SpecialGuest.want(5, "최순덕", "bolak", "rain", ["grill"])
@@ -2542,10 +2635,10 @@ func _test_special_guest() -> void:
 	_eq(SpecialGuest.want(5, "최순덕", "bolak", "rain", ["grill"]), w, "같은 날 같은 손님은 같은 바람")
 	var w2 := SpecialGuest.want(7, "박만수", "ureok", "rain", ok)
 	_eq(w2.style in ok, true, "바라는 갈래는 낼 수 있는 것 안에서")
-	var perfect := SpecialGuest.score(w2, "ureok", SpecialGuest.STYLES[w2.style].dishes[0], w2.side)
+	var perfect := SpecialGuest.score(w2, {"id": "ureok", "size": 19.0 if w2.trait == "small" else 40.0, "day": 7}, SpecialGuest.STYLES[w2.style].dishes[0], 7)
 	_eq(perfect.perfect, true, "셋 다 맞히면 완벽")
 	_eq(perfect.stars, 3, "별 셋")
-	_eq(SpecialGuest.score(w2, "bolak", "grill" if w2.style != "grill" else "fry", "").stars, 1, "다 틀려도 별 하나")
+	_eq(SpecialGuest.score(w2, {"id": "bolak", "size": 12.0 if w2.trait != "small" else 29.0, "day": 5}, "grill" if w2.style != "grill" else "fry", 7).stars, 1, "다 틀려도 별 하나")
 	_eq(SpecialGuest.review(w2, perfect).contains("딱"), true, "세라 칭찬")
 	_eq(SpecialGuest.next_tale({}, "최순덕").is_empty(), false, "사연 첫 토막")
 	_eq(SpecialGuest.next_tale({"tale_최순덕": 3}, "최순덕"), "", "다 들으면 끝")

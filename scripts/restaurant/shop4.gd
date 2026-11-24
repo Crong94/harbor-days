@@ -29,15 +29,19 @@ const STOOLS := [
 	["low", 672, 1218, 1194.0], ["low", 834, 1218, 1194.0],
 ]
 
+## 주방 장비를 벽 바닥선에서 앞으로 내놓는 만큼 (바탕 px)
+const KIT_DROP := 30
+
 ## 물건 [그림, x, y, w, key, anchor, glow, var]
 const ITEMS := [
-	# 주방: 뒷벽(바닥선 y 354)에 정면 장비, 오른쪽 벽에 옆모습 화구 둘
-	["kit2_shelf_tall", 300, 354, 110, 10.354, "bl", false, false],
-	["kit2_sink", 418, 354, 130, 10.354, "bl", false, false],
-	["kit2_worktable", 556, 354, 130, 10.354, "bl", false, false],
-	["kit2_fridge", 756, 354, 128, 10.354, "bl", false, false],
-	["kit2_stove_side_empty", 810, 472, 78, 10.472, "bl", false, false], # 냄비 없는 빈 화구 (조리 도구는 영업 판이 얹는다, 11-24)
-	["kit2_stove_side_empty", 810, 550, 78, 10.55, "bl", false, false],
+	# 주방 장비 (KitchenDB 단계 그림). 회사 PC 결정(11-19): 벽에 박힌 것처럼 두지 말고 바닥에 자리를 차지하게.
+	# 벽 바닥선(y 354)보다 KIT_DROP만큼 내려 바닥 위에 놓고, 오른쪽 화구도 벽에서 떼어 놓는다
+	["gear/shelf", 300, 354 + KIT_DROP, 110, 10.354, "bl", false, false],
+	["gear/sink", 418, 354 + KIT_DROP, 130, 10.354, "bl", false, false],
+	["gear/work", 556, 354 + KIT_DROP, 130, 10.354, "bl", false, false],
+	["gear/fridge", 752, 354 + KIT_DROP, 121, 10.354, "bl", false, false],
+	["gear/stove", 798, 490, 78, 10.472, "bl", false, false], # 냄비 없는 화구 (조리 도구는 영업 판이 얹는다)
+	["gear/stove", 798, 566, 78, 10.55, "bl", false, false],
 	["kit2_panrack", 588, 196, 66, 9.5, "tl", false, false],
 	# 카운터(ㄱ자, 세로 팔 위를 잘라 직원 통로)와 픽업대
 	["struct4_counterG2", 288, 303, 0, 20.0, "tl", true, true],
@@ -86,7 +90,10 @@ const SEAT_STOOL := [0, 1, 2, 3, -1, -1, -1, -1, 10, 11, -1, -1, 14, 15, -1, -1]
 const BOOTH_CUT := 1142.0
 
 
-static func path(id: String, night: bool, variant: bool) -> String:
+## kitchen: 주방 장비 단계 {id: 단계} (GameState.kitchen)
+static func path(id: String, night: bool, variant: bool, kitchen := {}) -> String:
+	if id.begins_with("gear/"):
+		return KitchenDB.art(id.substr(5), KitchenDB.level(kitchen, id.substr(5)))
 	return DIR + id + ("_night" if night else "_day") if variant else DIR + id
 
 

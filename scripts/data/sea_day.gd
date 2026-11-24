@@ -27,6 +27,7 @@ static func of(day: int) -> Dictionary:
 	var w: String = "sunny" if day <= 1 else WEATHER_ORDER[rng.randi() % WEATHER_ORDER.size()]
 	return {
 		"day": day,
+		"school": school(day),
 		"tide": TIDES[tide_i],
 		"tide_bite": TIDE_BITE[tide_i],
 		"tide_good": TIDE_BITE[tide_i] >= 1.2,
@@ -37,12 +38,29 @@ static func of(day: int) -> Dictionary:
 	}
 
 
+## 오늘 떼로 들어온 어종 (없으면 ""). 나흘에 하루쯤, 그 달에 나오는 고기 가운데 하나가 SCHOOL_MULT배 잘 문다
+const SCHOOL_MULT := 2.5
+const SCHOOL_CHANCE := 0.28
+
+
+static func school(day: int) -> String:
+	if day < 3:
+		return ""
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("고기떼-%d" % day)
+	if rng.randf() >= SCHOOL_CHANCE:
+		return ""
+	var month := int(Calendar.date(day).month)
+	var pool := FishDB.FISH.keys().filter(func(id): return FishDB.FISH[id].rarity != "legend" and not FishDB.is_bycatch(id) and FishDB.season_mult(id, month) >= 0.5)
+	return pool[rng.randi() % pool.size()] if not pool.is_empty() else ""
+
+
 ## 이 날씨, 이 밝기에 잘 무는 어종 (가중치 큰 순서로 n개)
 static func best_fish(info: Dictionary, brightness: float, n := 2) -> Array:
 	var scored: Array = []
 	for id in FishDB.FISH:
 		var base: float = FishDB.FISH[id].weight
-		var w := FishDB.weight_of(id, {"brightness": brightness, "depth": 0.5, "weather": info.weather, "month": int(Calendar.date(int(info.get("day", 1))).month)}) / base
+		var w := FishDB.weight_of(id, {"brightness": brightness, "depth": 0.5, "weather": info.weather, "school": info.get("school", ""), "month": int(Calendar.date(int(info.get("day", 1))).month)}) / base
 		scored.append([w, id])
 	scored.sort_custom(func(a, b): return a[0] > b[0])
 	var out: Array = []

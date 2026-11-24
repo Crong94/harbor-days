@@ -49,7 +49,7 @@ const LIST := {
 	},
 	"store": {
 		"name": "경자상회", "pos": Vector2(0.592, 0.366), "unlock": "",
-		"scene": "", "desc": "50년 된 구멍가게",
+		"scene": "res://scenes/shop/store.tscn", "desc": "50년 된 구멍가게. 식재료, 선물, 주방 장비, 수조를 판다",
 	},
 	"bus": {
 		"name": "버스 정류장", "pos": Vector2(0.863, 0.313), "unlock": "",

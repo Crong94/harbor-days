@@ -76,22 +76,22 @@ const PLATE_SPOTS := [
 ]
 
 ## 걷는 길: 바닥의 빈 곳을 잇는 한 줄
-##   0 창가 아래 - 1 창가 위 - 2 홀 자리 앞 (HOME_LANE) - 3 가운데 통로 위 - 4 가운데 - 5 문 앞 (ENTRY_LANE)
+##   0 창가 아래 - 1 창가 위, 홀 자리 앞 (HOME_LANE) - 2 픽업대 아래 - 3 가운데 통로 위 - 4 가운데 - 5 문 앞 (ENTRY_LANE)
 const LANE := [Vector2(240 / W, 1005 / H), Vector2(240 / W, 740 / H), Vector2(390 / W, 740 / H),
 	Vector2(545 / W, 740 / H), Vector2(545 / W, 1000 / H), Vector2(545 / W, 1200 / H)]
-const HOME_LANE := 2
+const HOME_LANE := 1
 const ENTRY_LANE := 5
 ## 자리마다 서빙 자리로 들어가는 길 점 (LANE 번호)
 const SEAT_ACCESS := [[2, 3], [3], [3], [3], [1], [0],
 	[1, 2], [2], [4], [4], [4], [4], [5], [5], [5], [5]]
 
 ## 주방: 요리사는 오른쪽 벽 옆모습 화구 둘 앞에 선다
-const COOK_SPOT := Vector2(770 / W, 515 / H) # 요리사 발끝 (화구 앞)
-const BURNERS := [Vector2(849 / W, 365 / H), Vector2(849 / W, 443 / H)] # 화구 위 냄비 자리
+const COOK_SPOT := Vector2(742 / W, 520 / H) # 요리사 발끝 (화구 앞)
+const BURNERS := [Vector2(838 / W, 398 / H), Vector2(838 / W, 474 / H)] # 화구 위 냄비 자리
 ## 완성 접시 내놓는 자리 (카운터 꺾이는 모서리 픽업대 위)
 const PASS_SPOTS := [Vector2(328 / W, 575 / H), Vector2(366 / W, 575 / H), Vector2(404 / W, 575 / H)]
 const KITCHEN_EXIT := Vector2(330 / W, 390 / H) # 카운터 세로 팔 위 직원 통로
-const HALL_HOME := Vector2(390 / W, 772 / H) # 홀 담당(주인공)이 접시를 기다리는 자리 (픽업대 아래)
+const HALL_HOME := Vector2(238 / W, 512 / H) # 홀 담당(주인공)이 접시를 기다리는 자리. 왼쪽 위 빈 구석, 카운터 옆 (11-24 사용자: 손님 바로 옆이라 부담스럽다)
 const START := COOK_SPOT
 
 ## 손님 입구 (아래 가운데 문)
@@ -127,9 +127,19 @@ var angry := 0
 var sales := 0
 var burnt := 0
 var perfect := 0
-var pantry := {}
-var reserve := {}
-var side_sales := 0
+var pantry := {} # 채소 (GameState.produce). 요리 재료로 쓴다
+var reserve := {} # 남겨 둘 채소 (Pantry.reserve_for)
+## 하트 잇기: 하트를 이어 받을 때마다 값이 COMBO_STEP씩 더 붙는다 (COMBO_MAX번까지). 하트 없는 접시나 화난 손님이 나오면 끊긴다
+const COMBO_STEP := 0.03
+const COMBO_MAX := 5
+var combo := 0
+var best_combo := 0
+## 비싼 회를 시킬 손님이 몇 명 남았나 (DayFlow.raw_guests)
+var raw_left := 0
+## 주방 장비 (KitchenDB.apply)
+var cook_mult := 1.0
+var plate_bonus := 1.0
+var auto_clean := 0.0
 var _rng := RandomNumberGenerator.new()
 ## 생선튀김 (2026-11-18). 복자 할머니 비법(recipe_fish_fry)을 배우면 손님 일부가 구이 대신 튀김을 시킨다.
 ## 튀김은 값을 더 받는다. 굽는 규칙(화구, 노릇노릇, 탐)은 구이와 같다
@@ -161,6 +171,7 @@ func setup(day: int, inv: Array, names: Array, visitors := 0) -> void:
 	rng.seed = hash("영업-%d" % day)
 	_rng.seed = hash("자리-%d" % day)
 	_fry_rng.seed = hash("튀김-%d" % day)
+	raw_left = DayFlow.raw_guests(day)
 	var locals := maxi(1, rng.randi_range(GUESTS_MIN, GUESTS_MAX) + extra_guests)
 	var n := locals + maxi(0, visitors)
 	schedule.clear()
@@ -239,7 +250,7 @@ func _cook(dt: float) -> void:
 		var gi: int = queue.pop_front()
 		var used := cooking.map(func(c): return c.burner)
 		var b := 0 if not used.has(0) else 1
-		cooking.append({"guest": gi, "t": 0.0, "total": cook_time(guests[gi].size), "burner": b,
+		cooking.append({"guest": gi, "t": 0.0, "total": cook_time(guests[gi].size) * cook_mult, "burner": b,
 			"auto": _rng.randf_range(HELPER_AUTO[0], HELPER_AUTO[1])})
 		events.append({"type": "cook", "guest": gi, "burner": b})
 	for c in cooking:
@@ -301,7 +312,7 @@ func _to_pass(c: Dictionary, q: String) -> void:
 # 같은 생선을 시킨 손님이면 누구에게 줘도 된다 (두 손님의 주문을 맞바꾼다). 다른 요리를 시킨 손님은 안 받는다.
 
 const MAX_TASKS := 3
-const HELPER_HOME := Vector2(290 / W, 772 / H) # 서빙 알바가 기다리는 자리 (주인공 옆)
+const HELPER_HOME := Vector2(140 / W, 496 / H) # 서빙 알바가 기다리는 자리 (주인공 왼쪽)
 
 var selected := -1 # 고른 접시 (주문한 guest index). 아직 내놓는 자리에 있다
 var tasks: Array = [] # 줄 선 일 [{type: "serve", dish} / {type: "clear", seat}]
@@ -587,6 +598,7 @@ static func dish_price_of(fish_id: String, size_cm: float, dish: String) -> int:
 	var base := DayFlow.dish_price(fish_id, size_cm)
 	if Menu.RECIPES.has(dish):
 		return Menu.price(dish, base)
+	base = mini(base, DayFlow.REGULAR_MAX)
 	if dish != "fry":
 		return base
 	return int(roundf(base * FRY_PRICE / 500.0) * 500.0)
@@ -625,16 +637,18 @@ func _serve(gi: int, by_player: bool) -> void:
 	var st := ServicePlan.settle(kind, price, q, quick)
 	price = int(st.price)
 	var heart: bool = st.heart
-	var side := Sides.take(pantry, reserve)
-	var extra := Sides.bonus(side)
-	price += extra
-	side_sales += extra
+	if heart:
+		combo += 1
+		best_combo = maxi(best_combo, combo)
+		price = int(roundf(price * (1.0 + COMBO_STEP * mini(combo - 1, COMBO_MAX)) / 100.0) * 100.0)
+	else:
+		combo = 0
 	g.state = GuestState.EATING
 	g.paid = price
 	sales += price
-	served.append({"guest": g.name, "fish": g.fish, "size": g.size, "price": price, "heart": heart, "side": side, "quality": q,
+	served.append({"guest": g.name, "fish": g.fish, "size": g.size, "price": price, "heart": heart, "quality": q,
 		"dish": g.get("dish", "grill"), "kind": kind})
-	events.append({"type": "served", "guest": gi, "heart": heart, "price": price, "side": side, "quality": q, "helper": not by_player})
+	events.append({"type": "served", "guest": gi, "heart": heart, "price": price, "combo": combo, "quality": q, "helper": not by_player})
 
 
 # ─── 손님 ───────────────────────────────────────────
@@ -651,16 +665,44 @@ func free_seats() -> Array:
 	return out
 
 
-## 보통 손님에게 낼 수 있는 생선 중 가장 값진 것의 index. 없으면 -1
+## 이 생선을 비싼 회로 낼 수 있나 (구이 값 끝보다 비싸고, 회가 되는 싱싱한 것)
+func _is_raw(e: Dictionary) -> bool:
+	return DayFlow.too_pricey(e.id, e.size) and Menu.fits("hoe", e, today if today > 0 else int(e.get("day", 0))) \
+		and (plan.is_empty() or ServicePlan.dish_for(plan, e.id, flags) == "hoe")
+
+
+## 다음 손님에게 낼 생선: 가장 값진 것. 없으면 -1.
+## 회 손님을 다 받았으면 싱싱한 비싼 생선은 아껴 둔다 (내일 수조나 시장으로)
 func pick_fish() -> int:
 	var best := -1
 	for i in inventory.size():
 		var e: Dictionary = inventory[i]
-		if DayFlow.dish_price(e.id, e.size) > DayFlow.REGULAR_MAX:
+		if raw_left <= 0 and _is_raw(e):
 			continue
 		if best < 0 or FishDB.value_of(e.id, e.size) > FishDB.value_of(inventory[best].id, inventory[best].size):
 			best = i
 	return best
+
+
+## 그 생선으로 낼 요리. 비싼 회면 회 손님 한 명을 쓴다
+func _dish_of(e: Dictionary) -> String:
+	if raw_left > 0 and _is_raw(e):
+		raw_left -= 1
+		return "hoe"
+	var dish := ""
+	if not plan.is_empty():
+		# 메뉴판에 적은 대로. 재료가 떨어졌거나 싱싱하지 않으면 구이로
+		dish = ServicePlan.dish_for(plan, e.id, flags)
+		if Menu.RECIPES.has(dish):
+			if not Menu.fits(dish, e, today) or not Menu.can_make(dish, pantry, seafood, reserve):
+				dish = "grill"
+	else:
+		dish = Menu.pick(menu, e, today, pantry, seafood, _fry_rng)
+		if dish.is_empty():
+			dish = "fry" if fry and _fry_rng.randf() < FRY_SHARE else "grill"
+	if Menu.RECIPES.has(dish):
+		Menu.take(dish, pantry, seafood)
+	return dish
 
 
 func _active_count() -> int:
@@ -691,26 +733,11 @@ func _arrive() -> void:
 		var e: Dictionary = inventory[fi]
 		inventory.remove_at(fi)
 		var seat: int = seats[_rng.randi() % seats.size()]
-		var dish := ""
-		if not plan.is_empty():
-			# 메뉴판에 적은 대로 낸다. 새 메뉴 재료가 떨어졌거나 회인데 오늘 잡은 고기가 아니면 구이로
-			dish = ServicePlan.dish_for(plan, e.id, flags)
-			if Menu.RECIPES.has(dish):
-				var fresh_ok: bool = not Menu.recipe(dish).get("fresh", false) or int(e.get("day", today)) == today
-				if Menu.can_make(dish, pantry, seafood) and fresh_ok:
-					Menu.take(dish, pantry, seafood)
-				else:
-					dish = "grill"
-		else:
-			dish = Menu.pick(menu, e, today, pantry, seafood, _fry_rng)
-			if dish.is_empty():
-				dish = "fry" if fry and _fry_rng.randf() < FRY_SHARE else "grill"
-			else:
-				Menu.take(dish, pantry, seafood)
+		var dish := _dish_of(e)
 		var kind: String = s.get("kind", "normal")
 		var g := {
 			"name": s.name, "seat": seat, "fish": e.id, "size": e.size, "entry": e, "dish": dish,
-			"price": int(roundf(dish_price_of(e.id, e.size, dish) * price_mult / 500.0) * 500.0), "state": GuestState.WALKING,
+			"price": int(roundf(dish_price_of(e.id, e.size, dish) * price_mult * plate_bonus / 500.0) * 500.0), "state": GuestState.WALKING,
 			"kind": kind, "patience": patience_of(seat) * patience_mult * float(ServicePlan.KINDS[kind].patience),
 			"wait": 0.0, "eat": 0.0, "cooked": false, "quality": "",
 			"pos": ENTRANCE, "path": entry_path(seat), "dir": Vector2.UP,
@@ -751,7 +778,8 @@ func _wait(dt: float) -> void:
 				g.eat += dt
 				if g.eat >= EAT_TIME:
 					g.state = GuestState.LEFT
-					dirty[g.seat] = true # 빈 그릇이 남는다. 치워야 다음 손님이 앉는다
+					if auto_clean <= 0.0 or _rng.randf() >= auto_clean: # 좋은 싱크대면 가끔 저절로 치워진다
+						dirty[g.seat] = true # 빈 그릇이 남는다. 치워야 다음 손님이 앉는다
 					events.append({"type": "left", "guest": gi})
 
 
@@ -760,6 +788,7 @@ func _leave_angry(gi: int) -> void:
 	var g: Dictionary = guests[gi]
 	g.state = GuestState.LEFT
 	angry += 1
+	combo = 0
 	# 왜 화났는지: 접시가 나와 있었는데 안 날랐나(pass), 아직 굽는 중이었나(kitchen)
 	var reason := "pass" if pass_dishes.has(gi) or holding == gi else "kitchen"
 	angry_list.append({"guest": g.name, "kind": g.get("kind", "normal"), "reason": reason})

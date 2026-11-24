@@ -21,7 +21,18 @@ var debt := 30_000_000
 var monthly_repayment := 550_000
 ## 못 갚고 밀린 상환금 (Loan). 다음 상환일에 같이 빠진다
 var arrears := 0
-## 연체한 달 수 (지금까지 합)
+## 제때 낸 주가 이어진 수 (Loan 신용 우대)
+var pay_streak := 0
+## 주방 장비 단계 {KitchenDB id: 단계}
+var kitchen := {}
+## 경자상회에서 산 선물 {Store.GOODS id: 개수}, 오늘 산 식재료 수
+var goods := {}
+var store_bought := {}
+## 세라와 마지막으로 연구한 날 (Menu.research)
+var research_day := 0
+## 이번 주 도전 셈 (WeekGoals)
+var week := {}
+## 연체한 주 수 (지금까지 합)
 var missed_payments := 0
 var day := 1
 ## 다음에 지도에 오면 보여 줄 알림 (상환, 상한 생선 등). 보여 주면 비운다
@@ -353,6 +364,15 @@ func release_fish(entry: Dictionary) -> bool:
 	return true
 
 
+## 집에서 대출을 더 갚는다. 갚은 돈, 못 갚으면 0
+func pay_extra() -> int:
+	var n := Loan.extra_amount(money, debt)
+	if n > 0:
+		money -= n
+		debt -= n
+	return n
+
+
 ## 쿨러를 다음 단계로 산다. 문제가 없으면 빈 문자열
 func buy_cooler() -> String:
 	if cooler + 1 >= KitDB.COOLERS.size():
@@ -372,7 +392,7 @@ func buy_tank() -> String:
 	var nx := Tank.next_info(tank_level)
 	if nx.is_empty():
 		return "더 좋은 수조는 없어요."
-	var p := AppWork.shop_price(flags, int(nx.price))
+	var p := Store.price(self, int(nx.price))
 	if money < p:
 		return "돈이 모자라요."
 	spend(p)
@@ -481,6 +501,8 @@ func end_day(wake_minutes := -1) -> void:
 	yesterday_sales = sales_today
 	yesterday_spent = spent_today
 	news_today = []
+	for t in WeekGoals.close_day(self):
+		_news(t)
 	# 수조가 있으면 오늘 밤 상할 고기를 값진 것부터 옮겨 살려 둔다
 	var saving := spoiling_tonight()
 	saving.sort_custom(func(a, b): return FishDB.value_of(a.id, a.size) > FishDB.value_of(b.id, b.size))
@@ -490,6 +512,18 @@ func end_day(wake_minutes := -1) -> void:
 			moved += 1
 	if moved > 0:
 		_news("상할 뻔한 생선 %d마리를 수조로 옮겨 살려 뒀어요" % moved)
+	# 냉장고가 좋으면 상할 생선 몇 마리를 하루 더 살린다 (한 마리에 한 번만)
+	var cold := KitchenDB.value(kitchen, "fridge")
+	var kept := 0
+	saving = spoiling_tonight()
+	saving.sort_custom(func(a, b): return FishDB.value_of(a.id, a.size) > FishDB.value_of(b.id, b.size))
+	for e in saving:
+		if kept < cold and not e.get("chilled", false):
+			e["chilled"] = true
+			e["day"] = int(e.get("day", day)) + 1
+			kept += 1
+	if kept > 0:
+		_news("냉장고 덕분에 상할 생선 %d마리가 하루 더 버텨요" % kept)
 	# 오래된 생선은 밤새 상해서 버린다
 	var spoiled := spoiling_tonight()
 	if not spoiled.is_empty():
@@ -501,14 +535,15 @@ func end_day(wake_minutes := -1) -> void:
 		t["day"] = day + 1
 		trap_fish.append(t)
 	day += 1
-	# 매달 1일은 대출, 월세, 공과금이 나가는 날 (Loan)
-	var r := Loan.settle(day, money, debt, monthly_repayment, arrears)
+	# 월요일은 대출, 월세, 공과금이 나가는 날 (Loan)
+	var r := Loan.settle(day, money, debt, monthly_repayment, arrears, pay_streak)
 	if not r.is_empty():
 		if r.paid > 0:
 			money -= r.paid
 		else:
 			missed_payments += 1
 		arrears = r.arrears
+		pay_streak = r.streak
 		debt = r.debt
 		_news(Loan.notice(r))
 	time_minutes = wake_minutes if wake_minutes >= 0 else DayFlow.wake_time(night_fished)

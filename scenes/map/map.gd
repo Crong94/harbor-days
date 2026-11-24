@@ -42,7 +42,7 @@ var _velocity := Vector2.ZERO
 var _focus_tween: Tween
 var _drawer: DayDrawer
 var _dialogue: DialogueBox # 이야기 사건과 잡담 (처음 쓸 때 만든다)
-## 시트의 덧붙은 버튼들 (11-19): 선물하기(Friends), 앱 만들어 주기(AppWork), 메뉴 개발(Menu)
+## 시트의 덧붙은 버튼들 (11-19): 선물하기(Friends), 앱 만들어 주기(AppWork), 세라와 요리 연구(Menu)
 var _extras: VBoxContainer
 var _gift_sheet: Control
 var _gift_list: VBoxContainer
@@ -503,12 +503,23 @@ func _select(id: String) -> void:
 	_go_btn.disabled = _action.is_empty()
 	_fill_extras(id, arrive)
 	var was_open := _sheet.visible
+	_sheet.modulate.a = 1.0 if was_open else 0.0
 	_sheet.show()
+	_go_btn.grab_focus()
+	_settle_sheet.call_deferred(id, was_open)
+
+
+## 줄바꿈 글이 처음 잴 때 길게 잡혀 시트가 빈 채 늘어나던 것을 내용 높이로 맞춘 뒤 올라오게 하고, 고른 곳을 가운데로
+func _settle_sheet(id: String, was_open: bool) -> void:
+	await get_tree().process_frame
+	if not is_inside_tree() or not _sheet.visible or _selected != id:
+		return
+	_sheet.offset_bottom = -16
+	_sheet.offset_top = -16 - _sheet.get_combined_minimum_size().y
+	_sheet.modulate.a = 1.0
 	if not was_open:
 		UiKit.rise_in(_sheet, 0.0, 40.0)
-	_go_btn.grab_focus()
-	# 시트 크기가 정해진 뒤 고른 곳을 보이는 영역 가운데로
-	_center_on.call_deferred(id)
+	_center_on(id)
 
 
 func _close_sheet() -> void:
@@ -652,23 +663,24 @@ func _fill_extras(id: String, arrive: int) -> void:
 		var ab := UiKit.action("앱 만들어 주기 〈%s〉 %d/%d" % [AppWork.app(app).title, AppWork.stage(GameState, app) + 1, AppWork.app(app).stages.size()], "sun", true)
 		ab.pressed.connect(_extra_go.bind(id, "app", app))
 		_extras.add_child(ab)
-	# 활어 수조: 경자상회에서 한 단계씩 산다. 수조가 있으면 가게와 경자상회에서 넣고 꺼낸다
-	if id == "store":
-		var nx := Tank.next_info(GameState.tank_level)
-		if not nx.is_empty():
-			var price := AppWork.shop_price(GameState.flags, int(nx.price))
-			var label := ("수조 들이기: %s %s" if GameState.tank_level == 0 else "수조 바꾸기: %s %s") % [nx.name, GameState.format_won(price)]
-			var tb := UiKit.action(label, "mint", true)
-			tb.disabled = GameState.money < price
-			tb.pressed.connect(_extra_go.bind(id, "tank_buy", ""))
-			_extras.add_child(tb)
-	if id in ["shop", "store"] and GameState.tank_level > 0:
+	if id == "shop" and GameState.tank_level > 0:
 		var vb := UiKit.action("활어 수조  %d/%d" % [GameState.tank.size(), Tank.slots(GameState.tank_level)], "secondary", true)
 		vb.pressed.connect(_extra_go.bind(id, "tank", ""))
 		_extras.add_child(vb)
-	if id == "shop" and arrive + Menu.LAB_MINUTES <= DayFlow.SHOP_OPEN and Menu.RECIPES.keys().any(func(r): return Menu.learned(GameState.flags, r)):
-		var n := Menu.to_test(GameState.flags).size()
-		var lb := UiKit.action("메뉴 개발" + (" · 시험할 요리 %d" % n if n > 0 else ""), "sun", true)
+	if id == "home" and GameState.debt > 0 and GameState.has_flag("first_guest_done"):
+		var eb := UiKit.action("대출 더 갚기 %s (남은 대출 %s)" % [GameState.format_won(mini(Loan.EXTRA, GameState.debt)), GameState.format_won(GameState.debt)], "mint", true)
+		eb.disabled = Loan.extra_amount(GameState.money, GameState.debt) <= 0
+		eb.pressed.connect(func():
+			var n := GameState.pay_extra()
+			if n > 0:
+				Sound.play_sfx("coin")
+				_refresh_hud()
+				_show_toast("대출을 %s 더 갚았어요. 남은 대출 %s" % [GameState.format_won(n), GameState.format_won(GameState.debt)])
+				_select("home"))
+		_extras.add_child(eb)
+	if id == "shop" and arrive + Menu.LAB_MINUTES <= DayFlow.SHOP_OPEN and GameState.has_flag("sera_joined"):
+		var n := Menu.unknown(GameState.flags).filter(func(r): return Menu.can_research(GameState, r)).size()
+		var lb := UiKit.action("세라와 요리 연구" + (" · 지금 되는 요리 %d" % n if n > 0 else ""), "sun", true)
 		lb.pressed.connect(_extra_go.bind(id, "lab", ""))
 		_extras.add_child(lb)
 
@@ -686,29 +698,11 @@ func _extra_go(id: String, kind: String, data: String) -> void:
 			UiKit.go_to(self, APP_SCENE)
 		"lab":
 			UiKit.go_to(self, LAB_SCENE)
-		"tank_buy":
-			_buy_tank()
 		"tank":
 			_open_tank()
 
 
 # ─── 활어 수조 (11-24) ─────────────────────────────
-
-func _buy_tank() -> void:
-	var nx := Tank.next_info(GameState.tank_level)
-	var err := GameState.buy_tank()
-	if not err.is_empty():
-		_show_toast(err)
-		return
-	Sound.play_sfx("coin")
-	var first := GameState.tank_level == 1
-	_play_story([
-		{"speaker": "문경자", "text": "수조? 함지에 물 받아 두면 고기가 며칠은 산다. 가져가라." if first else "%s? 이거면 고기들이 한결 팔팔하겠네." % nx.name},
-		{"speaker": "", "text": "%s 들였다. 고기 %d마리를 살려 둘 수 있다. 상할 고기는 밤에 알아서 옮겨 둔다." % [Josa.attach(nx.name, "을/를"), int(nx.slots)]},
-	], func():
-		_refresh_hud()
-		_drawer.refresh_dot())
-
 
 func _build_tank_sheet() -> void:
 	_tank_sheet = Control.new()
@@ -841,11 +835,11 @@ func _give(g: Dictionary) -> void:
 	lines.append({"speaker": who, "face": "smile" if r.taste != "base" else "", "text": Friends.react(r.taste)})
 	if int(r.hearts) > int(r.hearts_before):
 		lines.append({"speaker": who, "face": "smile", "text": r.line})
-		lines.append({"speaker": "", "text": "%s 더 친해졌어요. %s" % [Josa.attach(Friends.person(who).call, "와/과"), Friends.heart_text(int(r.hearts))]})
+		lines.append({"speaker": "", "text": "%s 더 친해졌어요. %s" % [Josa.attach(Friends.person(who).call, "과/와"), Friends.heart_text(int(r.hearts))]})
 	if not str(r.learned).is_empty():
 		var rc := Menu.recipe(r.learned)
 		lines.append({"speaker": who, "text": rc.tip})
-		lines.append({"speaker": "", "text": "%s 요리법을 배웠어요. 저녁 장사 전에 식당에서 메뉴 개발을 해 봐요." % rc.name})
+		lines.append({"speaker": "", "text": "%s 요리법을 배웠어요. 오늘 저녁부터 메뉴판에서 고를 수 있어요." % rc.name})
 		GameState.note("%s %s 요리법을 알려 줬다." % [Josa.attach(Friends.person(who).call, "이/가"), rc.name], 3)
 	_play_story(lines, func():
 		_refresh_hud()

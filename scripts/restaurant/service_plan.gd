@@ -50,6 +50,14 @@ static func dish_options(fish_id: String, flags: Dictionary) -> Array:
 	return out
 
 
+## 아무것도 고르지 않았을 때의 요리: 비싼 생선(감성돔, 농어, 우럭)은 회, 나머지는 구이
+const RAW_FISH := ["gamseongdom", "nongeo", "ureok"]
+
+
+static func default_dish(fish_id: String) -> String:
+	return "hoe" if fish_id in RAW_FISH else "grill"
+
+
 static func dish_name(dish: String) -> String:
 	match dish:
 		"grill":
@@ -59,9 +67,9 @@ static func dish_name(dish: String) -> String:
 	return str(Menu.recipe(dish).get("name", dish))
 
 
-## 메뉴판에서 그 어종의 요리 (고른 게 없거나 지금은 못 내면 구이)
+## 메뉴판에서 그 어종의 요리 (고른 게 없으면 default_dish, 지금은 못 내면 구이)
 static func dish_for(plan: Dictionary, fish_id: String, flags: Dictionary) -> String:
-	var d: String = plan.get("dishes", {}).get(fish_id, "grill")
+	var d: String = plan.get("dishes", {}).get(fish_id, default_dish(fish_id))
 	return d if d in dish_options(fish_id, flags) else "grill"
 
 
@@ -72,6 +80,37 @@ static func next_dish(plan: Dictionary, fish_id: String, flags: Dictionary) -> S
 	var nx: String = opts[(opts.find(cur) + 1) % opts.size()]
 	plan.dishes[fish_id] = nx
 	return nx
+
+
+## 지금 아이스박스와 재료로 가장 값이 나가게 요리를 고른다 (메뉴판 "알아서 고르기")
+static func auto_plan(gs: Object, plan: Dictionary) -> void:
+	var produce: Dictionary = gs.produce.duplicate()
+	var seafood: Dictionary = gs.seafood.duplicate()
+	var reserve := Pantry.reserve_for(gs)
+	var groups := {}
+	for e in gs.inventory:
+		if not groups.has(e.id):
+			groups[e.id] = []
+		groups[e.id].append(e)
+	for fid in groups:
+		var list: Array = groups[fid]
+		var best := "grill"
+		var best_v := -1
+		for d in dish_options(fid, gs.flags):
+			var left := Menu.plates(d, produce, seafood, reserve) if Menu.RECIPES.has(d) else 99
+			var v := 0
+			for e in list:
+				var ok: bool = left > 0 and (not Menu.RECIPES.has(d) or Menu.fits(d, e, int(gs.day)))
+				v += DiningLogic.dish_price_of(e.id, e.size, d if ok else "grill")
+				if ok:
+					left -= 1
+			if v > best_v:
+				best_v = v
+				best = d
+		plan.dishes[fid] = best
+		if Menu.RECIPES.has(best):
+			var n := list.filter(func(e): return Menu.fits(best, e, int(gs.day))).size()
+			Menu.take(best, produce, seafood, mini(n, Menu.plates(best, produce, seafood, reserve)))
 
 
 ## 오늘 단골로 올 사람들 (친밀도 하트 하나 이상, 날짜로 정해진다)
@@ -96,7 +135,7 @@ static func forecast(gs: Object) -> Dictionary:
 	var vis := Bus.visitors(gs.reputation, gs.day)
 	var lo := DiningLogic.GUESTS_MIN + d + vis
 	var hi := DiningLogic.GUESTS_MAX + d + vis
-	var fish: int = gs.inventory.filter(func(e): return DayFlow.dish_price(e.id, e.size) <= DayFlow.REGULAR_MAX).size()
+	var fish: int = gs.inventory.size()
 	var note := "생선이 넉넉해요"
 	if fish < lo:
 		note = "생선이 모자라요. 손님 몇 명은 못 받아요"

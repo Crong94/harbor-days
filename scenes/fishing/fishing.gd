@@ -210,6 +210,7 @@ func _ready() -> void:
 	sea = SeaDay.of(GameState.day)
 	order = {} if tutorial else GameState.today_order()
 	logic.weather = sea.weather
+	logic.school = "" if tutorial else str(sea.school)
 	logic.month = int(Calendar.date(GameState.day).month)
 	logic.bite_mult = sea.bite
 	logic.bait = GameState.equipped_bait
