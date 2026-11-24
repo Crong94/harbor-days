@@ -4,7 +4,7 @@ extends Control
 
 const NEXT_SCENE := "res://scenes/prologue/resignation.tscn"
 const MAP_SCENE := "res://scenes/map/map.tscn"
-const VERSION := "v0.4"
+const VERSION := "v0.5"
 
 var _bg: TextureRect
 var _new_armed := false
