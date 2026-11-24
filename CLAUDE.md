@@ -85,7 +85,7 @@ scenes/title      타이틀
 scenes/prologue   사직서(플레이어명 입력), 간판(가게명 입력)
 scenes/fishing    방파제 찌낚시. 첫날은 새벽 튜토리얼(첫 물고기 볼락), 그 뒤는 낮 낚시 하루 한 번(06~17시 사이 아무 때나 세 시간)과 밤 21~23:30(선택). scripts/data/day_flow.gd. 캐스팅 포인트, 챔질 PERFECT, 좌우 줄다리기, 미끼, 물때·날씨, 주문
 scenes/restaurant 〈첫 번째 손님〉 식당 장면 (볼락구이, 최순덕)
-scenes/shop       준호네 낚시방 (장비 구매, 장착)
+scenes/shop       준호네 낚시방 (장비 구매, 장착). 경자상회 store.gd (식재료, 선물, 주방 장비, 살림 탭. 규칙은 Store, KitchenDB, Tank)
 scenes/garden     우리 텃밭. 이랑 네 줄에 심고 거두기 (CropDB)
 scenes/village    순덕 할머니 집 (부탁 세 가지, 다 들어주면 닭장 열림)
 scenes/coop       닭장 (모이 주기, 달걀 줍기, 모이 사기). 규칙은 scripts/data/coop.gd

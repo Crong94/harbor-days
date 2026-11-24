@@ -96,7 +96,7 @@ func _build_sheet() -> void:
 	_box.add_theme_font_size_override("font_size", 18)
 	head.add_child(_box)
 	v.add_child(head)
-	var tip := UiKit.paragraph("흔한 고기는 저녁에 구워 파는 게 더 남아요. 비싼 고기는 보통 손님이 못 사니 여기서 팔아요", "body", UiKit.NOTE_INK_SOFT)
+	var tip := UiKit.paragraph("흔한 고기는 저녁에 구워 파는 게 더 남아요. 비싼 고기는 오늘 안에 회로 내거나, 회 손님이 모자라면 여기서 팔아요", "body", UiKit.NOTE_INK_SOFT)
 	tip.add_theme_font_size_override("font_size", 16)
 	v.add_child(tip)
 	v.add_child(UiKit.gap(4))
