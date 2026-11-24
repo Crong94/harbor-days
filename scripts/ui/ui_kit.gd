@@ -768,7 +768,7 @@ static func fade_in(node: CanvasItem, duration := 0.6) -> void:
 static func rise_in(c: Control, delay := 0.0, distance := 18.0) -> void:
 	c.modulate.a = 0.0
 	var tw := c.create_tween()
-	tw.tween_interval(delay)
+	tw.tween_interval(maxf(delay, 0.08)) # 줄바꿈 글 높이가 정해진 뒤에 움직인다. 그 전에 옮기면 길게 잡힌 크기로 굳어 화면 밖으로 나갔다
 	tw.tween_callback(func():
 		if c.get_parent() is Container:
 			# 컨테이너 안에서는 위치가 다시 정해지므로 흐릿하게 나타나기만 한다

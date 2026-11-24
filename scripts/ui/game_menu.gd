@@ -163,6 +163,7 @@ func _build_bag() -> void:
 	_list.add_child(tip)
 	if GameState.inventory.is_empty():
 		_list.add_child(_empty_note("아이스박스가 비어 있어요. 방파제에서 낚아 와요"))
+		_build_goods()
 		return
 	# 오늘 밤 상하는 것 먼저, 그다음 비싼 순서
 	var spoiling := GameState.spoiling_tonight()
@@ -175,6 +176,41 @@ func _build_bag() -> void:
 		_list.add_child(FishLine.make(e, GameState.day, GameState.format_won(FishDB.value_of(e.id, e.size))))
 	var sum := UiKit.text("모두 %s어치" % GameState.format_won(total), "title", UiKit.NOTE_INK_SOFT, HORIZONTAL_ALIGNMENT_RIGHT)
 	_list.add_child(sum)
+	_build_goods()
+
+
+## 가방 아래: 요리 재료(채소, 갯벌 것)와 선물
+func _build_goods() -> void:
+	var rows := []
+	for id in GameState.produce:
+		if int(GameState.produce[id]) > 0:
+			rows.append([Pantry.art_of(id), Pantry.name_of(id), int(GameState.produce[id])])
+	for id in GameState.seafood:
+		if int(GameState.seafood[id]) > 0:
+			rows.append(["flat/" + id, Flat.name_of(id), int(GameState.seafood[id])])
+	for id in GameState.goods:
+		if int(GameState.goods[id]) > 0 and Store.GOODS.has(id):
+			rows.append(["goods/" + id, Store.GOODS[id].name, int(GameState.goods[id])])
+	if rows.is_empty():
+		return
+	_list.add_child(UiKit.text("요리 재료와 선물", "title", UiKit.NOTE_INK_SOFT))
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 8)
+	_list.add_child(grid)
+	for r in rows:
+		var h := UiKit.hbox(UiKit.SPACE_MD)
+		h.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		h.alignment = BoxContainer.ALIGNMENT_BEGIN
+		h.custom_minimum_size = Vector2(0, 56)
+		var ic := UiKit.icon_rect(r[0], 48)
+		if ic:
+			h.add_child(ic)
+		var l := UiKit.text("%s  %d" % [r[1], r[2]], "label", UiKit.NOTE_INK)
+		l.add_theme_font_size_override("font_size", 21)
+		h.add_child(l)
+		grid.add_child(h)
 
 
 # ─── 도감 ───────────────────────────────────────────

@@ -748,7 +748,9 @@ func _fill_plan() -> void:
 	var regs := ServicePlan.regulars(GameState)
 	if not regs.is_empty():
 		_plan_body.add_child(UiKit.paragraph("오늘 올 것 같은 단골: " + ", ".join(PackedStringArray(regs.map(func(n): return Friends.person(n).call))), "body", UiKit.CORAL_DEEP))
-	_plan_body.add_child(UiKit.paragraph("노릇노릇한 접시를 빨리 갖다주면 손님이 만족해서 팁을 줘요", "caption", UiKit.CORAL_DEEP))
+	var tip_note := UiKit.paragraph("노릇노릇한 접시를 빨리 갖다주면 손님이 만족해서 팁을 줘요", "caption", UiKit.CORAL_DEEP)
+	tip_note.add_theme_font_size_override("font_size", LEDGER_NOTE_PX)
+	_plan_body.add_child(tip_note)
 	var head := UiKit.hbox(UiKit.SPACE_MD)
 	head.add_child(UiKit.text("생선마다 낼 요리", "title", UiKit.INK))
 	head.add_child(UiKit.spacer())
