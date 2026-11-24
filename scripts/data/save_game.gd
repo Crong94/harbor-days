@@ -10,7 +10,7 @@ extends RefCounted
 
 const PATH := "user://save.dat"
 const VERSION := 1
-const SKIP := ["vibration_on", "screen_shake_on"]
+const SKIP := ["vibration_on", "screen_shake_on", "fast_forward"]
 
 
 ## 저장할 변수 이름들

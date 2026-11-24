@@ -20,6 +20,10 @@ const SPEAKERS := {
 	"세라": "sera", "최세라": "sera",
 	"이장": "taesik", "정태식": "taesik",
 	"여울": "yeoul", "한여울": "yeoul",
+	"서윤": "seoyun", "한서윤": "seoyun",
+	"지우": "jiwoo", "서지우": "jiwoo",
+	"민혁": "minhyuk", "정민혁": "minhyuk",
+	"미자": "mija", "윤미자": "mija",
 	"은행 직원": "banker",
 	"{player}": "player", "나": "player",
 }

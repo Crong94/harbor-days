@@ -57,7 +57,7 @@ const LIST := {
 	},
 	"lookout": {
 		"name": "뒷산 전망대", "pos": Vector2(0.220, 0.088), "unlock": "", "pin": "below",
-		"scene": "", "desc": "마을과 바다가 한눈에 보이는 정자",
+		"scene": "res://scenes/places/lookout.tscn", "desc": "마을과 바다가 한눈에 보이는 정자. 망원경으로 내일 바다를 본다",
 	},
 	"hall": {
 		"name": "마을회관", "pos": Vector2(0.329, 0.459), "unlock": "hall_open",
@@ -65,11 +65,11 @@ const LIST := {
 	},
 	"school": {
 		"name": "물빛분교", "pos": Vector2(0.555, 0.488), "unlock": "met_haesol",
-		"scene": "", "desc": "학생이 한 명뿐인 분교",
+		"scene": "res://scenes/places/school.tscn", "desc": "학생이 한 명뿐인 분교. 오후엔 해솔이가 물고기 문제를 낸다",
 	},
 	"guesthouse": {
 		"name": "등대민박", "pos": Vector2(0.254, 0.198), "unlock": "met_jiwoo",
-		"scene": "", "desc": "방 다섯 개짜리 민박",
+		"scene": "res://scenes/places/guesthouse.tscn", "desc": "방 다섯 개짜리 민박. 조식 생선을 받아 준다",
 	},
 	"flat": {
 		"name": "물빛 갯벌", "pos": Vector2(0.300, 0.770), "unlock": "flat_open",
@@ -89,7 +89,7 @@ const LIST := {
 	},
 	"lab": {
 		"name": "해양생태 연구소", "pos": Vector2(0.192, 0.613), "unlock": "chapter3_start",
-		"scene": "", "desc": "서윤이 일하는 연구소",
+		"scene": "res://scenes/places/lab.tscn", "desc": "서윤이 일하는 연구소. 잡은 고기를 기록한다",
 	},
 	"beach": {
 		"name": "야광충 해변", "pos": Vector2(0.339, 0.742), "unlock": "found_glow_beach",

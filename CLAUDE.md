@@ -89,10 +89,11 @@ scenes/shop       준호네 낚시방 (장비 구매, 장착). 경자상회 stor
 scenes/garden     우리 텃밭. 이랑 네 줄에 심고 거두기 (CropDB)
 scenes/village    순덕 할머니 집 (부탁 세 가지, 다 들어주면 닭장 열림)
 scenes/coop       닭장 (모이 주기, 달걀 줍기, 모이 사기). 규칙은 scripts/data/coop.gd
+scenes/places     전망대, 분교, 등대민박, 연구소 (낮에 하루 한 번 할 일, 규칙은 scripts/data/places.gd, 공통 바탕 place_scene.gd)
 scenes/map        마을 지도. 장소 선택, 이동 시간, 해금 (scripts/data/locations.gd)
 scripts/fishing   FishingLogic (낚시 규칙, 헤드리스 테스트 가능)
 scripts/cooking   CookingLogic (간 맞추기, 굽기 규칙)
-scripts/data      FishDB (어종 7종, 희귀도), GearDB (낚싯대·릴 10단계), BaitDB (미끼), SeaDay (물때·날씨), Orders (식당 주문), Locations (장소), Quests (메인·서브·오늘 부탁 이야기 목록, 모든 줄에 누가와 왜), CropDB (텃밭 네 칸과 작물 6종, docs/텃밭_설계.md), Catalog (바다 한 접시 어종 71종, 레시피 50개)
+scripts/data      FishDB (어종 7종, 희귀도), GearDB (낚싯대·릴 10단계), BaitDB (미끼), SeaDay (물때·날씨), Orders (식당 주문), Locations (장소), StoryCh3 (네 주 뒤 메인 이야기 챕터 3), Quests (메인·서브·오늘 부탁 이야기 목록, 모든 줄에 누가와 왜), CropDB (텃밭 네 칸과 작물 6종, docs/텃밭_설계.md), Catalog (바다 한 접시 어종 71종, 레시피 50개)
 assets/art        사용자에게 받은 그림 (docs/그림_요청_목록.md). dish, cook_tool, kitchen, ingredient, gear_icon은 바다 한 접시에서 가져옴
 assets/art/sd     주인공 SD 동작 프레임 (back_01~12 낚시 뒷모습, front_01~12 앞모습)
 assets/audio      배경음악 bgm, 효과음 sfx (바다 한 접시에서 가져옴)

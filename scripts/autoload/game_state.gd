@@ -63,6 +63,8 @@ var seafood := {}
 ## 친밀도 {이름: 점수}, 마지막으로 선물한 날 {이름: 날} (Friends)
 var friendship := {}
 var gift_day := {}
+## 연구소 표본 {어종: 가장 큰 cm} (Places)
+var specimens := {}
 ## 앱 만들기 {앱 id: 마친 단계}, 마지막으로 한 날 {앱 id: 날} (AppWork)
 var apps := {}
 var app_day := {}
@@ -136,6 +138,8 @@ const SETTINGS_PATH := "user://settings.cfg"
 var vibration_on := true
 ## 화면 흔들림 (낚시 입질, 챔질, 줄다리기 때 화면이 흔들리고 살짝 확대된다)
 var screen_shake_on := true
+## 저녁 영업 빨리감기 (할 일이 없을 때 저절로, DiningFloor)
+var fast_forward := true
 
 
 func _ready() -> void:
@@ -154,10 +158,16 @@ func set_screen_shake(on: bool) -> void:
 	save_settings()
 
 
+func set_fast_forward(on: bool) -> void:
+	fast_forward = on
+	save_settings()
+
+
 func save_settings(path := SETTINGS_PATH) -> void:
 	var c := ConfigFile.new()
 	c.set_value("feel", "vibration", vibration_on)
 	c.set_value("feel", "screen_shake", screen_shake_on)
+	c.set_value("service", "fast_forward", fast_forward)
 	c.save(path)
 
 
@@ -168,6 +178,7 @@ func load_settings(path := SETTINGS_PATH) -> void:
 		return
 	vibration_on = bool(c.get_value("feel", "vibration", vibration_on))
 	screen_shake_on = bool(c.get_value("feel", "screen_shake", screen_shake_on))
+	fast_forward = bool(c.get_value("service", "fast_forward", fast_forward))
 
 
 ## 진행 저장 (SaveGame). 마을 지도에 올 때마다 자동으로 부른다

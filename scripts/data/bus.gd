@@ -53,13 +53,15 @@ static func bait_price(bait_id: String) -> int:
 
 
 ## 오늘 저녁 버스로 오는 외지 손님 수. 평판과 날짜로 정해진다
-static func visitors(reputation: int, day: int) -> int:
+## flags를 주면 민박 손님(Places.inn_guests)도 더한다
+static func visitors(reputation: int, day: int, flags := {}) -> int:
 	var base := clampi(reputation / VISIT_STEP, 0, VISIT_MAX)
+	var inn := Places.inn_guests(flags, day)
 	if base == 0:
-		return 0
+		return inn
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("버스손님-%d" % day)
-	return clampi(base - rng.randi_range(0, 1), 0, VISIT_MAX)
+	return clampi(base - rng.randi_range(0, 1), 0, VISIT_MAX) + inn
 
 
 ## "08:00" 꼴

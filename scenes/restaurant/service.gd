@@ -199,13 +199,7 @@ func _special_arrives() -> void:
 	var fname: String = FishDB.get_fish(special_fish.id).name
 	var want_name: String = FishDB.get_fish(special.fish).name
 	var wanted: bool = special_fish.id == special.fish
-	var ask := ""
-	if GameState.order_done:
-		ask = "아까 보내 준 %s 잘 받았어. 오늘 저녁은 여기서 먹고 갈게." % want_name
-	elif wanted:
-		ask = "%s 있나? 오늘은 그게 땡기네." % want_name
-	else:
-		ask = "%s 없나 보네. 그럼 있는 걸로 줘." % Josa.attach(want_name, "은/는")
+	var ask := SpecialGuest.ask(special.name, want_name, GameState.order_done, wanted)
 	# 알아맞히기 대접 (SpecialGuest): 손님이 힌트 세 가지를 흘린다
 	_want = SpecialGuest.want(GameState.day, special.name, special.fish, SeaDay.of(GameState.day).weather, SpecialGuest.styles_ok(GameState.flags, special.fish))
 	var talk := [
@@ -912,7 +906,7 @@ func _fill_serve() -> void:
 	for c in _serve_body.get_children():
 		c.queue_free()
 	var who := Orders.call_name(special.name)
-	_serve_body.add_child(UiKit.text("%s께 낼 한 상" % who, "h2", UiKit.INK))
+	_serve_body.add_child(UiKit.text("%s 낼 한 상" % Friends.to(special.name), "h2", UiKit.INK))
 	for h in _want.hints:
 		var hl := UiKit.paragraph("\"%s\"" % h, "body", UiKit.INK_SOFT)
 		_serve_body.add_child(hl)

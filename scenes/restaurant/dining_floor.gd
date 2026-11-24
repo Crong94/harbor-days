@@ -143,7 +143,7 @@ func start(day: int, inventory: Array) -> void:
 	logic.flags = GameState.flags
 	logic.patience_mult = 1.0
 	logic.regular_names = ServicePlan.regulars(GameState)
-	logic.setup(day, inventory, DayFlow.GUESTS, Bus.visitors(GameState.reputation, day))
+	logic.setup(day, inventory, DayFlow.GUESTS, Bus.visitors(GameState.reputation, day, GameState.flags))
 	logic.place_staff()
 	logic.seat_bonus = ShopDecor.seat_comfort(GameState.shop_decor)
 	_staff.clear()
@@ -185,6 +185,7 @@ func _ready() -> void:
 	_draw_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_draw_layer.draw.connect(_draw_floor)
 	add_child(_draw_layer)
+	_build_fast_button()
 	hide()
 
 
@@ -423,6 +424,37 @@ func _pass_pos(i: int) -> Vector2:
 	return to_screen(DiningLogic.PASS_SPOTS[i])
 
 
+# ─── 빨리감기 (11-24 사용자: 저절로, 끄는 단추) ─────────
+
+const FAST_WAIT := 0.5 # 할 일이 없은 지 이만큼 지나면 빨라진다 (깜빡거리지 않게)
+const CALM := 2.0 # 손님이 화나서 가면 이만큼은 보통 속도
+var fast_now := false
+var _idle_t := 0.0
+var _calm := 0.0
+var _fast_btn: Button
+
+
+func _build_fast_button() -> void:
+	_fast_btn = UiKit.game_button("", UiKit.TEAL_BTN, Vector2(172, 46), 18)
+	_fast_btn.focus_mode = Control.FOCUS_NONE
+	_fast_btn.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	_fast_btn.offset_left = 12
+	_fast_btn.offset_right = 184
+	_fast_btn.offset_top = -56
+	_fast_btn.offset_bottom = -10
+	_fast_btn.pressed.connect(func():
+		GameState.set_fast_forward(not GameState.fast_forward)
+		Sound.play_sfx("tap")
+		_paint_fast_button())
+	add_child(_fast_btn)
+	_paint_fast_button()
+
+
+func _paint_fast_button() -> void:
+	_fast_btn.text = "빨리감기 " + ("켬" if GameState.fast_forward else "끔")
+	_fast_btn.modulate = Color.WHITE if GameState.fast_forward else Color(0.75, 0.75, 0.75)
+
+
 # ─── 진행 ───────────────────────────────────────────
 
 func _process(delta: float) -> void:
@@ -433,8 +465,13 @@ func _process(delta: float) -> void:
 	_update_sera(delta)
 	if not special_cook.is_empty():
 		special_cook.t = minf(float(special_cook.t) + delta, float(special_cook.total))
+	_fast_btn.visible = _started and not _done
 	if _started and not _done:
-		logic.update(delta)
+		var still := logic.idle()
+		_idle_t = _idle_t + delta if still else 0.0
+		fast_now = GameState.fast_forward and _idle_t >= FAST_WAIT and _calm <= 0.0
+		_calm = maxf(0.0, _calm - delta)
+		_t += logic.advance(delta, fast_now) - delta # 세라 움직임도 같이 빨라진다
 		_handle_events()
 		if logic.is_over():
 			_done = true
@@ -531,6 +568,7 @@ func _handle_events() -> void:
 					_pop(_bubble_pos(gi) + Vector2(0, 38), "하트 %d번 잇기!" % e.combo, UiKit.CORAL, false)
 			"angry":
 				var gi: int = e.guest
+				_calm = CALM
 				Sound.play_sfx("bad", 0.0, -6.0)
 				Haptics.play("lost")
 				if _guests.has(gi):
@@ -743,7 +781,7 @@ func _draw_floor() -> void:
 		_caption(ci, font, Vector2(size.x / 2.0, to_screen(Vector2(0.5, 0.24)).y), "마감! 남은 손님만 받아요")
 	elif _started and not _done and not _bottom_hint:
 		# 지금 할 일 한 줄 (처음 배우는 아래 안내가 떠 있을 때는 겹치지 않게 숨긴다) (흐름이 헷갈리지 않게)
-		_caption(ci, font, Vector2(size.x / 2.0, to_screen(Vector2(0.5, 0.0)).y + 150.0), ServicePlan.hint(logic))
+		_caption(ci, font, Vector2(size.x / 2.0, to_screen(Vector2(0.5, 0.0)).y + 150.0), ServicePlan.hint(logic) + ("  (빨리 보는 중)" if fast_now else ""))
 
 
 ## 세라가 접시를 담았다: 바 쪽으로 갔다 돌아오고, 돌아오면 결과에 따라 반응

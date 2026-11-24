@@ -216,6 +216,44 @@ func update(dt: float) -> void:
 	_helper_step(dt)
 
 
+# ─── 빨리감기 (11-24) ───────────────────────────────
+
+const FAST := 3 # 할 일이 없을 때 몇 배로 넘기나
+const FAST_PATIENCE := 0.75 # 참는 시간의 이 비율을 넘긴 손님이 있으면 보통 속도
+
+
+## 주인공이 할 일이 없어 기다리기만 하는가. 접시가 나왔거나 다 익었거나, 치울 자리가 있거나,
+## 누가 나르고 있거나, 곧 화날 손님이 있으면 아니다. 더 올 손님이 없으면 빈 그릇은 치우지 않아도 된다
+func idle() -> bool:
+	if is_over() or selected >= 0 or holding >= 0 or not pass_dishes.is_empty():
+		return false
+	if not task.is_empty() or not tasks.is_empty() or not player_path.is_empty():
+		return false
+	if not helper_task.is_empty() or not helper_path.is_empty():
+		return false
+	if not dirty.is_empty() and not schedule.is_empty():
+		return false
+	if cooking.any(func(c): return float(c.t) >= float(c.total)):
+		return false
+	for g in guests:
+		if g.state == GuestState.SEATED and float(g.wait) >= float(g.get("patience", PATIENCE)) * FAST_PATIENCE:
+			return false
+	return true
+
+
+## dt만큼 진행하되 fast면 FAST번까지 이어서 진행한다. 할 일이 생기면 바로 멈춘다. 진행한 시간을 돌려준다
+func advance(dt: float, fast: bool) -> float:
+	update(dt)
+	var done := dt
+	if fast:
+		for i in FAST - 1:
+			if not idle():
+				break
+			update(dt)
+			done += dt
+	return done
+
+
 # ─── 주방 ───────────────────────────────────────────
 
 static func cook_time(size_cm: float) -> float:

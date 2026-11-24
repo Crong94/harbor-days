@@ -73,6 +73,10 @@ static func _todo(gs: Object, day: int, m: int) -> Array:
 			ready += 1
 	if ready > 0:
 		rows.append({"text": "텃밭에서 %d줄 거두기" % ready, "state": "지금", "tone": "gold", "target": "garden"})
+	var spots := Places.left_today(gs, m)
+	if gs.has_flag("first_guest_done") and not spots.is_empty():
+		var names := PackedStringArray(spots.map(func(id): return Locations.get_loc(id).name))
+		rows.append({"text": "들를 곳 · " + ", ".join(names), "state": "", "tone": "info", "target": spots[0]})
 	if gs.has_flag("first_guest_done") and not gs.opened_today and m < DayFlow.SHOP_CLOSE:
 		var n: int = gs.inventory.size()
 		var t2 := "저녁 장사 · 아이스박스 %d마리" % n if n > 0 else "저녁 장사 · 팔 생선이 없어요"

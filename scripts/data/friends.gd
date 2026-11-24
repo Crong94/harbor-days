@@ -48,6 +48,18 @@ const PEOPLE := {
 		"love": ["sea:ge", "goods:candy"], "like": ["produce:egg", "fish:bolak"],
 		"lines": ["우와 이거 나 주는 거예요?", "삼촌 오늘도 낚시했어요?", "삼촌은 내 베프예요!"],
 		"teach": {1: "jeon"}},
+	"정민혁": {"call": "민혁 선생님", "place": "school", "met": "met_minhyuk", "time": [9 * 60, 14 * 60],
+		"love": ["goods:coffee"], "like": ["produce:egg", "fish:bolak", "goods:yakgwa"],
+		"lines": ["해솔이가 좋아하겠네요.", "덕분에 학교가 시끌시끌해졌어요.", "여기 남길 잘했다는 생각이 요즘 들어요."]},
+	"한서윤": {"call": "서윤", "place": "lab", "met": "met_seoyun", "time": [9 * 60, 19 * 60],
+		"love": ["sea:ge"], "like": ["sea:gul", "fish:ssombaengi", "goods:coffee"],
+		"lines": ["고마워요. 이건 먹는 거죠? 표본 아니고.", "{player} 씨 기록은 숫자가 정직해요.", "여름에 야광충 보러 같이 가요. 조사예요. 조사."]},
+	"윤미자": {"call": "미자 아주머니", "place": "guesthouse", "met": "met_mija", "time": [6 * 60, 14 * 60],
+		"love": ["goods:yakgwa"], "like": ["produce:baechu", "fish:noraemi", "produce:daepa"],
+		"lines": ["어머 손도 크네!", "우리 집 방 하나는 늘 비워 둘게.", "아들보다 자주 본다니까 정말."]},
+	"서지우": {"call": "지우", "place": "guesthouse", "met": "met_jiwoo", "time": [14 * 60, 19 * 60],
+		"love": ["goods:candy"], "like": ["goods:coffee", "fish:hakgongchi", "produce:kkaennip"],
+		"lines": ["이거 그려도 돼요?", "한 달 더 있을까 봐요. 아직 비밀이에요.", "여기 바다는 매일 색이 달라요. 다 그리려면 오래 걸리겠죠?"]},
 }
 
 
@@ -65,6 +77,12 @@ static func who_at(place: String, minutes: int, flags: Dictionary) -> String:
 			continue
 		return n
 	return ""
+
+
+## 어른에게는 "께", 아이와 또래에게는 "에게". 예: "해솔이에게"
+static func to(name: String) -> String:
+	var call: String = person(name).get("call", Orders.call_name(name))
+	return call + ("에게" if name in ["김해솔", "이준호", "서지우", "한서윤"] else "께")
 
 
 static func points(gs: Object, name: String) -> int:
@@ -158,8 +176,9 @@ static func give(gs: Object, name: String, g: Dictionary) -> Dictionary:
 		line = lines[mini(after - 1, lines.size() - 1)]
 		for h in p.get("teach", {}):
 			if int(h) > before and int(h) <= after:
-				learned = str(p.teach[h])
-				gs.flags["learn_" + learned] = true
+				if not Menu.on_menu(gs.flags, str(p.teach[h])): # 잔치나 연구로 이미 배웠으면 다시 알려 주지 않는다
+					learned = str(p.teach[h])
+				gs.flags["learn_" + str(p.teach[h])] = true
 	return {"taste": t, "gain": gain(t), "hearts_before": before, "hearts": after, "line": line, "learned": learned}
 
 

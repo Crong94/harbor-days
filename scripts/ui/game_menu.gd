@@ -446,6 +446,7 @@ func _build_settings() -> void:
 		GameState.set_vibration(on)
 		Haptics.play("hook"))) # 켰을 때 어떤 느낌인지 바로 알 수 있게 (끄면 울리지 않는다)
 	_list.add_child(_toggle_row("화면 흔들림", GameState.screen_shake_on, func(on: bool): GameState.set_screen_shake(on)))
+	_list.add_child(_toggle_row("장사 빨리감기", GameState.fast_forward, func(on: bool): GameState.set_fast_forward(on)))
 	_list.add_child(UiKit.gap(8))
 	var title_btn := UiKit.game_button("한 번 더 누르면 타이틀로 가요" if _title_armed else "타이틀로", UiKit.RED_BTN if _title_armed else UiKit.GRAY_DARK, Vector2(0, 58))
 	title_btn.pressed.connect(func():

@@ -56,6 +56,10 @@ func _init() -> void:
 	_test_special_guest()
 	_test_shop4()
 	_test_spots()
+	_test_fast_forward()
+	_test_special_more()
+	_test_ch3()
+	_test_places()
 	print("\n결과: %d 통과, %d 실패" % [_pass, _fail])
 	quit(1 if _fail > 0 else 0)
 
@@ -1217,7 +1221,7 @@ func _test_story() -> void:
 	_eq(Story.pending("market", 2, 9 * 60, {}).get("id", ""), "yongpal_first", "시장 첫 방문에 용팔")
 	gs.free()
 	var ids := {}
-	for ev in Story.EVENTS:
+	for ev in Story.all():
 		_eq(ids.has(ev.id), false, "사건 이름 겹침 없음 %s" % ev.id)
 		ids[ev.id] = true
 		_eq(Locations.LIST.has(ev.place), true, "%s 장소가 있음" % ev.id)
@@ -2456,7 +2460,19 @@ func _test_quests() -> void:
 		gs.flags[f] = true
 	_eq(Quests.main_quest(gs).id, "main_first_month", "다 만나면 첫 달 버티기")
 	gs.day = 40
-	_eq(Quests.main_quest(gs).id, "main_debt", "네 주를 버티면 대출 줄이기")
+	_eq(Quests.main_quest(gs).id, "main_ch3_act1_done", "네 주를 버티면 챕터 3")
+	gs.flags["act1_done"] = true
+	gs.arrears = 10000
+	_eq(Quests.main_quest(gs).id, "main_ch3_mansu_month", "챕터 3 시작 뒤엔 밀린 돈이 있어도 이야기가 보임")
+	gs.arrears = 0
+	gs.flags.erase("act1_done")
+	var keep: Dictionary = gs.flags.duplicate()
+	for s in StoryCh3.STEPS:
+		gs.flags[s.done] = true
+	for k in StoryCh3.INVITES:
+		gs.flags[k] = true
+	_eq(Quests.main_quest(gs).id, "main_debt", "챕터 3을 마치면 대출 줄이기")
+	gs.flags = keep
 	gs.arrears = 10000
 	_eq(Quests.main_quest(gs).goal.contains("밀린 돈"), true, "밀린 돈이 있으면 갚기")
 	gs.arrears = 0
@@ -2648,3 +2664,211 @@ func _test_special_guest() -> void:
 	_eq(SpecialGuest.next_tale({}, "최순덕").is_empty(), false, "사연 첫 토막")
 	_eq(SpecialGuest.next_tale({"tale_최순덕": 3}, "최순덕"), "", "다 들으면 끝")
 	_eq(SpecialGuest.style_of("jiri"), "soup", "맑은탕은 국물")
+
+
+## 영업 빨리감기 (11-25): 할 일이 없을 때만 빨라지고 결과는 같다
+func _test_fast_forward() -> void:
+	var d := DiningLogic.new()
+	d.setup(4, _fish_box(12), ["손님"])
+	_eq(d.idle(), true, "문 열고 손님 오기 전은 한가함")
+	_eq(is_equal_approx(d.advance(0.1, true), 0.3), true, "한가하면 세 배")
+	_eq(is_equal_approx(d.advance(0.1, false), 0.1), true, "끄면 보통 속도")
+	d.pass_dishes = [0]
+	_eq(d.idle(), false, "접시가 나오면 보통 속도")
+	d.pass_dishes = []
+	d.cooking = [{"guest": 0, "t": 8.0, "total": 8.0, "burner": 0, "auto": 1.0}]
+	_eq(d.idle(), false, "다 익으면 보통 속도")
+	d.cooking = []
+	d.dirty = {2: true}
+	_eq(d.idle(), false, "치울 그릇이 있으면 보통 속도")
+	d.dirty = {}
+	d.selected = 0
+	_eq(d.idle(), false, "접시를 골랐으면 보통 속도")
+	d.selected = -1
+	d.guests = [{"state": DiningLogic.GuestState.SEATED, "wait": 25.0, "patience": 32.0}]
+	_eq(d.idle(), false, "곧 화날 손님이 있으면 보통 속도")
+	d.guests[0].wait = 5.0
+	_eq(d.idle(), true, "아직 느긋한 손님은 괜찮음")
+	d.helper_task = {"type": "serve", "dish": 0}
+	_eq(d.idle(), false, "여울이 나르는 중이면 보통 속도")
+	# 사람처럼 하며 한 판: 빨리감기를 켜도 화난 손님 없이 같은 접시가 나가고 실제 시간은 짧다
+	var real := {}
+	for fast in [false, true]:
+		var a := DiningLogic.new()
+		a.setup(4, _fish_box(12), ["손님"])
+		var t := 0.0
+		while not a.is_over() and t < 400.0:
+			for i in a.pass_dishes.size():
+				if not a._dish_reserved(a.pass_dishes[i]) and a._task_count() < DiningLogic.MAX_TASKS:
+					a.take(i)
+					break
+			if a._task_count() == 0:
+				for seat in a.dirty:
+					a.clear_seat(seat)
+					break
+			a.advance(1.0 / 30.0, fast and a.idle())
+			t += 1.0 / 30.0
+		real[fast] = [t, a.served.size(), a.angry]
+	_eq(real[true][1], real[false][1], "빨리감기를 켜도 낸 접시 수가 같음")
+	_eq(real[true][2], 0, "빨리감기로 화난 손님 없음")
+	_eq(real[true][0] < real[false][0] * 0.85, true, "실제 걸린 시간이 짧아짐 %.0f초 → %.0f초" % [real[false][0], real[true][0]])
+	print("빨리감기: %.0f초 → %.0f초" % [real[false][0], real[true][0]])
+
+
+## 특별 손님 여덟 명 (11-25): 말투와 사연
+func _test_special_more() -> void:
+	_eq(Orders.CUSTOMERS.size(), 8, "특별 손님 여덟 명")
+	for c in Orders.CUSTOMERS:
+		_eq(Friends.PEOPLE.has(c.name), true, "%s 친밀도가 있음" % c.name)
+		_eq(Friends.person(c.name).met, c.met, "%s 만난 표시가 같음" % c.name)
+		_eq(SpecialGuest.TALES.get(c.name, []).size(), 3, "%s 사연 세 토막" % c.name)
+		_eq(c.react.size(), 3, "%s 먹고 하는 말 셋" % c.name)
+		_eq(Portraits.path(c.name).is_empty(), false, "%s 일러스트" % c.name)
+		for l in c.lines:
+			_eq(l.contains("%s"), true, "%s 주문 말에 생선 자리" % c.name)
+	for t in SpecialGuest.TONE_HINTS:
+		var th: Dictionary = SpecialGuest.TONE_HINTS[t]
+		for k in SpecialGuest.STYLES.keys() + SpecialGuest.TRAITS.keys():
+			_eq(th.has(k) and th[k].size() == 2, true, "%s 말투 %s" % [t, k])
+	var all := SpecialGuest.STYLES.keys()
+	for d in range(2, 40):
+		for h in SpecialGuest.want(d, "김해솔", "bolak", "rain", all).hints:
+			_eq(h.contains("한잔") or h.contains("구먼"), false, "해솔이는 어른 말을 안 함")
+	_eq(SpecialGuest.ask("김해솔", "볼락", false, true), "볼락 있어요? 저 그거 먹으러 왔어요.", "해솔 첫마디")
+	_eq(SpecialGuest.ask("최순덕", "볼락", false, false).contains("볼락은"), true, "어르신 첫마디 조사")
+	_eq(Friends.to("김해솔"), "해솔이에게", "아이에게")
+	_eq(Friends.to("문경자"), "경자 할머니께", "어른께")
+	var seen := {}
+	for d in range(2, 80):
+		seen[Orders.of(d).customer] = true
+	_eq(seen.size(), 8, "여덟 명이 다 주문함")
+
+
+## 챕터 3 (StoryCh3): 안내대로만 다니면 끝까지 간다
+func _test_ch3() -> void:
+	for route in [0, 1]:
+		var gs = load("res://scripts/autoload/game_state.gd").new()
+		gs.day = 29
+		for f in ["first_guest_done", "met_mansu", "met_yongpal", "met_kyungja", "met_bokja", "met_haesol", "hall_open", "met_taesik", "met_sundeok"]:
+			gs.flags[f] = true
+		# 다른 이야기는 다 본 것으로
+		for ev in Story.EVENTS:
+			gs.flags["ev_" + ev.id] = true
+		var per_day := {}
+		var guard := 0
+		while not gs.flags.get("ch3_done", false) and gs.day < 70 and guard < 400:
+			guard += 1
+			var st := StoryCh3.step(gs)
+			_eq(st.is_empty(), false, "할 일이 있음")
+			if st.target.is_empty():
+				gs.day += 1
+				continue
+			_eq(Locations.is_unlocked(st.target, gs.flags), true, "%s 안내한 곳이 열려 있음 (%s)" % [st.done, st.target])
+			gs.inventory = [{"id": "bolak", "size": 18.0, "day": gs.day}, {"id": "noraemi", "size": 22.0, "day": gs.day}, {"id": "ureok", "size": 26.0, "day": gs.day}, {"id": "bolak", "size": 14.0, "day": gs.day}]
+			if st.done == "lab_data" and gs.specimens.size() < 3:
+				gs.specimens[["bolak", "noraemi", "ureok"][gs.specimens.size()]] = 20.0
+				if gs.specimens.size() == 3:
+					gs.flags["lab_3"] = true
+				gs.day += 1
+				continue
+			Story.sync(gs)
+			var ev := {}
+			for m in [7 * 60, 10 * 60, 12 * 60, 15 * 60]:
+				ev = Story.pending(st.target, gs.day, m, gs.flags)
+				if not ev.is_empty():
+					break
+			_eq(ev.is_empty(), false, "%d일 %s: %s에 가면 사건이 있음" % [gs.day, st.done, st.target])
+			if ev.is_empty():
+				break
+			Story.finish(ev, gs, route if ev.has("choice") else -1)
+			per_day[gs.day] = int(per_day.get(gs.day, 0)) + 1
+		_eq(gs.flags.get("ch3_done", false), true, "갈래 %d: 챕터 3을 마침 (%d일)" % [route, gs.day])
+		_eq(gs.flags.get("geonwoo_given", false), route == 0, "전하기로 했을 때만 만수에게 감")
+		_eq(StoryCh3.step(gs), {}, "마치면 할 일 없음")
+		_eq(Menu.on_menu(gs.flags, "haemultang"), true, "잔치에서 해물탕을 배움")
+		_eq(gs.reputation >= 39, true, "평판이 오름")
+		print("챕터 3 갈래 %d: %d일차에 끝" % [route, gs.day])
+		gs.free()
+	# 조건: 29일 전엔 안 나오고, 재료가 없으면 잔치가 안 열리고, 가져갈 때 값싼 것부터
+	_eq(Story.pending("home", 28, 600, {"met_mansu": true, "met_yongpal": true, "met_kyungja": true, "met_bokja": true}), {}, "28일엔 아직")
+	var g2 = load("res://scripts/autoload/game_state.gd").new()
+	g2.inventory = [{"id": "gamseongdom", "size": 40.0}, {"id": "bolak", "size": 25.0}, {"id": "bolak", "size": 13.0}, {"id": "noraemi", "size": 20.0}]
+	Story.sync(g2)
+	_eq(g2.flags.ready_feast, true, "어종 셋")
+	StoryCh3.take(g2, {"fish": 2})
+	_eq(g2.inventory.any(func(e): return e.id == "gamseongdom"), true, "비싼 고기는 남김")
+	_eq(g2.inventory.size(), 2, "두 마리 가져감")
+	Story.sync(g2)
+	_eq(g2.flags.ready_feast, false, "모자라면 꺼짐")
+	g2.free()
+	for ev in StoryCh3.EVENTS:
+		for n in ev.get("friend", {}):
+			_eq(Friends.PEOPLE.has(n), true, "%s 친밀도 대상 %s" % [ev.id, n])
+		for l in ev.lines:
+			if not str(l.speaker).is_empty():
+				_eq(Portraits.SPEAKERS.has(l.speaker), true, "%s 말하는 사람 %s" % [ev.id, l.speaker])
+
+
+## 빈 장소 넷 (Places)
+func _test_places() -> void:
+	var gs = load("res://scripts/autoload/game_state.gd").new()
+	gs.day = 30
+	for id in ["lookout", "school", "guesthouse", "lab"]:
+		_eq(Locations.get_loc(id).scene, "res://scenes/places/%s.tscn" % id, "%s 장면" % id)
+	_eq(Places.left_today(gs, 600), ["lookout"], "처음엔 전망대만")
+	var f := Places.forecast(30)
+	_eq(f.size(), 2, "내일과 모레")
+	_eq(f[0].lines[0].contains(SeaDay.of(31).weather_name), true, "내일 날씨")
+	Places.mark(gs, "lookout")
+	_eq(Places.done_today(gs, "lookout"), true, "하루 한 번")
+	# 분교
+	for d in range(1, 30):
+		var q := Places.quiz(d)
+		_eq(q.size(), 3, "세 문제")
+		for x in q:
+			_eq(x.choices.has(x.fish) and x.choices.size() == 4, true, "보기 넷에 정답")
+			var names: Array = x.choices.duplicate()
+			names.sort()
+			_eq(names.all(func(c): return x.choices.count(c) == 1), true, "보기가 안 겹침")
+	for id in FishDB.FISH:
+		_eq(Places.quiz_fact(id).contains(FishDB.get_fish(id).name), false, "%s 힌트에 이름 없음" % id)
+	gs.flags["met_haesol"] = true
+	_eq(Places.is_open(gs, "school", 600), false, "오전엔 수업 중")
+	_eq(Places.is_open(gs, "school", 15 * 60), true, "오후엔 해솔")
+	var gift := Places.finish_quiz(gs, 3)
+	_eq(gs.produce.get(gift, 0), 1, "다 맞히면 재료 하나")
+	_eq(gs.friendship["김해솔"], 6, "해솔 친밀도")
+	_eq(Places.finish_quiz(gs, 3), "", "하루 한 번만")
+	# 민박
+	gs.flags["inn_open"] = true
+	gs.inventory = [{"id": "gamseongdom", "size": 45.0, "day": 30}]
+	_eq(Places.inn_deliver(gs), 0, "비싼 생선은 안 받음")
+	for i in 4:
+		gs.inventory.append({"id": "bolak", "size": 15.0 + i, "day": 30})
+	var before: int = gs.money
+	var pay := Places.inn_deliver(gs)
+	_eq(pay > 0 and gs.money == before + pay, true, "사례금")
+	_eq(gs.inventory.size(), 5 - Places.inn_count(30), "마리 수만큼 나감")
+	_eq(Places.inn_deliver(gs), 0, "하루 한 번")
+	_eq(Bus.visitors(0, 31, gs.flags), 1, "다음 날 민박 손님 하나")
+	_eq(Bus.visitors(0, 32, gs.flags), 0, "그다음 날은 없음")
+	# 연구소
+	gs.inventory = [{"id": "bolak", "size": 20.0, "day": 30}, {"id": "noraemi", "size": 22.0, "day": 30}]
+	var r := Places.record(gs, gs.inventory[0])
+	_eq(r.new and int(r.pay) == 8000, true, "처음 보는 볼락")
+	_eq(gs.inventory.size(), 2, "고기는 돌려받음")
+	_eq(Places.record(gs, gs.inventory[1]), {}, "하루 한 마리")
+	gs.day += 1
+	_eq(Places.specimen_pay(gs, {"id": "bolak", "size": 21.0}), 0, "조금 큰 건 기록 안 함")
+	_eq(Places.specimen_pay(gs, {"id": "bolak", "size": 22.5}), 3000, "훨씬 크면 기록 갱신")
+	Places.record(gs, gs.inventory[1])
+	gs.day += 1
+	_eq(Places.record(gs, {"id": "ureok", "size": 25.0}).stage, 3, "세 가지 단계")
+	_eq(gs.flags.get("lab_3", false), true, "서윤 이야기 열림")
+	gs.day += 1
+	for id in FishDB.FISH:
+		gs.day += 1
+		Places.record(gs, {"id": id, "size": 30.0})
+	_eq(gs.specimens.size(), 8, "여덟 가지")
+	_eq(gs.flags.get("lab_8", false), true, "마지막 단계")
+	gs.free()

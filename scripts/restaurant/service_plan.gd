@@ -116,7 +116,7 @@ static func regulars(gs: Object) -> Array:
 
 ## 손님 예상: {"guests": [최소, 최대], "fish": 아이스박스 생선 수, "note": 한 줄}
 static func forecast(gs: Object) -> Dictionary:
-	var vis := Bus.visitors(gs.reputation, gs.day)
+	var vis := Bus.visitors(gs.reputation, gs.day, gs.flags)
 	var lo := DiningLogic.GUESTS_MIN + vis
 	var hi := DiningLogic.GUESTS_MAX + vis
 	var fish: int = gs.inventory.size()

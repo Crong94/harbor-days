@@ -22,7 +22,8 @@ const CUT_SEARCH := 0.08 # 경계 찾는 범위 (그림 너비 대비)
 ## 이름 없는 손님 그림 (11-12 그림 세션). 손님 이름 → 그림 id. 모르는 이름은 다섯 중 하나
 const GUEST_FACES := {
 	"퇴근한 회사원": "guest_office", "고깃배 선장": "guest_fisher", "등산객": "guest_tourist",
-	"민박 손님": "guest_tourist", "물질 마친 해녀": "guest_haenyeo", "학교 마친 학생": "guest_student", "낚시꾼": "guest_fisher",
+	"민박 손님": "guest_tourist", "물질 마친 해녀": "guest_haenyeo",
+	"오용팔": "guest_fisher", "정태식": "guest_office", "정민혁": "guest_office", "서지우": "guest_tourist", "학교 마친 학생": "guest_student", "낚시꾼": "guest_fisher",
 }
 const NAMELESS := ["guest_office", "guest_fisher", "guest_tourist", "guest_haenyeo", "guest_student"]
 ## 그림이 없을 때 대신 앉는 주민

@@ -427,6 +427,7 @@ func _build_sheet() -> void:
 
 
 func _select(id: String) -> void:
+	Story.sync(GameState)
 	Sound.play_sfx("tap", 0.05, -6.0)
 	_selected = id
 	var loc := Locations.get_loc(id)
@@ -483,10 +484,12 @@ func _select(id: String) -> void:
 					_go_btn.text = "가게 열기" if arrive >= DayFlow.SHOP_OPEN else "가게 열기 (저녁 6시로)"
 		"bus":
 			var dep := Bus.next_departure(arrive)
-			var come := Bus.visitors(GameState.reputation, GameState.day)
+			var come := Bus.visitors(GameState.reputation, GameState.day, GameState.flags)
 			var note := "
 오늘 저녁 버스로 외지 손님이 %d명쯤 와요." % come if come > 0 and not GameState.opened_today else ""
-			if dep < 0:
+			if not Story.pending(id, GameState.day, arrive, GameState.flags).is_empty():
+				_action = "talk" # 정류장에 기다리는 사람이 있다. 이야기만 보고 지도로
+			elif dep < 0:
 				_sheet_desc.text = "읍내 가는 버스는 오늘 끝났어요. 아침 8시에 첫차가 와요." + note
 			elif GameState.money < Bus.FARE:
 				_action = ""
@@ -568,10 +571,14 @@ func _travel() -> void:
 		return
 	# 이야기 사건이 있으면 지도 위 대사창으로 먼저 보여 주고 이어서 들어간다 (Story)
 	var talk_only := _action == "talk"
+	Story.sync(GameState)
 	var ev := Story.pending(id, GameState.day, GameState.time_minutes, GameState.flags)
 	if not ev.is_empty():
 		_refresh_hud()
 		_play_story(ev.lines, func():
+			if ev.has("choice"):
+				_ask_choice(ev, id)
+				return
 			Story.finish(ev, GameState)
 			if talk_only:
 				_refresh_hud()
@@ -601,6 +608,33 @@ func _enter(id: String) -> void:
 		_play_story(talk, Callable())
 	else:
 		_show_toast(GameState.line("%s에 왔어요." % loc.name))
+
+
+## 대사 뒤에 고르는 사건 (StoryCh3 choice). 고르면 이어지는 대사를 보여 주고 들어간다
+func _ask_choice(ev: Dictionary, id: String) -> void:
+	var layer := Control.new()
+	layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(layer)
+	layer.add_child(UiKit.scrim(0.5))
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(center)
+	var panel := UiKit.paper_panel(28)
+	panel.custom_minimum_size = Vector2(620, 0)
+	center.add_child(panel)
+	var v := UiKit.vbox(UiKit.SPACE_LG)
+	panel.add_child(v)
+	v.add_child(UiKit.text("어떻게 할까?", "h2", UiKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+	for i in ev.choice.size():
+		var c: Dictionary = ev.choice[i]
+		var b := UiKit.action(c.text, "primary" if i == 0 else "secondary")
+		b.pressed.connect(func():
+			layer.queue_free()
+			Sound.play_sfx("tap")
+			Story.finish(ev, GameState, i)
+			_play_story(c.lines, func(): _enter(id)))
+		v.add_child(b)
+	UiKit.fade_in(layer, UiKit.MOTION_BASE)
 
 
 ## 지도 위 대사창 (이야기 사건, 잡담). 끝나면 then을 부른다
@@ -666,7 +700,7 @@ func _fill_extras(id: String, arrive: int) -> void:
 	if not who.is_empty():
 		var h := Friends.hearts(Friends.points(GameState, who))
 		var call: String = Friends.person(who).call
-		var gb := UiKit.action("%s께 선물하기  %s" % [call, Friends.heart_text(h)] if Friends.can_give(GameState, who) else "%s  %s · 오늘은 선물했어요" % [call, Friends.heart_text(h)], "mint", true)
+		var gb := UiKit.action("%s 선물하기  %s" % [Friends.to(who), Friends.heart_text(h)] if Friends.can_give(GameState, who) else "%s  %s · 오늘은 선물했어요" % [call, Friends.heart_text(h)], "mint", true)
 		gb.disabled = not Friends.can_give(GameState, who) or Friends.giftables(GameState).is_empty()
 		gb.pressed.connect(_extra_go.bind(id, "gift", who))
 		_extras.add_child(gb)
@@ -824,7 +858,7 @@ func _open_gift(who: String) -> void:
 	if _gift_sheet == null:
 		_build_gift_sheet()
 	_gift_who = who
-	_gift_title.text = "%s께 선물  %s" % [Friends.person(who).call, Friends.heart_text(Friends.hearts(Friends.points(GameState, who)))]
+	_gift_title.text = "%s 선물  %s" % [Friends.to(who), Friends.heart_text(Friends.hearts(Friends.points(GameState, who)))]
 	for c in _gift_list.get_children():
 		c.queue_free()
 	for g in Friends.giftables(GameState):
