@@ -168,7 +168,7 @@ func _tank_card() -> PanelContainer:
 	var nx := Tank.next_info(GameState.tank_level)
 	var cur := Tank.level_info(GameState.tank_level)
 	var now: String = "%s · %d마리" % [cur.name, int(cur.slots)] if GameState.tank_level > 0 else "아직 없음"
-	return _card("kit/cooler", "활어 수조", "고기를 살려 둔다. 꺼내면 오늘 잡은 것처럼 싱싱해서 회로 낼 수 있다. 지금: " + now,
+	return _card("kit/tank_%d" % clampi(GameState.tank_level + 1, 1, Tank.LEVELS.size()), "활어 수조", "고기를 살려 둔다. 꺼내면 오늘 잡은 것처럼 싱싱해서 회로 낼 수 있다. 지금: " + now,
 		"다음: %s · %d마리" % [nx.name, int(nx.slots)] if not nx.is_empty() else "", Store.price(GameState, int(nx.price)) if not nx.is_empty() else -1, "최고",
 		func(): _done(GameState.buy_tank(), "함지에 물 받아 두면 고기가 며칠은 산다. 식당에 갖다 놨다."))
 

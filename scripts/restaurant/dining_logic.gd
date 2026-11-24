@@ -142,7 +142,7 @@ var _rng := RandomNumberGenerator.new()
 ## 튀김은 값을 더 받는다. 굽는 규칙(화구, 노릇노릇, 탐)은 구이와 같다
 const FRY_SHARE := 0.35
 const FRY_PRICE := 1.25
-const FRY_ART := "bungjangeo-twigim"
+const FRY_ART := "saengseon-twigim"
 var fry := false
 var _fry_rng := RandomNumberGenerator.new()
 ## 새 메뉴 (Menu, 11-19): 메뉴판에 오른 요리 id들. 손님이 고르면 그 재료를 seafood와 pantry(채소)에서 쓴다

@@ -73,7 +73,7 @@ func _build_junho() -> void:
 	row.offset_top = GameHeader.BOTTOM + 76.0
 	row.offset_bottom = GameHeader.BOTTOM + 330.0
 	add_child(row)
-	var junho := ArtSlot.make("npc_junho", "이준호", Vector2(190, 250))
+	var junho := ArtSlot.make("portrait/junho_normal", "이준호", Vector2(190, 250))
 	row.add_child(junho)
 	var bubble_holder := UiKit.vbox()
 	bubble_holder.alignment = BoxContainer.ALIGNMENT_END
