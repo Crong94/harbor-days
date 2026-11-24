@@ -111,7 +111,7 @@ var day_fished := false # 오늘 낮 낚시를 했나 (하루 한 번, DayFlow)
 var reputation := 0
 ## 식당 가구와 장식 (ShopDecor). 놓은 것 {슬롯 id: 물건 id}, 산 것 [물건 id]
 var shop_decor := {}
-## 저녁 영업 메뉴판 {"price": "low"/"mid"/"high", "dishes": {어종: 요리}} (ServicePlan)
+## 저녁 영업 메뉴판 {"dishes": {어종: 요리}} (ServicePlan)
 var service_plan := {}
 var owned_decor: Array = []
 ## 뽑은 알바 {역할: 알바 id} (StaffDB). 한 번 뽑으면 그만두게 할 때까지 매일 나온다

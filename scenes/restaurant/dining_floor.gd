@@ -137,14 +137,11 @@ func start(day: int, inventory: Array) -> void:
 	logic.menu = Menu.menu_list(GameState.flags)
 	logic.seafood = GameState.seafood # 새 메뉴 재료는 GameState에서 바로 빠진다
 	logic.today = GameState.day
-	# 영업 전 메뉴판 (ServicePlan): 값 수준, 생선마다 요리, 오늘 올 단골
+	# 영업 전 메뉴판 (ServicePlan): 생선마다 요리, 오늘 올 단골
 	var plan := ServicePlan.plan_of(GameState)
-	var pr := ServicePlan.price(plan.price)
 	logic.plan = plan
 	logic.flags = GameState.flags
-	logic.price_mult = float(pr.mult)
-	logic.patience_mult = float(pr.patience)
-	logic.extra_guests = int(pr.guests)
+	logic.patience_mult = 1.0
 	logic.regular_names = ServicePlan.regulars(GameState)
 	logic.setup(day, inventory, DayFlow.GUESTS, Bus.visitors(GameState.reputation, day))
 	logic.place_staff()
@@ -442,7 +439,7 @@ func _process(delta: float) -> void:
 		if logic.is_over():
 			_done = true
 			finished.emit({"served": logic.served, "missed": logic.missed + logic.angry, "sales": logic.sales,
-				"best_combo": logic.best_combo,
+				"best_combo": logic.best_combo, "tips": logic.tips,
 				"angry": logic.angry, "sold_out": logic.turned_away, "hearts": logic.served.filter(func(e): return e.heart).size(),
 				"burnt": logic.burnt, "perfect": logic.perfect, "angry_list": logic.angry_list})
 	for p in _pops:
@@ -528,8 +525,10 @@ func _handle_events() -> void:
 							if is_instance_valid(sd2):
 								sd2.set_pose("eat"))
 				_pop(_bubble_pos(gi) + Vector2(0, -30), "+" + GameState.format_won(e.price), UiKit.SUN, e.heart)
+				if int(e.tip) > 0:
+					_pop(_bubble_pos(gi) + Vector2(0, 4), "팁 +" + GameState.format_won(e.tip), UiKit.LEAF, false)
 				if int(e.combo) >= 2:
-					_pop(_bubble_pos(gi) + Vector2(0, 4), "하트 %d번 잇기!" % e.combo, UiKit.CORAL, false)
+					_pop(_bubble_pos(gi) + Vector2(0, 38), "하트 %d번 잇기!" % e.combo, UiKit.CORAL, false)
 			"angry":
 				var gi: int = e.guest
 				Sound.play_sfx("bad", 0.0, -6.0)

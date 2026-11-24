@@ -798,7 +798,7 @@ func _test_day_flow() -> void:
 	# 값
 	_eq(DayFlow.dish_price("bolak", 15.0) >= DayFlow.DISH_MIN, true, "구이 최소값")
 	_eq(DayFlow.dish_price("gamseongdom", 40.0) > DayFlow.dish_price("bolak", 15.0), true, "감성돔 구이가 더 비쌈")
-	_eq(DayFlow.special_price("bolak", 20.0, 3) > DayFlow.special_price("bolak", 20.0, 1), true, "별 많을수록 비쌈")
+	_eq(DayFlow.special_tip(5000, 3) > DayFlow.special_tip(5000, 1), true, "별 많을수록 팁이 큼")
 	var n := DayFlow.guest_count(5)
 	_eq(n >= DayFlow.GUESTS_MIN and n <= DayFlow.GUESTS_MAX, true, "손님 수 범위")
 	_eq(DayFlow.guest_count(5), n, "같은 날 같은 손님 수")
@@ -1077,7 +1077,7 @@ func _test_icebox() -> void:
 	var r := DayFlow.serve_regulars(5, [{"id": "gamseongdom", "size": 40.0}, {"id": "bolak", "size": 20.0}])
 	_eq(r.served.size(), 2, "감성돔도 팔림")
 	_eq(r.served[0].price, DayFlow.REGULAR_MAX, "구이 값 끝")
-	_eq(DayFlow.special_price("gamseongdom", 52.0, 3), DayFlow.SPECIAL_MAX, "특별 손님 값에도 끝이 있음")
+	_eq(DayFlow.special_tip(90000, 3), DayFlow.SPECIAL_TIP_MAX, "특별 손님 팁에도 끝이 있음")
 	_eq(DayFlow.DISH_MIN > DayFlow.DISH_COST, true, "가장 싼 접시도 재료비보다 비싸다")
 	_eq(Orders.call_name("최순덕"), "순덕 할머니", "부르는 이름")
 	for c in Orders.CUSTOMERS:
@@ -1090,7 +1090,7 @@ func _test_market() -> void:
 	_eq(Market.is_open(17 * 60), false, "오후 5시 닫음")
 	_eq(Market.is_open(22 * 60), false, "밤엔 닫음")
 	_eq(Market.price("bolak", 20.0) < DayFlow.dish_price("bolak", 20.0) - DayFlow.DISH_COST, true, "흔한 고기는 재료비를 빼도 식당이 더 남음")
-	_eq(Market.price("gamseongdom", 45.0) > DayFlow.special_price("gamseongdom", 45.0, 3), true, "감성돔은 시장이 더 남음")
+	_eq(Market.price("gamseongdom", 45.0) > DayFlow.grill_price("gamseongdom", 45.0), true, "감성돔은 구이보다 시장이 더 남음")
 	_eq(Market.better_here("gamseongdom", 45.0), true, "시장이 나은 고기 표시")
 	_eq(Locations.get_loc("market").scene.is_empty(), false, "지도에서 시장으로 감")
 	var gs = load("res://scripts/autoload/game_state.gd").new()
@@ -1717,7 +1717,7 @@ func _test_dining() -> void:
 	_eq(hearts > 0, true, "빨리 받으면 하트 (%d)" % hearts)
 	var sum := 0
 	for e in a.served:
-		sum += e.price
+		sum += e.price + e.tip
 	_eq(a.sales, sum, "매출 = 받은 값 합")
 	_eq(a.is_over(), true, "영업이 끝남")
 	_eq(a.time < DiningLogic.OPEN_SECONDS, true, "손님을 다 받으면 문 닫기 전에 끝남 (%.0f초)" % a.time)
@@ -1804,9 +1804,11 @@ func _test_dining() -> void:
 	g.raw_left = 0
 	_eq(g.pick_fish(), -1, "회 손님이 없으면 아껴 둠")
 	# 값: 빨리 받으면 더, 아슬아슬하면 덜
-	_eq(DiningLogic.pay(10000, 5.0), 11500, "빨리 받으면 하트 값")
-	_eq(DiningLogic.pay(10000, 20.0), 10000, "보통이면 제값")
-	_eq(DiningLogic.pay(10000, DiningLogic.PATIENCE), 8500, "오래 기다리면 깎임")
+	var fine := ServicePlan.settle("normal", 10000, "perfect", true)
+	_eq([fine.price, fine.tip, fine.level], [10000, 2500, 2], "노릇하고 빠르면 음식값 그대로에 팁")
+	_eq(ServicePlan.settle("normal", 10000, "good", false).tip, 0, "보통이면 팁 없음")
+	_eq([ServicePlan.settle("normal", 10000, "perfect", false, true).price, ServicePlan.settle("normal", 10000, "perfect", false, true).tip], [10000, 0], "너무 늦으면 팁 없음")
+	_eq(ServicePlan.settle("normal", 10000, "perfect", true, false, 3).tip, 3100, "하트를 이으면 팁이 늘어남")
 	_eq(DiningLogic.cook_time(30.0) > DiningLogic.cook_time(15.0), true, "큰 고기는 더 오래 구움")
 	# 고르고 갖다주기: 같은 생선을 시킨 손님이면 누구에게 줘도 되고 다른 요리는 안 받는다
 	var h := DiningLogic.new()
@@ -2119,7 +2121,7 @@ func _test_kitchen() -> void:
 	for i in int((DiningLogic.COOK_TIME + DiningLogic.BURN) * 10.0) + 3:
 		b.update(0.1)
 	_eq([b.pass_dishes, b.guests[0].quality, b.burnt], [[0], "burnt", 1], "너무 두면 타서 저절로 내려옴")
-	_eq(DiningLogic.QUALITY_PRICE.burnt < 1.0 and DiningLogic.QUALITY_PRICE.perfect > 1.0, true, "탄 건 싸고 노릇한 건 비쌈")
+	_eq([ServicePlan.settle("normal", 10000, "burnt", true).price, ServicePlan.settle("normal", 10000, "burnt", true).tip], [6000, 0], "탄 건 싸고 팁 없음")
 	# 서빙 알바는 맨 앞 접시를 알아서 나른다
 	var a := DiningLogic.new()
 	a.helper_serve = true
@@ -2563,15 +2565,15 @@ func _test_service_plan() -> void:
 	var fl := {"recipe_fish_fry": true, "menu_maeuntang": true, "menu_jorim": true}
 	_eq(ServicePlan.dish_options("ureok", fl), ["grill", "fry", "hoe", "jorim", "maeuntang"], "우럭은 매운탕까지")
 	_eq(ServicePlan.dish_options("bolak", fl).has("maeuntang"), false, "볼락은 매운탕 안 됨")
-	var plan := {"price": "mid", "dishes": {}}
+	var plan := {"dishes": {}}
 	_eq(ServicePlan.next_dish(plan, "ureok", fl), "jorim", "누르면 다음 요리 (우럭은 회부터)")
 	_eq(ServicePlan.dish_for(plan, "ureok", {}), "grill", "못 내는 요리면 구이")
 	_eq(ServicePlan.dish_for({"dishes": {}}, "gamseongdom", {}), "hoe", "감성돔은 처음부터 회")
 	var st := ServicePlan.settle("gourmet", 10000, "good", true)
 	_eq(st.heart, false, "미식가는 노릇노릇해야 하트")
-	_eq(int(ServicePlan.settle("gourmet", 10000, "perfect", true).price) > 10000, true, "미식가 만족하면 웃돈")
-	_eq(int(ServicePlan.settle("hurry", 10000, "good", true).price) > 10000, true, "급한 손님 빨리 받으면 웃돈")
-	_eq(int(ServicePlan.settle("hurry", 10000, "good", false).price), 10000, "늦으면 웃돈 없음")
+	_eq(ServicePlan.settle("gourmet", 10000, "perfect", true).tip, 4000, "미식가는 노릇하면 팁을 더")
+	_eq(ServicePlan.settle("hurry", 10000, "perfect", true).tip, 4000, "급한 손님은 빨리 받으면 팁을 더")
+	_eq(ServicePlan.settle("hurry", 10000, "good", false).tip, 0, "늦으면 팁 없음")
 	# 손님 종류: 단골 이름이 들어간다
 	var sch := []
 	for i in 10:
@@ -2579,13 +2581,11 @@ func _test_service_plan() -> void:
 	ServicePlan.assign_kinds(sch, ["최순덕"], 5)
 	_eq(sch.filter(func(x): return x.kind == "regular").size(), 1, "단골 한 명")
 	_eq(sch.filter(func(x): return x.name == "최순덕").size(), 1, "단골 이름")
-	# 영업 규칙에 넣기: 비싸게면 값이 오르고 덜 참는다
+	# 영업 규칙에 넣기
 	var l := DiningLogic.new()
-	l.plan = {"price": "high", "dishes": {"bolak": "fry"}}
+	l.plan = {"dishes": {"bolak": "fry"}}
 	l.flags = {"recipe_fish_fry": true}
-	l.price_mult = 1.2
 	l.patience_mult = 0.85
-	l.extra_guests = -2
 	var inv := []
 	for i in 12:
 		inv.append({"id": "bolak", "size": 20.0, "day": 5})
@@ -2595,7 +2595,7 @@ func _test_service_plan() -> void:
 	l._arrive()
 	var g: Dictionary = l.guests[0]
 	_eq(g.dish, "fry", "메뉴판대로 튀김")
-	_eq(int(g.price) >= DiningLogic.dish_price_of("bolak", 20.0, "fry"), true, "비싸게면 값이 오름")
+	_eq(int(g.price) >= DiningLogic.dish_price_of("bolak", 20.0, "fry"), true, "메뉴판 값")
 	_eq(float(g.patience) < l.patience_of(g.seat) * 1.4, true, "참는 시간이 정해짐")
 	# 화난 이유
 	l.guests[0].state = DiningLogic.GuestState.SEATED
@@ -2609,7 +2609,7 @@ func _test_service_plan() -> void:
 	for i in 12:
 		gs.inventory.append({"id": "bolak", "size": 20.0, "day": 5})
 	gs.service_plan = {}
-	_eq(ServicePlan.plan_of(gs).price, "mid", "처음 메뉴판은 보통 값")
+	_eq(ServicePlan.plan_of(gs).dishes, {}, "처음 메뉴판은 비어 있음")
 	_eq(ServicePlan.forecast(gs).fish, 12, "낼 생선 수")
 	gs.friendship = {"최순덕": 25}
 	gs.day = 3

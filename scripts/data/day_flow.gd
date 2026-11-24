@@ -42,8 +42,9 @@ const DISH_COST := 2500
 const REGULAR_MAX := 12500
 ## 비싼 회를 시키는 손님 수 [최소, 최대]
 const RAW_GUESTS := [2, 3]
-## 특별 손님 한 접시 값의 끝
-const SPECIAL_MAX := 20000
+## 특별 손님 팁: 별 1~3의 비율과 끝. 음식값은 메뉴판 값 그대로
+const SPECIAL_TIP := [0.1, 0.4, 1.0]
+const SPECIAL_TIP_MAX := 10000
 ## 생선 없이 온 손님이 그냥 돌아갈 때 깎이는 평판
 const REP_MISS := -2
 const REP_SERVED := 1
@@ -177,10 +178,9 @@ static func special_guest(day: int, flags = null) -> Dictionary:
 	return {"name": o.customer, "fish": o.fish}
 
 
-## 특별 손님 요리값: 별 하나당 더 받는다
-static func special_price(fish_id: String, size_cm: float, stars: int) -> int:
-	var base := dish_price(fish_id, size_cm)
-	return mini(SPECIAL_MAX, int(roundf(base * (0.8 + 0.3 * clampi(stars, 1, 3)) / 500.0) * 500.0))
+## 특별 손님 팁: 별이 많을수록 (음식값 × SPECIAL_TIP, SPECIAL_TIP_MAX까지)
+static func special_tip(price: int, stars: int) -> int:
+	return mini(SPECIAL_TIP_MAX, int(roundf(price * float(SPECIAL_TIP[clampi(stars, 1, 3) - 1]) / 100.0) * 100.0))
 
 
 ## 구이로는 제값을 못 받는 비싼 생선인지 (회로 내거나 시장에 파는 게 낫다)

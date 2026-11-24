@@ -25,13 +25,11 @@ const COOK_TIME := 8.0 # 한 접시 굽는 시간 (초). 큰 고기는 조금 �
 const COOK_PER_CM := 0.15
 const GOLD := 2.2 # 다 익은 뒤 이 시간 안에 담으면 노릇노릇 (값 더)
 const BURN := 6.0 # 다 익은 뒤 이 시간이 지나면 탄다 (값 깎임, 하트 없음)
-const QUALITY_PRICE := {"perfect": 1.1, "good": 1.0, "burnt": 0.6}
 const STOVES := 2 # 화구 하나에 불 두 개
 const PASS_MAX := 3 # 내놓는 자리에 놓을 수 있는 접시 수
 const PATIENCE := 32.0 # 주문하고 받을 때까지 참는 시간 (초). 11-16 서빙 판으로 바꾸며 40에서 줄임
 const QUICK := 0.5 # 참는 시간의 이 비율 안에 받으면 하트
-const QUICK_BONUS := 1.15
-const SLOW_CUT := 0.85
+const LATE := 0.8 # 참는 시간의 이 비율을 넘겨 받으면 팁이 없다
 const EAT_TIME := 6.0
 const WALK_SPEED := 0.42 # 주인공, 서빙 알바 걷는 속도 (그림 비율/초)
 const GUEST_SPEED := 0.4
@@ -124,14 +122,13 @@ var missed := 0 # 예전 저장과 맞추려고 남김 (재료 소진 뒤로는 
 var sold_out := false
 var turned_away := 0
 var angry := 0
-var sales := 0
+var sales := 0 # 음식값 + 팁
+var tips := 0 # 그중 팁
 var burnt := 0
 var perfect := 0
 var pantry := {} # 채소 (GameState.produce). 요리 재료로 쓴다
 var reserve := {} # 남겨 둘 채소 (Pantry.reserve_for)
-## 하트 잇기: 하트를 이어 받을 때마다 값이 COMBO_STEP씩 더 붙는다 (COMBO_MAX번까지). 하트 없는 접시나 화난 손님이 나오면 끊긴다
-const COMBO_STEP := 0.03
-const COMBO_MAX := 5
+## 하트 잇기: 하트를 이어 받을 때마다 팁이 늘어난다 (ServicePlan.COMBO_TIP). 하트 없는 접시나 화난 손님이 나오면 끊긴다
 var combo := 0
 var best_combo := 0
 ## 비싼 회를 시킬 손님이 몇 명 남았나 (DayFlow.raw_guests)
@@ -155,9 +152,7 @@ var today := 0
 ## 영업 개편 (ServicePlan, 11-19): setup 전에 넣는다. plan이 비면 예전 규칙(손님이 메뉴를 고른다)
 var plan := {}
 var flags := {}
-var price_mult := 1.0
 var patience_mult := 1.0
-var extra_guests := 0
 var regular_names: Array = []
 var angry_list: Array = [] # 화나서 간 손님 {"guest", "kind", "reason"}
 var events: Array = [] # 화면 연출용 한 번짜리 알림 {type, ...}
@@ -172,7 +167,7 @@ func setup(day: int, inv: Array, names: Array, visitors := 0) -> void:
 	_rng.seed = hash("자리-%d" % day)
 	_fry_rng.seed = hash("튀김-%d" % day)
 	raw_left = DayFlow.raw_guests(day)
-	var locals := maxi(1, rng.randi_range(GUESTS_MIN, GUESTS_MAX) + extra_guests)
+	var locals := maxi(1, rng.randi_range(GUESTS_MIN, GUESTS_MAX))
 	var n := locals + maxi(0, visitors)
 	schedule.clear()
 	var last := OPEN_SECONDS * LAST_ARRIVAL
@@ -592,7 +587,6 @@ func patience_of(seat: int) -> float:
 	return PATIENCE + (float(seat_bonus[seat]) if seat < seat_bonus.size() else 0.0)
 
 
-## 받는 시점의 값. 빨리 받으면 하트 값, 아슬아슬하면 깎인 값
 ## 한 접시 값: 구이는 DayFlow.dish_price, 튀김은 그보다 FRY_PRICE배
 static func dish_price_of(fish_id: String, size_cm: float, dish: String) -> int:
 	var base := DayFlow.dish_price(fish_id, size_cm)
@@ -618,37 +612,24 @@ static func dish_art_id(fish_id: String, dish: String) -> String:
 	return FishDB.get_fish(fish_id).get("grill", "bollak-gui")
 
 
-static func pay(price: int, waited: float) -> int:
-	var k := 1.0
-	if waited <= PATIENCE * QUICK:
-		k = QUICK_BONUS
-	elif waited >= PATIENCE * 0.8:
-		k = SLOW_CUT
-	return int(roundf(price * k / 500.0) * 500.0)
-
-
 func _serve(gi: int, by_player: bool) -> void:
 	var g: Dictionary = guests[gi]
 	var q: String = g.get("quality", "good")
 	var pat := float(g.get("patience", PATIENCE))
 	var quick: bool = g.wait <= pat * QUICK
-	var price := pay(int(roundf(g.price * float(QUALITY_PRICE.get(q, 1.0)) / 500.0) * 500.0), g.wait * PATIENCE / pat)
+	var late: bool = g.wait >= pat * LATE
 	var kind: String = g.get("kind", "normal")
-	var st := ServicePlan.settle(kind, price, q, quick)
-	price = int(st.price)
-	var heart: bool = st.heart
-	if heart:
-		combo += 1
-		best_combo = maxi(best_combo, combo)
-		price = int(roundf(price * (1.0 + COMBO_STEP * mini(combo - 1, COMBO_MAX)) / 100.0) * 100.0)
-	else:
-		combo = 0
+	combo = combo + 1 if ServicePlan.gives_heart(kind, q, quick) else 0
+	best_combo = maxi(best_combo, combo)
+	var st := ServicePlan.settle(kind, int(g.price), q, quick, late, combo)
+	var paid := int(st.price) + int(st.tip)
 	g.state = GuestState.EATING
-	g.paid = price
-	sales += price
-	served.append({"guest": g.name, "fish": g.fish, "size": g.size, "price": price, "heart": heart, "quality": q,
+	g.paid = paid
+	sales += paid
+	tips += int(st.tip)
+	served.append({"guest": g.name, "fish": g.fish, "size": g.size, "price": int(st.price), "tip": int(st.tip), "level": int(st.level), "heart": st.heart, "quality": q,
 		"dish": g.get("dish", "grill"), "kind": kind})
-	events.append({"type": "served", "guest": gi, "heart": heart, "price": price, "combo": combo, "quality": q, "helper": not by_player})
+	events.append({"type": "served", "guest": gi, "heart": st.heart, "price": int(st.price), "tip": int(st.tip), "combo": combo, "quality": q, "helper": not by_player})
 
 
 # ─── 손님 ───────────────────────────────────────────
@@ -737,7 +718,7 @@ func _arrive() -> void:
 		var kind: String = s.get("kind", "normal")
 		var g := {
 			"name": s.name, "seat": seat, "fish": e.id, "size": e.size, "entry": e, "dish": dish,
-			"price": int(roundf(dish_price_of(e.id, e.size, dish) * price_mult * plate_bonus / 500.0) * 500.0), "state": GuestState.WALKING,
+			"price": int(roundf(dish_price_of(e.id, e.size, dish) * plate_bonus / 500.0) * 500.0), "state": GuestState.WALKING,
 			"kind": kind, "patience": patience_of(seat) * patience_mult * float(ServicePlan.KINDS[kind].patience),
 			"wait": 0.0, "eat": 0.0, "cooked": false, "quality": "",
 			"pos": ENTRANCE, "path": entry_path(seat), "dir": Vector2.UP,

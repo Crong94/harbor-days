@@ -19,7 +19,8 @@ var cook := CookingLogic.new()
 var result := {} # 영업 판(DiningFloor) 결과 {served, missed, sales, angry, hearts}
 var special := {} # {"name", "fish"}
 var special_fish := {} # 특별 손님에게 낼 생선 {"id", "size"}
-var special_price := 0
+var special_price := 0 # 특별 손님 음식값
+var special_tip := 0 # 특별 손님 팁
 var wage_paid := 0 # 오늘 알바 일당
 var dish_cost_paid := 0 # 오늘 재료비 (낸 접시 수 × DayFlow.DISH_COST)
 var _staff_panel: Control
@@ -288,16 +289,9 @@ func _special_served() -> void:
 	_gauge.hide()
 	_cook_hint.text = {3: "딱 맞혔어요", 2: "거의 맞혔어요", 1: "아쉬워요"}.get(st, "")
 	UiKit.pop_in(_cook_panel)
-	special_price = DayFlow.special_price(special_fish.id, special_fish.size, st)
-	if _pick_dish == "hoe" and DayFlow.too_pricey(special_fish.id, special_fish.size):
-		special_price = int(roundf(DayFlow.dish_price(special_fish.id, special_fish.size) * (0.9 + 0.1 * st) / 500.0) * 500.0) # 비싼 회는 제값
-	elif Menu.RECIPES.has(_pick_dish):
-		special_price = Menu.price(_pick_dish, special_price)
-	elif _pick_dish == "fry":
-		special_price = int(roundf(special_price * DiningLogic.FRY_PRICE / 500.0) * 500.0)
-	if sc.perfect:
-		special_price = int(roundf(special_price * SpecialGuest.PERFECT_TIP / 500.0) * 500.0)
-	GameState.earn(special_price)
+	special_price = DiningLogic.dish_price_of(special_fish.id, special_fish.size, _pick_dish)
+	special_tip = DayFlow.special_tip(special_price, st)
+	GameState.earn(special_price + special_tip)
 	_pay_dish_cost(1)
 	var who := Orders.call_name(special.name)
 	if st >= 3:
@@ -319,7 +313,7 @@ func _special_served() -> void:
 			GameState.flags["tale_" + special.name] = int(GameState.flags.get("tale_" + special.name, 0)) + 1
 			GameState.note("%s 옛날 얘기를 해 줬다." % Josa.attach(Orders.call_name(special.name), "이/가"), 4)
 	after.append({"speaker": "최세라", "text": SpecialGuest.review(_want, sc)})
-	after.append({"speaker": "", "text": "%s %s을 내고 갔다." % [Josa.attach(Orders.call_name(special.name), "이/가"), GameState.format_won(special_price)]})
+	after.append({"speaker": "", "text": "%s 음식값 %s에 팁 %s을 얹어 냈다." % [Josa.attach(Orders.call_name(special.name), "이/가"), GameState.format_won(special_price), GameState.format_won(special_tip)]})
 	_dialogue.play(after)
 
 
@@ -390,7 +384,10 @@ func _show_ledger() -> void:
 	for c in _ledger_rows.get_children():
 		c.queue_free()
 	var served: int = result.get("served", []).size()
-	_ledger_rows.add_child(_row("보통 손님", "%d명" % served, "+" + GameState.format_won(int(result.get("sales", 0))), UiKit.SEA))
+	var tips := int(result.get("tips", 0))
+	var tipped: int = result.get("served", []).filter(func(x): return int(x.get("tip", 0)) > 0).size()
+	_ledger_rows.add_child(_row("음식값", "보통 손님 %d명" % served, "+" + GameState.format_won(int(result.get("sales", 0)) - tips), UiKit.SEA))
+	_ledger_rows.add_child(_row("팁", "만족한 손님 %d명" % tipped if tipped > 0 else "팁을 준 손님이 없어요", "+" + GameState.format_won(tips), UiKit.LEAF))
 	for line in ServicePlan.ledger_lines(result):
 		var lp := UiKit.paragraph(line, "caption", UiKit.INK_SOFT)
 		lp.add_theme_font_size_override("font_size", LEDGER_NOTE_PX) # 폰에서도 읽히게 (11-23)
@@ -398,9 +395,10 @@ func _show_ledger() -> void:
 	if special_price > 0:
 		var note := "세라가 만든 %s" % ServicePlan.dish_name(_pick_dish)
 		_ledger_rows.add_child(_row(special.name, note, "+" + GameState.format_won(special_price), UiKit.SEA))
+		_ledger_rows.add_child(_row("%s 팁" % Orders.call_name(special.name), "", "+" + GameState.format_won(special_tip), UiKit.LEAF))
 	var bc := int(result.get("best_combo", 0))
 	if bc >= 2:
-		_ledger_rows.add_child(_row("하트 잇기", "가장 길게 %d번 (값에 포함)" % bc, "", UiKit.CORAL))
+		_ledger_rows.add_child(_row("하트 잇기", "가장 길게 %d번 (팁에 포함)" % bc, "", UiKit.CORAL))
 	if int(result.get("missed", 0)) > 0:
 		_ledger_rows.add_child(_row("돌아간 손님", "%d명" % result.missed, "", UiKit.INK_MUTED))
 	if int(result.get("sold_out", 0)) > 0:
@@ -750,18 +748,7 @@ func _fill_plan() -> void:
 	var regs := ServicePlan.regulars(GameState)
 	if not regs.is_empty():
 		_plan_body.add_child(UiKit.paragraph("오늘 올 것 같은 단골: " + ", ".join(PackedStringArray(regs.map(func(n): return Friends.person(n).call))), "body", UiKit.CORAL_DEEP))
-	_plan_body.add_child(UiKit.text("값", "title", UiKit.INK))
-	var row := UiKit.hbox(UiKit.SPACE_SM)
-	for lv in ServicePlan.PRICE_ORDER:
-		var b := UiKit.action(ServicePlan.PRICES[lv].name, "sun" if plan.price == lv else "secondary", true)
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.pressed.connect(func():
-			plan.price = lv
-			Sound.play_sfx("tap")
-			_fill_plan())
-		row.add_child(b)
-	_plan_body.add_child(row)
-	_plan_body.add_child(UiKit.paragraph(ServicePlan.PRICES[plan.price].desc, "caption", UiKit.INK_SOFT))
+	_plan_body.add_child(UiKit.paragraph("노릇노릇한 접시를 빨리 갖다주면 손님이 만족해서 팁을 줘요", "caption", UiKit.CORAL_DEEP))
 	var head := UiKit.hbox(UiKit.SPACE_MD)
 	head.add_child(UiKit.text("생선마다 낼 요리", "title", UiKit.INK))
 	head.add_child(UiKit.spacer())
