@@ -5,7 +5,7 @@ extends RefCounted
 ##
 ## 여울에서 고친 점
 ## - 같은 일이 여러 칸(오늘 저녁 VIP, 예약, 아침 소식)에 겹쳐 나오던 것을 한 번만 보여 준다
-## - 긴 소식 문장 대신 맨 위 숫자 세 칸(어제 번 돈, 통장, 다음 달 고정비)으로 먼저 보여 준다
+## - 긴 소식 문장 대신 맨 위 숫자 세 칸(어제 번 돈, 통장, 이번 주 고정비)으로 먼저 보여 준다
 ## - "지금 할 일"은 지금 시각에 맞춰 할 수 있는 것만, 하는 순서대로. 줄을 누르면 지도에서 그 장소를 고른다
 ## - 남은 시간과 마감은 오른쪽에 짧게 (예: "~11:00", "D-3")
 ##
@@ -24,6 +24,7 @@ static func build(gs: Object) -> Dictionary:
 		"sections": [
 			{"name": "지금 할 일", "rows": _todo(gs, day, m)},
 			{"name": "메인 이야기", "rows": _quests(gs, "main")},
+			{"name": "이번 주 도전", "rows": _week(gs)},
 			{"name": "마을 사람 이야기", "rows": _quests(gs, "sub")},
 			{"name": "오늘 부탁", "rows": _quests(gs, "daily")},
 			{"name": "오늘의 바다", "rows": _sea(gs, day, m)},
@@ -39,9 +40,9 @@ static func _stats(gs: Object) -> Array:
 		var net: int = gs.yesterday_sales - gs.yesterday_spent
 		out.append({"name": "어제 번 돈", "value": _won(net), "tone": "good" if net >= 0 else "bad"})
 	out.append({"name": "통장", "value": _won(gs.money), "tone": "info"})
-	# 다음 1일에 나갈 돈 (대출, 월세, 공과금, 밀린 돈)
+	# 다음 월요일에 나갈 돈 (대출, 월세, 공과금, 밀린 돈)
 	var left := Loan.days_left(gs.day)
-	var due := Loan.due(Calendar.next_month_start(gs.day), gs.monthly_repayment, gs.arrears, gs.debt)
+	var due := Loan.due(Loan.next_pay_day(gs.day), gs.monthly_repayment, gs.arrears, gs.debt)
 	var short: bool = gs.money < due
 	out.append({"name": "고정비 D-%d" % left, "value": _won(due), "tone": "bad" if (short and left <= Loan.WARN_DAYS) or gs.arrears > 0 else "info"})
 	return out
@@ -72,6 +73,10 @@ static func _todo(gs: Object, day: int, m: int) -> Array:
 			ready += 1
 	if ready > 0:
 		rows.append({"text": "텃밭에서 %d줄 거두기" % ready, "state": "지금", "tone": "gold", "target": "garden"})
+	var spots := Places.left_today(gs, m)
+	if gs.has_flag("first_guest_done") and not spots.is_empty():
+		var names := PackedStringArray(spots.map(func(id): return Locations.get_loc(id).name))
+		rows.append({"text": "들를 곳 · " + ", ".join(names), "state": "", "tone": "info", "target": spots[0]})
 	if gs.has_flag("first_guest_done") and not gs.opened_today and m < DayFlow.SHOP_CLOSE:
 		var n: int = gs.inventory.size()
 		var t2 := "저녁 장사 · 아이스박스 %d마리" % n if n > 0 else "저녁 장사 · 팔 생선이 없어요"
@@ -95,12 +100,29 @@ static func _quests(gs: Object, kind: String) -> Array:
 	return rows
 
 
+## 이번 주 도전 세 가지 (WeekGoals). 첫 손님을 받은 뒤부터
+static func _week(gs: Object) -> Array:
+	if not gs.flags.get("first_guest_done", false):
+		return []
+	var rows: Array = []
+	var left := 7 - (int(gs.day) - 1) % 7
+	for g in WeekGoals.goals(gs.day):
+		var done := WeekGoals.is_done(gs, g)
+		var now := WeekGoals.progress(gs, g)
+		var state := "이룸" if done else ("%d%%" % int(100.0 * now / float(g.goal)) if g.id == "sales" else "%d/%d" % [now, g.goal])
+		rows.append({"text": g.text, "why": "일요일 밤까지 %d일 · 상금 %s, 평판 +%d" % [left, _won(WeekGoals.REWARD), WeekGoals.REP], "state": state, "tone": "good" if done else "gold",
+			"target": "breakwater" if g.id in ["caught", "trophy", "rare"] else ("store" if g.id == "gifts" else "shop")})
+	return rows
+
+
 ## 날씨와 물때, 오늘 잘 무는 고기
 static func _sea(gs: Object, day: int, m: int) -> Array:
 	var info := SeaDay.of(day)
 	var best: Array = SeaDay.best_fish(info, FishingLogic.brightness_at(m), 2)
 	var names := ", ".join(PackedStringArray(best.map(func(id): return FishDB.get_fish(id).name)))
-	return [
+	var sch: String = info.get("school", "")
+	var rush := [{"text": "%s 떼가 들어왔어요! 오늘 아주 잘 물어요" % FishDB.get_fish(sch).name, "state": "", "tone": "gold", "target": "breakwater"}] if not sch.is_empty() else []
+	return rush + [
 		{"text": "%s · %s%s" % [info.weather_name, info.tide, " · 물때 좋음" if info.tide_good else ""], "state": "", "tone": "good" if info.tide_good else "info", "target": ""},
 		{"text": "잘 무는 고기: %s" % names, "state": "", "tone": "info", "target": ""},
 		{"text": Tide.times_text(day), "state": "", "tone": "info", "target": ""},

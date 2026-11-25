@@ -163,6 +163,7 @@ func _build_bag() -> void:
 	_list.add_child(tip)
 	if GameState.inventory.is_empty():
 		_list.add_child(_empty_note("아이스박스가 비어 있어요. 방파제에서 낚아 와요"))
+		_build_goods()
 		return
 	# 오늘 밤 상하는 것 먼저, 그다음 비싼 순서
 	var spoiling := GameState.spoiling_tonight()
@@ -175,6 +176,41 @@ func _build_bag() -> void:
 		_list.add_child(FishLine.make(e, GameState.day, GameState.format_won(FishDB.value_of(e.id, e.size))))
 	var sum := UiKit.text("모두 %s어치" % GameState.format_won(total), "title", UiKit.NOTE_INK_SOFT, HORIZONTAL_ALIGNMENT_RIGHT)
 	_list.add_child(sum)
+	_build_goods()
+
+
+## 가방 아래: 요리 재료(채소, 갯벌 것)와 선물
+func _build_goods() -> void:
+	var rows := []
+	for id in GameState.produce:
+		if int(GameState.produce[id]) > 0:
+			rows.append([Pantry.art_of(id), Pantry.name_of(id), int(GameState.produce[id])])
+	for id in GameState.seafood:
+		if int(GameState.seafood[id]) > 0:
+			rows.append(["flat/" + id, Flat.name_of(id), int(GameState.seafood[id])])
+	for id in GameState.goods:
+		if int(GameState.goods[id]) > 0 and Store.GOODS.has(id):
+			rows.append(["goods/" + id, Store.GOODS[id].name, int(GameState.goods[id])])
+	if rows.is_empty():
+		return
+	_list.add_child(UiKit.text("요리 재료와 선물", "title", UiKit.NOTE_INK_SOFT))
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 8)
+	_list.add_child(grid)
+	for r in rows:
+		var h := UiKit.hbox(UiKit.SPACE_MD)
+		h.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		h.alignment = BoxContainer.ALIGNMENT_BEGIN
+		h.custom_minimum_size = Vector2(0, 56)
+		var ic := UiKit.icon_rect(r[0], 48)
+		if ic:
+			h.add_child(ic)
+		var l := UiKit.text("%s  %d" % [r[1], r[2]], "label", UiKit.NOTE_INK)
+		l.add_theme_font_size_override("font_size", 21)
+		h.add_child(l)
+		grid.add_child(h)
 
 
 # ─── 도감 ───────────────────────────────────────────
@@ -358,7 +394,7 @@ func _build_gear() -> void:
 		if n == 0:
 			continue
 		var b := BaitDB.bait(id)
-		var stats := ("무제한" if n < 0 else "%d개" % n) + "  ·  잘 무는 고기: " + BaitDB.liked_names(id)
+		var stats := ("%d개" % n) + "  ·  잘 무는 고기: " + BaitDB.liked_names(id)
 		_list.add_child(_gear_row(BaitDB.icon_art(id), b.name, stats, id == GameState.equipped_bait, func():
 			GameState.equipped_bait = id
 			_gear_picked()))
@@ -410,6 +446,7 @@ func _build_settings() -> void:
 		GameState.set_vibration(on)
 		Haptics.play("hook"))) # 켰을 때 어떤 느낌인지 바로 알 수 있게 (끄면 울리지 않는다)
 	_list.add_child(_toggle_row("화면 흔들림", GameState.screen_shake_on, func(on: bool): GameState.set_screen_shake(on)))
+	_list.add_child(_toggle_row("장사 빨리감기", GameState.fast_forward, func(on: bool): GameState.set_fast_forward(on)))
 	_list.add_child(UiKit.gap(8))
 	var title_btn := UiKit.game_button("한 번 더 누르면 타이틀로 가요" if _title_armed else "타이틀로", UiKit.RED_BTN if _title_armed else UiKit.GRAY_DARK, Vector2(0, 58))
 	title_btn.pressed.connect(func():

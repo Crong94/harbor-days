@@ -21,7 +21,18 @@ var debt := 30_000_000
 var monthly_repayment := 550_000
 ## 못 갚고 밀린 상환금 (Loan). 다음 상환일에 같이 빠진다
 var arrears := 0
-## 연체한 달 수 (지금까지 합)
+## 제때 낸 주가 이어진 수 (Loan 신용 우대)
+var pay_streak := 0
+## 주방 장비 단계 {KitchenDB id: 단계}
+var kitchen := {}
+## 경자상회에서 산 선물 {Store.GOODS id: 개수}, 오늘 산 식재료 수
+var goods := {}
+var store_bought := {}
+## 세라와 마지막으로 연구한 날 (Menu.research)
+var research_day := 0
+## 이번 주 도전 셈 (WeekGoals)
+var week := {}
+## 연체한 주 수 (지금까지 합)
 var missed_payments := 0
 var day := 1
 ## 다음에 지도에 오면 보여 줄 알림 (상환, 상한 생선 등). 보여 주면 비운다
@@ -52,6 +63,8 @@ var seafood := {}
 ## 친밀도 {이름: 점수}, 마지막으로 선물한 날 {이름: 날} (Friends)
 var friendship := {}
 var gift_day := {}
+## 연구소 표본 {어종: 가장 큰 cm} (Places)
+var specimens := {}
 ## 앱 만들기 {앱 id: 마친 단계}, 마지막으로 한 날 {앱 id: 날} (AppWork)
 var apps := {}
 var app_day := {}
@@ -66,7 +79,13 @@ var equipped_reel := GearDB.DEFAULT_REEL
 var owned_rods: Array = [GearDB.DEFAULT_ROD]
 var owned_reels: Array = [GearDB.DEFAULT_REEL]
 ## 미끼: id → 남은 수 (크릴은 -1, 끝이 없다)
-var baits := {BaitDB.DEFAULT: -1}
+## 활어 수조 (Tank). tank_level 0이면 없음. tank: 살려 둔 고기 (상하지 않는다)
+var tank_level := 0
+var tank: Array = []
+
+## 미끼 남은 수. 크릴도 사서 쓴다 (11-24). 처음엔 창고에서 찾은 크릴 START_KRILL개
+const START_KRILL := 30
+var baits := {BaitDB.DEFAULT: START_KRILL}
 var equipped_bait := BaitDB.DEFAULT
 
 ## 오늘의 주문 (Orders.of(day)). 잡은 수와 받았는지
@@ -94,7 +113,7 @@ var day_fished := false # 오늘 낮 낚시를 했나 (하루 한 번, DayFlow)
 var reputation := 0
 ## 식당 가구와 장식 (ShopDecor). 놓은 것 {슬롯 id: 물건 id}, 산 것 [물건 id]
 var shop_decor := {}
-## 저녁 영업 메뉴판 {"price": "low"/"mid"/"high", "dishes": {어종: 요리}} (ServicePlan)
+## 저녁 영업 메뉴판 {"dishes": {어종: 요리}} (ServicePlan)
 var service_plan := {}
 var owned_decor: Array = []
 ## 뽑은 알바 {역할: 알바 id} (StaffDB). 한 번 뽑으면 그만두게 할 때까지 매일 나온다
@@ -119,6 +138,8 @@ const SETTINGS_PATH := "user://settings.cfg"
 var vibration_on := true
 ## 화면 흔들림 (낚시 입질, 챔질, 줄다리기 때 화면이 흔들리고 살짝 확대된다)
 var screen_shake_on := true
+## 저녁 영업 빨리감기 (할 일이 없을 때 저절로, DiningFloor)
+var fast_forward := true
 
 
 func _ready() -> void:
@@ -137,10 +158,16 @@ func set_screen_shake(on: bool) -> void:
 	save_settings()
 
 
+func set_fast_forward(on: bool) -> void:
+	fast_forward = on
+	save_settings()
+
+
 func save_settings(path := SETTINGS_PATH) -> void:
 	var c := ConfigFile.new()
 	c.set_value("feel", "vibration", vibration_on)
 	c.set_value("feel", "screen_shake", screen_shake_on)
+	c.set_value("service", "fast_forward", fast_forward)
 	c.save(path)
 
 
@@ -151,6 +178,7 @@ func load_settings(path := SETTINGS_PATH) -> void:
 		return
 	vibration_on = bool(c.get_value("feel", "vibration", vibration_on))
 	screen_shake_on = bool(c.get_value("feel", "screen_shake", screen_shake_on))
+	fast_forward = bool(c.get_value("service", "fast_forward", fast_forward))
 
 
 ## 진행 저장 (SaveGame). 마을 지도에 올 때마다 자동으로 부른다
@@ -236,8 +264,6 @@ func buy_bait(id: String, price := -1) -> String:
 	if not BaitDB.BAITS.has(id):
 		return "없는 물건이에요."
 	var b := BaitDB.bait(id)
-	if b.amount < 0:
-		return "창고에 많이 있어요."
 	var cost: int = AppWork.shop_price(flags, int(b.price)) if price < 0 else price
 	if money < cost:
 		return "돈이 모자라요."
@@ -250,7 +276,7 @@ func bait_count(id: String) -> int:
 	return int(baits.get(id, 0))
 
 
-## 미끼 하나를 쓴다. 다 떨어지면 크릴로 바꾼다.
+## 미끼 하나를 쓴다. 다 떨어지면 남은 미끼 가운데 하나로 바꾼다 (크릴 먼저)
 func use_bait() -> void:
 	var n := bait_count(equipped_bait)
 	if n < 0:
@@ -259,7 +285,16 @@ func use_bait() -> void:
 	baits[equipped_bait] = n
 	if n <= 0:
 		baits.erase(equipped_bait)
+		for id in BaitDB.ORDER:
+			if bait_count(id) > 0:
+				equipped_bait = id
+				return
 		equipped_bait = BaitDB.DEFAULT
+
+
+## 던질 미끼가 남았는지
+func has_bait() -> bool:
+	return bait_count(equipped_bait) != 0
 
 
 ## 오늘 주문
@@ -340,6 +375,15 @@ func release_fish(entry: Dictionary) -> bool:
 	return true
 
 
+## 집에서 대출을 더 갚는다. 갚은 돈, 못 갚으면 0
+func pay_extra() -> int:
+	var n := Loan.extra_amount(money, debt)
+	if n > 0:
+		money -= n
+		debt -= n
+	return n
+
+
 ## 쿨러를 다음 단계로 산다. 문제가 없으면 빈 문자열
 func buy_cooler() -> String:
 	if cooler + 1 >= KitDB.COOLERS.size():
@@ -352,6 +396,45 @@ func buy_cooler() -> String:
 	cooler += 1
 	icebox_size = int(c.size)
 	return ""
+
+
+## 수조를 다음 단계로 산다 (경자상회). 건너뛰지 않고 하나씩. 문제가 없으면 빈 문자열
+func buy_tank() -> String:
+	var nx := Tank.next_info(tank_level)
+	if nx.is_empty():
+		return "더 좋은 수조는 없어요."
+	var p := Store.price(self, int(nx.price))
+	if money < p:
+		return "돈이 모자라요."
+	spend(p)
+	tank_level += 1
+	return ""
+
+
+func tank_free() -> int:
+	return maxi(0, Tank.slots(tank_level) - tank.size())
+
+
+## 아이스박스 고기를 수조로 옮긴다. 옮겼으면 true
+func tank_put(entry: Dictionary) -> bool:
+	if tank_free() <= 0 or not inventory.has(entry):
+		return false
+	inventory.erase(entry)
+	entry["alive"] = true
+	tank.append(entry)
+	return true
+
+
+## 수조 고기를 꺼내 아이스박스에 넣는다. 오늘 잡은 것처럼 싱싱하다. 꺼냈으면 true
+func tank_take(entry: Dictionary) -> bool:
+	if icebox_free() <= 0 or not tank.has(entry):
+		return false
+	tank.erase(entry)
+	var e := entry.duplicate()
+	e["day"] = day
+	e.erase("alive")
+	inventory.append(e)
+	return true
 
 
 ## 도구를 다음 단계로 산다. 문제가 없으면 빈 문자열
@@ -429,6 +512,29 @@ func end_day(wake_minutes := -1) -> void:
 	yesterday_sales = sales_today
 	yesterday_spent = spent_today
 	news_today = []
+	for t in WeekGoals.close_day(self):
+		_news(t)
+	# 수조가 있으면 오늘 밤 상할 고기를 값진 것부터 옮겨 살려 둔다
+	var saving := spoiling_tonight()
+	saving.sort_custom(func(a, b): return FishDB.value_of(a.id, a.size) > FishDB.value_of(b.id, b.size))
+	var moved := 0
+	for e in saving:
+		if tank_put(e):
+			moved += 1
+	if moved > 0:
+		_news("상할 뻔한 생선 %d마리를 수조로 옮겨 살려 뒀어요" % moved)
+	# 냉장고가 좋으면 상할 생선 몇 마리를 하루 더 살린다 (한 마리에 한 번만)
+	var cold := KitchenDB.value(kitchen, "fridge")
+	var kept := 0
+	saving = spoiling_tonight()
+	saving.sort_custom(func(a, b): return FishDB.value_of(a.id, a.size) > FishDB.value_of(b.id, b.size))
+	for e in saving:
+		if kept < cold and not e.get("chilled", false):
+			e["chilled"] = true
+			e["day"] = int(e.get("day", day)) + 1
+			kept += 1
+	if kept > 0:
+		_news("냉장고 덕분에 상할 생선 %d마리가 하루 더 버텨요" % kept)
 	# 오래된 생선은 밤새 상해서 버린다
 	var spoiled := spoiling_tonight()
 	if not spoiled.is_empty():
@@ -440,14 +546,15 @@ func end_day(wake_minutes := -1) -> void:
 		t["day"] = day + 1
 		trap_fish.append(t)
 	day += 1
-	# 매달 1일은 대출, 월세, 공과금이 나가는 날 (Loan)
-	var r := Loan.settle(day, money, debt, monthly_repayment, arrears)
+	# 월요일은 대출, 월세, 공과금이 나가는 날 (Loan)
+	var r := Loan.settle(day, money, debt, monthly_repayment, arrears, pay_streak)
 	if not r.is_empty():
 		if r.paid > 0:
 			money -= r.paid
 		else:
 			missed_payments += 1
 		arrears = r.arrears
+		pay_streak = r.streak
 		debt = r.debt
 		_news(Loan.notice(r))
 	time_minutes = wake_minutes if wake_minutes >= 0 else DayFlow.wake_time(night_fished)

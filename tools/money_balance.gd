@@ -26,7 +26,7 @@ var _fight_rng := 0
 ## guests: 하루 보통 손님 수 끝 [최소, 최대] (빈 배열이면 지금 규칙), cost: 접시마다 재료비, order: 주문 보상 배수
 ## 다른 안을 재 보려면 여기에 줄을 더한다. (11-16에 잰 안: 예전 값은 첫 달 300만~450만 원이 남았다)
 const VARIANTS := {
-	"지금 규칙": {"price": 1.0, "special_cap": DayFlow.SPECIAL_MAX, "guests": [], "cost": DayFlow.DISH_COST, "order": 1.0},
+	"지금 규칙": {"price": 1.0, "special_cap": 99999999, "guests": [], "cost": DayFlow.DISH_COST, "order": 1.0},
 }
 
 
@@ -87,7 +87,7 @@ func _run(pname: String, slots: Array, staff: Dictionary, v: Dictionary) -> void
 			for i in inv.size():
 				if FishDB.value_of(inv[i].id, inv[i].size) > FishDB.value_of(inv[best].id, inv[best].size):
 					best = i
-			var p := mini(int(v.special_cap), int(DayFlow.special_price(inv[best].id, inv[best].size, 2) * float(v.price))) - int(v.cost)
+			var p := mini(int(v.special_cap), int((DayFlow.grill_price(inv[best].id, inv[best].size) + DayFlow.special_tip(DayFlow.grill_price(inv[best].id, inv[best].size), 2)) * float(v.price))) - int(v.cost)
 			money += p
 			tot.special += p
 			inv.remove_at(best)

@@ -10,7 +10,7 @@ extends RefCounted
 
 const DAYS := 3
 const REP := 2
-## 보상 = 그 물건 값 × 이 배수 (생선은 생선 값, 채소는 곁들임 값 bonus. 그냥 팔거나 접시에 얹는 것보다 조금 낫게)
+## 보상 = 그 물건 값 × 이 배수 (생선은 생선 값, 채소는 CropDB bonus. 그냥 쓰는 것보다 조금 낫게)
 const FISH_RATE := 1.3
 const PRODUCE_RATE := 2.5
 const MIN_REWARD := 3000

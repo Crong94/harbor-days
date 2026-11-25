@@ -9,9 +9,9 @@ const LIKE_MULT := 2.4
 
 const BAITS := {
 	"krill": {
-		"name": "크릴", "price": 0, "amount": -1, "wait": 1.0, "icon": "bait-8",
+		"name": "크릴", "price": 2000, "amount": 20, "wait": 1.0, "icon": "bait-8",
 		"likes": [],
-		"desc": "무엇이든 조금씩 무는 기본 미끼. 창고에 한 상자 있다.",
+		"desc": "무엇이든 조금씩 무는 기본 미끼. 한 봉지로 스무 번 던진다.",
 	},
 	"worm": {
 		"name": "청갯지렁이", "price": 4000, "amount": 10, "wait": 0.9, "icon": "bait-1",

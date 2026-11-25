@@ -73,7 +73,7 @@ func _build_junho() -> void:
 	row.offset_top = GameHeader.BOTTOM + 76.0
 	row.offset_bottom = GameHeader.BOTTOM + 330.0
 	add_child(row)
-	var junho := ArtSlot.make("npc_junho", "이준호", Vector2(190, 250))
+	var junho := ArtSlot.make("portrait/junho_normal", "이준호", Vector2(190, 250))
 	row.add_child(junho)
 	var bubble_holder := UiKit.vbox()
 	bubble_holder.alignment = BoxContainer.ALIGNMENT_END
@@ -198,8 +198,9 @@ func _item_card(kind: String, id: String, item: Dictionary, stats: Array) -> Pan
 		lock.add_child(why)
 		h.add_child(lock)
 	else:
-		var buy := UiKit.game_button(GameState.format_won(item.price), UiKit.CORAL_DEEP, SHOP_BTN, 19)
-		buy.disabled = GameState.money < item.price
+		var cost := AppWork.shop_price(GameState.flags, int(item.price))
+		var buy := UiKit.game_button(GameState.format_won(cost), UiKit.CORAL_DEEP, SHOP_BTN, 19)
+		buy.disabled = GameState.money < cost
 		buy.pressed.connect(_buy.bind(kind, id))
 		h.add_child(buy)
 	return card
@@ -235,8 +236,9 @@ func _bait_card(id: String) -> PanelContainer:
 	info.add_child(stat_row)
 	info.add_child(UiKit.text("가진 것 %d개" % maxi(GameState.bait_count(id), 0), "caption", UiKit.INK_SOFT))
 	h.add_child(info)
-	var buy := UiKit.game_button(GameState.format_won(b.price), UiKit.CORAL_DEEP, SHOP_BTN, 19)
-	buy.disabled = GameState.money < b.price
+	var cost := AppWork.shop_price(GameState.flags, int(b.price))
+	var buy := UiKit.game_button(GameState.format_won(cost), UiKit.CORAL_DEEP, SHOP_BTN, 19)
+	buy.disabled = GameState.money < cost
 	buy.pressed.connect(func():
 		var err := GameState.buy_bait(id)
 		if not err.is_empty():
@@ -312,8 +314,9 @@ func _tool_card(icon: String, title: String, desc: String, now: String, next_tex
 	if price < 0:
 		h.add_child(UiKit.status_tag("다 갖춤", UiKit.GOLD_SOFT, UiKit.GOLD_DARK, SHOP_BTN))
 	else:
-		var buy := UiKit.game_button(GameState.format_won(price), UiKit.CORAL_DEEP, SHOP_BTN, 19)
-		buy.disabled = GameState.money < price
+		var cost := AppWork.shop_price(GameState.flags, price)
+		var buy := UiKit.game_button(GameState.format_won(cost), UiKit.CORAL_DEEP, SHOP_BTN, 19)
+		buy.disabled = GameState.money < cost
 		buy.pressed.connect(on_buy)
 		h.add_child(buy)
 	return card

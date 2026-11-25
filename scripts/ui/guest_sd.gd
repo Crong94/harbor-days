@@ -22,7 +22,8 @@ const CUT_SEARCH := 0.08 # 경계 찾는 범위 (그림 너비 대비)
 ## 이름 없는 손님 그림 (11-12 그림 세션). 손님 이름 → 그림 id. 모르는 이름은 다섯 중 하나
 const GUEST_FACES := {
 	"퇴근한 회사원": "guest_office", "고깃배 선장": "guest_fisher", "등산객": "guest_tourist",
-	"민박 손님": "guest_tourist", "물질 마친 해녀": "guest_haenyeo", "학교 마친 학생": "guest_student", "낚시꾼": "guest_fisher",
+	"민박 손님": "guest_tourist", "물질 마친 해녀": "guest_haenyeo",
+	"오용팔": "guest_fisher", "정태식": "guest_office", "정민혁": "guest_office", "서지우": "guest_tourist", "학교 마친 학생": "guest_student", "낚시꾼": "guest_fisher",
 }
 const NAMELESS := ["guest_office", "guest_fisher", "guest_tourist", "guest_haenyeo", "guest_student"]
 ## 그림이 없을 때 대신 앉는 주민
@@ -43,6 +44,7 @@ const HIP_UP := {
 		"guest_tourist": 0.19, "guest_fisher": 0.16, "guest_student": 0.21, "guest_office": 0.24, "guest_haenyeo": 0.14, "haesol": 0.24},
 }
 const HIP_DEFAULT := {"back": 0.18, "side": 0.18, "front": 0.15}
+var body_h := 0.0 # 걷는 그림의 키 (발끝에서 머리끝, 화면 px). 0이면 칸 높이로 맞춘다
 var seat_k := 0.0 # 시트 px → 화면 px (홀 식당). 0이면 예전처럼 노드 아래 가운데가 발
 
 var guest_id := ""
@@ -255,12 +257,33 @@ static func walk_frame(dir: String, t: float) -> int:
 	return 4 + int(t * WALK_FPS) % 4
 
 
+## 걷기 시트 첫 칸에서 그림이 있는 [위 끝, 높이] (시트 px)
+static func _walk_body(id: String, e: Dictionary) -> Vector2:
+	var key := id + "/body"
+	if not _cache.has(key):
+		var img: Image = e.tex.get_image()
+		if img.is_compressed():
+			img.decompress()
+		var r := img.get_region(Rect2i(0, 0, int(e.cuts[1]), img.get_height())).get_used_rect()
+		_cache[key] = Vector2(r.position.y, maxf(1.0, r.size.y))
+	return _cache[key]
+
+
 func _draw_walk() -> void:
 	# 지도 걷기(MapWalker)와 같은 시트 캐시를 쓴다 (칸 경계도 가장 빈 열에서 찾음)
 	var e := MapWalker._sheet(guest_id)
 	var tex: Texture2D = e.tex
 	var f := walk_frame(walk, _t)
 	var src := Rect2(e.cuts[f], 0, e.cuts[f + 1] - e.cuts[f], tex.get_height())
+	if body_h > 0.0:
+		# 사람마다 시트 여백이 달라서 그림이 있는 높이를 재서 모두 같은 키로. 발끝이 노드 아래에 온다 (해솔은 아이라 조금 작게)
+		var b := _walk_body(guest_id, e)
+		var kk := body_h * (0.82 if guest_id == "haesol" else 1.0) / b.y
+		if flip:
+			draw_set_transform(Vector2(size.x, 0), 0.0, Vector2(-1, 1))
+		draw_texture_rect_region(tex, Rect2(size.x / 2.0 - src.size.x * kk / 2.0, size.y - (b.x + b.y) * kk, src.size.x * kk, src.size.y * kk), src)
+		draw_set_transform_matrix(Transform2D.IDENTITY)
+		return
 	# 걷기 시트는 칸 위 여백이 커서 서 있는 그림과 키를 맞추려고 조금 키운다
 	var k := size.y / src.size.y * WALK_SCALE
 	var dw := src.size.x * k

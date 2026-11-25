@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bic2756m1jlpi"
-path="res://.godot/imported/bg_tackle_shop.jpg-0a082d335e0d83f542d510c615e6ff90.ctex"
+uid="uid://c8j4fnalxsbrl"
+path="res://.godot/imported/sink_lv_3.png-c2125f4de9d86f62fb66e4872a2c582b.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/art/bg_tackle_shop.jpg"
-dest_files=["res://.godot/imported/bg_tackle_shop.jpg-0a082d335e0d83f542d510c615e6ff90.ctex"]
+source_file="res://assets/art/shop4/gear/sink_lv_3.png"
+dest_files=["res://.godot/imported/sink_lv_3.png-c2125f4de9d86f62fb66e4872a2c582b.ctex"]
 
 [params]
 

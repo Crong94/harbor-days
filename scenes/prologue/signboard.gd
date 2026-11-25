@@ -87,7 +87,7 @@ func _ready() -> void:
 
 const INTRO := [
 	{"speaker": "", "text": "통장 잔고는 생각보다 적었다."},
-	{"speaker": "은행 직원", "text": "{player} 고객님 귀농귀촌 창업 대출 승인되셨습니다. 상환은 다음 달부터 시작이에요."},
+	{"speaker": "은행 직원", "text": "{player} 고객님 귀농귀촌 창업 대출 승인되셨습니다. 상환은 다음 주부터 월요일마다예요."},
 	{"speaker": "", "text": "부동산 앱을 뒤지다 터무니없이 싼 매물을 찾았다. 경남 물빛울포. 식당 겸 주택. 월세 협의 가능."},
 	{"speaker": "", "text": "사진 속 바다에 빨간 등대가 보였다. 그게 무슨 뜻인지는 아직 몰랐다."},
 	{"speaker": "", "text": "버스를 세 번 갈아타고 도착한 물빛울포. 정류장엔 아무도 없고 갈매기 소리만 들린다."},
@@ -229,6 +229,7 @@ func _hang_sign() -> void:
 			tw_shake.tween_property(_shop_edit, "position:x", dx, 0.05)
 		return
 	_hung = true
+	_shop_edit.release_focus()
 	var n := _shop_edit.text.strip_edges()
 	GameState.shop_name = n if not n.is_empty() else GameState.DEFAULT_SHOP_NAME
 	_shop_label.text = GameState.shop_name
@@ -266,7 +267,7 @@ func _on_dialogue_finished() -> void:
 		_board.show()
 		_form.show()
 		UiKit.rise_in(_form, 0.1)
-		_shop_edit.grab_focus()
+		add_child(KeyboardLift.make(self, _shop_edit)) # 자판은 이름 칸을 눌렀을 때만 올라온다 (11-24)
 		return
 	_lead.text = GameState.line("{player}의 작은 식당, {shop}")
 	_next_btn.show()

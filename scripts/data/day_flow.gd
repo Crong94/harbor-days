@@ -37,11 +37,14 @@ const DISH_MARKUP := 1.0
 const DISH_MIN := 5000
 ## 접시마다 드는 재료비 (밥, 반찬, 가스). 영업이 끝나면 낸 접시 수만큼 나간다
 const DISH_COST := 2500
-## 보통 손님이 한 끼에 내는 돈의 끝. 이보다 비싼 생선(감성돔 같은)은 보통 손님에게 내지 않는다.
-## 그런 고기는 특별 손님에게 내거나 수산시장에 판다
+## 구이로 받을 수 있는 값의 끝. 이보다 비싼 생선(감성돔, 큰 농어와 우럭)도 구이로 팔 수 있지만 여기까지만 받는다.
+## 제값은 회로 낼 때 받는다 (Menu hoe. 오늘 잡았거나 수조에서 꺼낸 것, 하루 RAW_GUESTS명). 2026-11-24 사용자
 const REGULAR_MAX := 12500
-## 특별 손님 한 접시 값의 끝
-const SPECIAL_MAX := 20000
+## 비싼 회를 시키는 손님 수 [최소, 최대]
+const RAW_GUESTS := [2, 3]
+## 특별 손님 팁: 별 1~3의 비율과 끝. 음식값은 메뉴판 값 그대로
+const SPECIAL_TIP := [0.1, 0.4, 1.0]
+const SPECIAL_TIP_MAX := 10000
 ## 생선 없이 온 손님이 그냥 돌아갈 때 깎이는 평판
 const REP_MISS := -2
 const REP_SERVED := 1
@@ -71,6 +74,16 @@ static func fishing_end(minutes: int) -> int:
 	if s.id == "day":
 		return mini(minutes + DAY_SESSION, int(s.end))
 	return s.end
+
+
+## 낚시 화면이 끝나는 시각. 낮은 시작하고 DAY_SESSION분 뒤(늦어도 17시), 밤은 23:30, 갯바위는 물이 들어오기 전.
+## 낚시 시간대 밖이면 late_min까지 두 시간 (11-24: 낮에 17시까지 이어지던 것을 고침)
+static func session_end(minutes: int, spot := "breakwater", day := 1, late_min := 23 * 60 + 30) -> int:
+	if spot == "rocks":
+		return Spots.rocks_end(day, minutes)
+	if fishing_slot(minutes).is_empty():
+		return mini(minutes + 120, late_min)
+	return fishing_end(minutes)
 
 
 ## 가게를 열 수 있는가 (열기 전이면 18시로 건너뛴다)
@@ -107,6 +120,18 @@ static func dish_price(fish_id: String, size_cm: float) -> int:
 	return maxi(DISH_MIN, int(roundf(v / 500.0) * 500.0))
 
 
+## 구이로 받는 값 (비싼 생선은 REGULAR_MAX까지)
+static func grill_price(fish_id: String, size_cm: float) -> int:
+	return mini(REGULAR_MAX, dish_price(fish_id, size_cm))
+
+
+## 오늘 비싼 회를 시키는 손님 수 (날짜로 정해진다)
+static func raw_guests(day: int) -> int:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("회손님-%d" % day)
+	return rng.randi_range(RAW_GUESTS[0], RAW_GUESTS[1])
+
+
 ## 오늘 보통 손님 수 (날짜로 정해진다)
 static func guest_count(day: int) -> int:
 	var rng := RandomNumberGenerator.new()
@@ -120,8 +145,7 @@ static func guest_count(day: int) -> int:
 static func serve_regulars(day: int, inventory: Array) -> Dictionary:
 	var order := []
 	for i in inventory.size():
-		if dish_price(inventory[i].id, inventory[i].size) <= REGULAR_MAX:
-			order.append(i)
+		order.append(i)
 	order.sort_custom(func(a, b): return FishDB.value_of(inventory[a].id, inventory[a].size) > FishDB.value_of(inventory[b].id, inventory[b].size))
 	var n := guest_count(day)
 	var served := []
@@ -134,7 +158,7 @@ static func serve_regulars(day: int, inventory: Array) -> Dictionary:
 		if g >= order.size():
 			continue
 		var e: Dictionary = inventory[order[g]]
-		var price := dish_price(e.id, e.size)
+		var price := grill_price(e.id, e.size)
 		served.append({"guest": guest, "fish": e.id, "size": e.size, "price": price})
 		used.append(order[g])
 		sales += price
@@ -154,12 +178,11 @@ static func special_guest(day: int, flags = null) -> Dictionary:
 	return {"name": o.customer, "fish": o.fish}
 
 
-## 특별 손님 요리값: 별 하나당 더 받는다
-static func special_price(fish_id: String, size_cm: float, stars: int) -> int:
-	var base := dish_price(fish_id, size_cm)
-	return mini(SPECIAL_MAX, int(roundf(base * (0.8 + 0.3 * clampi(stars, 1, 3)) / 500.0) * 500.0))
+## 특별 손님 팁: 별이 많을수록 (음식값 × SPECIAL_TIP, SPECIAL_TIP_MAX까지)
+static func special_tip(price: int, stars: int) -> int:
+	return mini(SPECIAL_TIP_MAX, int(roundf(price * float(SPECIAL_TIP[clampi(stars, 1, 3) - 1]) / 100.0) * 100.0))
 
 
-## 보통 손님에게 내기엔 너무 비싼 생선인지 (시장에 파는 게 낫다)
+## 구이로는 제값을 못 받는 비싼 생선인지 (회로 내거나 시장에 파는 게 낫다)
 static func too_pricey(fish_id: String, size_cm: float) -> bool:
 	return dish_price(fish_id, size_cm) > REGULAR_MAX

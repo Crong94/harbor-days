@@ -3,7 +3,7 @@ extends RefCounted
 ## 이야기 목록 (2026-11-19 사용자: 퀘스트가 갑자기 생겨서 맥락이 없다. 메인과 서브로 나눠 달라)
 ##
 ## 세 갈래로 나눈다.
-## - 메인: 1막 줄기. 첫 손님 → 마을에 인사하기 → 첫 달 버티기. 한 번에 하나만 보인다
+## - 메인: 1막 줄기. 첫 손님 → 마을에 인사하기 → 네 번의 월요일 → 마을에 스며들다(StoryCh3) → 내 가게 만들기(대출 줄이기). 한 번에 하나만 보인다
 ## - 서브: 마을 사람 개인 이야기. 그 사람이 직접 부탁한 뒤에만 보인다 (부탁을 듣기 전에는 목록에 없다)
 ## - 오늘: 날마다 바뀌는 부탁. 가게 문 쪽지(Orders)와 마을회관 게시판(Board)
 ## 모든 줄에 who(누가)와 why(왜 하는지 한 줄)가 있다. 새 저장 값은 없고 flags와 GameState에서 그때그때 계산한다.
@@ -18,6 +18,12 @@ const GREET := [
 	["met_kyungja", "경자상회 할머니", "store", 3, "경자상회"],
 	["met_bokja", "밥집 사장님", "diner", 4, "복자네 밥집"],
 ]
+
+
+## 처음 버티는 주 수, 대출 고비 간격, 처음 대출
+const BEAR_WEEKS := 4
+const DEBT_STEP := 1_000_000
+const START_DEBT := 30_000_000
 
 
 ## 지금 보이는 이야기 전부 (메인, 서브, 오늘 순서)
@@ -55,17 +61,28 @@ static func main_quest(gs: Object) -> Dictionary:
 		return _q("main_greet", "main", "마을에 인사하기", "순덕 할머니",
 			"\"내일부턴 마을 사람들한테 얼굴도 좀 비추고. 장사는 인심이여.\"",
 			goal, "%d/%d" % [met, GREET.size()], next[2] if not next.is_empty() else "")
-	var first_due := Calendar.next_month_start(1) # 4월 1일
-	if int(gs.day) < first_due or int(gs.arrears) > 0:
-		var due := Loan.due(Calendar.next_month_start(int(gs.day)), int(gs.monthly_repayment), int(gs.arrears), int(gs.debt))
-		var goal2 := "%s까지 %s 모으기" % [Calendar.short_text(Calendar.next_month_start(int(gs.day))), _won(due)]
+	var weeks := (int(gs.day) - 1) / Loan.WEEK # 지나간 월요일 수
+	if weeks < BEAR_WEEKS or (int(gs.arrears) > 0 and not f.get("act1_done", false)):
+		var pay := Loan.next_pay_day(int(gs.day))
+		var due := Loan.due(pay, int(gs.monthly_repayment), int(gs.arrears), int(gs.debt))
+		var goal2 := "%s까지 %s 모으기 · 지금 %d%%" % [Calendar.text(pay), _won(due), clampi(int(100.0 * float(gs.money) / maxf(1.0, float(due))), 0, 100)]
 		if int(gs.arrears) > 0:
-			goal2 = "밀린 돈 %s 갚기" % _won(int(gs.arrears))
-		return _q("main_first_month", "main", "첫 달 버티기", "복자 사장님",
-			"\"망하지만 말고 버텨 봐.\" 매달 1일에 대출과 월세가 나간다.",
-			goal2, "%d%%" % clampi(int(100.0 * float(gs.money) / maxf(1.0, float(due))), 0, 100), "shop")
-	return _q("main_wait", "main", "1막 끝", "",
-		"첫 달을 버텼다. 마을 사람들도 {shop} 이름을 알기 시작했다.",
+			goal2 = "밀린 돈까지 %s 모으기 · %s" % [_won(due), Calendar.text(pay)]
+		return _q("main_first_month", "main", "네 번의 월요일", "복자 사장님",
+			"\"망하지만 말고 버텨 봐.\" 월요일마다 대출과 월세가 나간다.",
+			goal2, "%d/%d주" % [mini(weeks, BEAR_WEEKS), BEAR_WEEKS], "shop")
+	# 네 주를 버틴 뒤: 챕터 3 〈마을에 스며들다〉 (StoryCh3)
+	var st := StoryCh3.step(gs)
+	if not st.is_empty():
+		return _q("main_ch3_" + str(st.done), "main", st.title, st.who, st.why, st.goal, st.progress, st.target)
+	if int(gs.debt) > 0:
+		# 대출 반씩 줄여 가기: 다음 고비까지 얼마
+		var step := (int(gs.debt) - 1) / DEBT_STEP * DEBT_STEP
+		return _q("main_debt", "main", "내 가게 만들기", "나",
+			"이 가게가 온전히 {shop|이/가} 되는 날까지. 집에서 대출을 더 갚을 수 있다.",
+			"대출을 %s까지 줄이기 · 지금 %s" % [_won(step), _won(int(gs.debt))], "%d%%" % int(100.0 * (START_DEBT - int(gs.debt)) / START_DEBT), "home")
+	return _q("main_wait", "main", "온전한 내 가게", "",
+		"대출을 다 갚았다. 이제 {shop|은/는} 온전히 내 가게다.",
 		"다음 이야기는 준비 중이에요", "", "")
 
 
@@ -129,11 +146,13 @@ static func sub_quests(gs: Object) -> Array:
 			out.append(_q("sub_app_" + id, "sub", ap.title, Friends.person(ap.who).get("call", ap.who), ap.why,
 				"오늘은 했어요. 내일 이어서" if today_done else "앱 만들어 주기 · %s" % Locations.get_loc(ap.place).name,
 				"%d/%d" % [AppWork.stage(gs, id), ap.stages.size()], "" if today_done else ap.place))
-	# 새 메뉴 (Menu): 배운 요리는 시험 조리해서 메뉴판에 올린다
-	for id in Menu.to_test(gs.flags):
-		var r := Menu.recipe(id)
-		out.append(_q("sub_menu_" + id, "sub", "새 메뉴 " + str(r.name), Friends.person(r.who).get("call", r.who),
-			"\"%s\"" % str(r.tip), "낮에 식당에서 시험 조리 · %s" % Menu.needs_text(id), "", "shop"))
+	# 세라와 연구 (Menu): 아직 모르는 요리 가운데 지금 재료가 있는 것 하나
+	if gs.flags.get("sera_joined", false):
+		for id in Menu.unknown(gs.flags):
+			if Menu.can_research(gs, id):
+				out.append(_q("sub_menu_" + id, "sub", "세라와 요리 연구", "세라",
+					"\"재료만 주면 제가 해 볼게요.\"", "낮에 식당에서 새 요리 연구 · %s" % Menu.needs_text(id), "", "shop"))
+				break
 	return out
 
 

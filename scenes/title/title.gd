@@ -4,7 +4,7 @@ extends Control
 
 const NEXT_SCENE := "res://scenes/prologue/resignation.tscn"
 const MAP_SCENE := "res://scenes/map/map.tscn"
-const VERSION := "v0.3"
+const VERSION := "v0.5"
 
 var _bg: TextureRect
 var _new_armed := false
@@ -29,7 +29,7 @@ func _ready() -> void:
 	top.add_child(UiKit.shadowed(kicker, Color(0, 0, 0, 0.4), 1))
 	var title := UiKit.shadowed(UiKit.text("오늘의 바다", "display", Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER), Color(UiKit.NAVY_DEEP, 0.6), 4)
 	top.add_child(title)
-	var sub := UiKit.shadowed(UiKit.text("물때 맞춰 삽니다", "h1", UiKit.FOAM_SOFT, HORIZONTAL_ALIGNMENT_CENTER), Color(0, 0, 0, 0.4), 2)
+	var sub := UiKit.shadowed(UiKit.text("물때 맞춰 삽니다", "h1", Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER), Color(0, 0, 0, 0.4), 2)
 	sub.add_theme_font_override("font", UiKit.font("serif"))
 	sub.add_theme_font_size_override("font_size", 26)
 	top.add_child(sub)

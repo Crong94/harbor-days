@@ -14,11 +14,14 @@ config/name="오늘의 바다"
 config/description="오늘 잡은 물고기로 내일을 살아간다."
 run/main_scene="res://scenes/title/title.tscn"
 config/features=PackedStringArray("4.4", "GL Compatibility")
+config/quit_on_go_back=false
+config/icon="res://assets/art/app_icon.png"
 
 [autoload]
 
 GameState="*res://scripts/autoload/game_state.gd"
 Sound="*res://scripts/autoload/sound.gd"
+BackButton="*res://scripts/autoload/back_button.gd"
 
 [display]
 

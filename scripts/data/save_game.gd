@@ -10,7 +10,7 @@ extends RefCounted
 
 const PATH := "user://save.dat"
 const VERSION := 1
-const SKIP := ["vibration_on", "screen_shake_on"]
+const SKIP := ["vibration_on", "screen_shake_on", "fast_forward"]
 
 
 ## 저장할 변수 이름들
@@ -95,4 +95,7 @@ static func load_into(gs: Object, path := PATH) -> bool:
 	if d.is_empty():
 		return false
 	restore(gs, d)
+	# 예전 저장의 크릴 무제한(-1)은 창고 한 상자로 바꾼다 (11-24부터 크릴도 사서 쓴다)
+	if int(gs.baits.get(BaitDB.DEFAULT, 0)) < 0:
+		gs.baits[BaitDB.DEFAULT] = gs.START_KRILL
 	return true

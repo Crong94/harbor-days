@@ -128,6 +128,9 @@ static func weight_of(id: String, ctx: Dictionary) -> float:
 	w *= season_mult(id, int(ctx.get("month", 0)))
 	# 낚시터 (갯바위는 바위 고기와 감성돔이 잘 나온다. Spots)
 	w *= Spots.fish_mult(ctx.get("spot", "breakwater"), id)
+	# 오늘 떼로 들어온 고기 (SeaDay.school)
+	if ctx.get("school", "") == id:
+		w *= SeaDay.SCHOOL_MULT
 	# 연속 PERFECT 같은 버프
 	if f.rarity != "common":
 		w *= ctx.get("rare_boost", 1.0)

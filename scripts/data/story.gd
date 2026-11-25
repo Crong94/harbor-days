@@ -299,15 +299,32 @@ const SMALL_TALK := {
 		[{"speaker": "", "text": "운동장에 그네 하나와 녹슨 축구 골대가 있다. 교실 창문으로 책상 하나가 보인다."}],
 		[{"speaker": "김해솔", "face": "smile", "text": "아저씨! 오늘 받아쓰기 백 점 맞았어요. 학생이 저 혼자라 일 등도 저예요."}],
 	],
+	"guesthouse": [
+		[{"speaker": "", "text": "마당 빨랫줄에 이불이 펄럭인다. 지붕에서 망치 소리가 난다."}],
+	],
+	"lab": [
+		[{"speaker": "한서윤", "text": "수온이 어제보다 조금 올랐어요."}],
+	],
 	"shop": [
 		[{"speaker": "", "text": "{shop}. 의자 다리는 아직 흔들리지만 테이블은 반짝반짝 닦아 두었다."}],
 	],
 }
 
 
+## 모든 사건: 첫 주부터의 마을 이야기 뒤에 챕터 3 (StoryCh3)
+static func all() -> Array:
+	return EVENTS + StoryCh3.EVENTS
+
+
+## 아이스박스를 봐야 아는 조건을 표시로 바꾼다 (지도가 장소를 고르거나 갈 때 부른다)
+static func sync(gs: Object) -> void:
+	gs.flags["ready_feast"] = StoryCh3.kinds(gs.inventory) >= StoryCh3.FEAST_KINDS
+	gs.flags["ready_lunch"] = gs.inventory.size() >= StoryCh3.LUNCH_FISH
+
+
 ## 이 장소에서 지금 나올 사건. 없으면 빈 Dictionary
 static func pending(place: String, day: int, minutes: int, flags: Dictionary) -> Dictionary:
-	for ev in EVENTS:
+	for ev in all():
 		if ev.place != place or day < ev.day or flags.get("ev_" + ev.id, false):
 			continue
 		var ok := true
@@ -324,11 +341,24 @@ static func pending(place: String, day: int, minutes: int, flags: Dictionary) ->
 
 
 ## 사건을 본 것으로 표시하고 결과(flags, 돈)를 넣는다
-static func finish(ev: Dictionary, gs: Object) -> void:
+## pick: 고르는 사건(choice)에서 고른 번호
+static func finish(ev: Dictionary, gs: Object, pick := -1) -> void:
 	gs.flags["ev_" + ev.id] = true
 	gs.flags["evday_" + ev.id] = int(gs.day)
+	_apply(ev, gs)
+	if pick >= 0 and pick < ev.get("choice", []).size():
+		_apply(ev.choice[pick], gs)
+
+
+## 켤 표시, 돈, 평판, 친밀도, 가져갈 생선, 일지 메모
+static func _apply(ev: Dictionary, gs: Object) -> void:
 	for f in ev.get("set", []):
 		gs.flags[f] = true
+	if ev.has("take"):
+		StoryCh3.take(gs, ev.take)
+	gs.reputation += int(ev.get("rep", 0))
+	for n in ev.get("friend", {}):
+		gs.friendship[n] = clampi(int(gs.friendship.get(n, 0)) + int(ev.friend[n]), 0, Friends.HEART * Friends.MAX_HEARTS)
 	if int(ev.get("money", 0)) > 0:
 		gs.earn(int(ev.money))
 	if ev.has("note"):
